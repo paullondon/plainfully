@@ -1,0 +1,48 @@
+# ------------------------
+# OS / Editor
+# ------------------------
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.vscode/
+.idea/
+
+# ------------------------
+# Composer / PHP
+# ------------------------
+vendor/
+composer.lock
+
+# ------------------------
+# Environment / Security
+# ------------------------
+.env
+.env.*
+.env.local
+.env.backup
+*.key
+*.pem
+
+# ------------------------
+# Logs / Cache / Temp
+# ------------------------
+storage/
+cache/
+*.log
+php_errors.log
+
+# ------------------------
+# System / Build
+# ------------------------
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# ------------------------
+# Project Specific
+# ------------------------
+/public/uploads/*
+/public/storage/*
+/sql/dumps/*
+tools/debug_tokens/*
