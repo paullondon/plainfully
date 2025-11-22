@@ -95,13 +95,17 @@ function handle_magic_verify(): void
 
     $showDebug = function ($title, $msg) use ($debug) {
     if (!$debug) {
-        $_SESSION['magic_link_error'] = "Your sign-in link is no longer valid. Please request a new one.";
-        pf_redirect('/login');
+        ob_start();
+        require __DIR__ . '/../views/auth_invalid_link.php';
+        $inner = ob_get_clean();
+        pf_render_shell('Link invalid', $inner);
+        exit;
     }
-    pf_render_shell($title, '<pre>' . htmlspecialchars($msg) . '</pre>');
+
+    // Debug mode (dev only)
+    pf_render_shell($title, '<pre>' . htmlspecialchars($msg, ENT_QUOTES, 'UTF-8') . '</pre>');
     exit;
     };
-
 
     if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
         $showDebug('Invalid', 'Must be GET.');
