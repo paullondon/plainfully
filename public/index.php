@@ -104,6 +104,7 @@ require dirname(__DIR__) . '/app/auth/magic_link.php';
 require dirname(__DIR__) . '/app/controllers/main_controller.php';
 require dirname(__DIR__) . '/app/views/render.php';
 require dirname(__DIR__) . '/routes/web.php';
+require dirname(__DIR__) . '/app/controllers/health_controller.php';
 
 // ---------------------------------------------------------
 // 5. Small helper functions
@@ -205,46 +206,6 @@ function pf_send_magic_link_email(string $toEmail, string $link): bool
         . "If you did not request this, you can ignore this email.\n";
 
     return pf_send_email($toEmail, $subject, $body);
-}
-
-// ---------------------------------------------------------
-// 6. Route handlers
-// ---------------------------------------------------------
-
-function handle_health(array $config): void
-{
-    $debugToken = getenv('DEBUG_TOKEN') ?: '';
-    $token      = $_GET['token'] ?? '';
-
-    if ($debugToken === '' || $token !== $debugToken) {
-        http_response_code(404);
-        echo 'Not found';
-        return;
-    }
-
-    $status = [
-        'app_env'   => $config['app']['env'] ?? 'unknown',
-        'db_ok'     => false,
-        'turnstile' => [
-            'site_key_set'   => !empty($config['security']['turnstile_site_key']),
-            'secret_set'     => !empty($config['security']['turnstile_secret_key']),
-        ],
-        'mail'      => [
-            'from_email_set' => !empty($config['mail']['from_email']),
-            'smtp_host_set'  => !empty($config['smtp']['host']),
-        ],
-    ];
-
-    try {
-        $pdo = pf_db();
-        $pdo->query('SELECT 1');
-        $status['db_ok'] = true;
-    } catch (Throwable $e) {
-        $status['db_ok'] = false;
-    }
-
-    header('Content-Type: application/json; charset=utf-8');
-    echo json_encode($status, JSON_PRETTY_PRINT);
 }
 
 // ---------------------------------------------------------
