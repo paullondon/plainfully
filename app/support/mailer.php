@@ -6,14 +6,49 @@
  * PHPMailer wrapper for Plainfully.
  *
  * Expects:
- *  - vendor/autoload.php (Composer, with PHPMailer installed)
+ *  - PHPMailer source files to exist under app/support/phpmailer/src
+ *    (PHPMailer.php, SMTP.php, Exception.php)
  *  - MAIL_* env vars as per your .env (host, port, user, pass, etc.)
  */
 
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
 
-require_once __DIR__ . '/../../vendor/autoload.php';
+// ---------------------------------------------------------
+// Load PHPMailer classes without Composer
+// ---------------------------------------------------------
+
+if (!class_exists(PHPMailer::class)) {
+    // Adjust this if your PHPMailer lives somewhere else.
+    // Assumption: app/support/phpmailer/src/{PHPMailer,SMTP,Exception}.php
+    $base = __DIR__ . '/phpmailer/src';
+
+    $files = [
+        $base . '/Exception.php',
+        $base . '/PHPMailer.php',
+        $base . '/SMTP.php',
+    ];
+
+    foreach ($files as $file) {
+        if (is_readable($file)) {
+            require_once $file;
+        }
+    }
+}
+
+if (!class_exists(PHPMailer::class)) {
+    // Fail loudly in non-Live, and cleanly in Live
+    $env = getenv('APP_ENV') ?: 'local';
+    $msg = 'PHPMailer is not available. '
+         . 'Ensure it is copied to app/support/phpmailer/src or install via Composer.';
+
+    if (strtolower($env) === 'live' || strtolower($env) === 'production') {
+        // In Live you might want to log this instead
+        throw new RuntimeException($msg);
+    } else {
+        throw new RuntimeException($msg);
+    }
+}
 
 /**
  * Send an email via PHPMailer, using config/app.php + .env.
@@ -58,7 +93,7 @@ function pf_send_email(string $toEmail, string $subject, string $body): bool
         // Content
         $mailer->Subject = $subject;
         $mailer->Body    = $body;
-        $mailer->isHTML(false); // plain-text for now
+        $mailer->isHTML(false); // plain text for now
 
         $mailer->send();
         return true;
