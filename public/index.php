@@ -101,6 +101,7 @@ require dirname(__DIR__) . '/app/auth/login.php';
 require dirname(__DIR__) . '/app/auth/magic_link.php';
 require dirname(__DIR__) . '/app/controllers/main_controller.php';
 require dirname(__DIR__) . '/app/views/render.php';
+require dirname(__DIR__) . '/routes/web.php';
 
 // ---------------------------------------------------------
 // 5. Small helper functions
@@ -258,39 +259,24 @@ if ($path !== '/' && str_ends_with($path, '/')) {
     $path = rtrim($path, '/');
 }
 
-switch (true) {
-    case $path === '/' && $method === 'GET':
-        require_login();   // ✅ must be logged in to see /
-        handle_welcome();
-        break;
+$routes = pf_register_routes();
 
-    case $path === '/login' && $method === 'GET':
-        require_guest();
-        handle_login_form($config);
-        break;
+$matched = false;
 
-    case $path === '/magic/request' && $method === 'POST':
-        require_guest();
-        handle_magic_request($config);
-        break;
-
-    case $path === '/magic/verify' && $method === 'GET':
-        require_guest();
-        handle_magic_verify();
-        break;
-
-    case $path === '/logout' && $method === 'POST':
-        require_login();   // ✅ must be logged in to see /
-        handle_logout();
-        break;
-
-    case $path === '/health' && $method === 'GET':
-        require_guest();
-        handle_health($config);
-        break;
-
-    default:
-        http_response_code(404);
-        pf_render_shell('Not found', '<h1 class="pf-auth-title">404</h1><p class="pf-auth-subtitle">Page not found.</p>');
-        break;
+foreach ($routes as $route) {
+    if ($route['method'] === $method && $route['path'] === $path) {
+        $matched = true;
+        ($route['action'])();     // call the closure
+        exit;
+    }
 }
+
+if (!$matched) {
+    http_response_code(404);
+    pf_render_shell(
+        'Not found',
+        '<h1 class="pf-auth-title">404</h1>
+         <p class="pf-auth-subtitle">Page not found.</p>'
+    );
+}
+

@@ -94,10 +94,14 @@ function handle_magic_verify(): void
     $debug = !in_array(strtolower($env), ['live', 'production'], true);
 
     $showDebug = function ($title, $msg) use ($debug) {
-        if (!$debug) pf_redirect('/login');
-        pf_render_shell($title, '<pre>' . htmlspecialchars($msg) . '</pre>');
-        exit;
+    if (!$debug) {
+        $_SESSION['magic_link_error'] = "Your sign-in link is no longer valid. Please request a new one.";
+        pf_redirect('/login');
+    }
+    pf_render_shell($title, '<pre>' . htmlspecialchars($msg) . '</pre>');
+    exit;
     };
+
 
     if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
         $showDebug('Invalid', 'Must be GET.');
