@@ -420,15 +420,31 @@ function handle_magic_request(array $config): void
 
 function handle_magic_verify(): void
 {
+    $env   = getenv('APP_ENV') ?: 'local';
+    $debug = !in_array(strtolower($env), ['live', 'production'], true);
+
+    $showDebug = function (string $title, string $message) use ($debug): void {
+        if (!$debug) {
+            pf_redirect('/login');
+        }
+        $inner = '
+            <h1 class="pf-auth-title">' . htmlspecialchars($title, ENT_QUOTES, 'UTF-8') . '</h1>
+            <p class="pf-auth-subtitle">' . htmlspecialchars($message, ENT_QUOTES, 'UTF-8') . '</p>
+            <p class="pf-note"><a href="/login">Back to login</a></p>
+        ';
+        pf_render_shell('Magic link issue', $inner);
+        exit;
+    };
+
     if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
-        pf_redirect('/');
+        $showDebug('Invalid request', 'Magic link must be opened via GET request.');
     }
 
     $token = $_GET['token'] ?? '';
     $token = trim($token);
 
     if ($token === '') {
-        pf_redirect('/login');
+        $showDebug('Missing token', 'No token was provided in the URL.');
     }
 
     $tokenHash = hash('sha256', $token);
@@ -447,19 +463,18 @@ function handle_magic_verify(): void
         $row = $stmt->fetch();
 
         if (!$row) {
-            pf_redirect('/login');
+            $showDebug('Token not found', 'We could not find this magic link token in the database. It may have been deleted or never created.');
         }
 
-        // Check expiry and single-use
         if ($row['consumed_at'] !== null) {
-            pf_redirect('/login');
+            $showDebug('Token already used', 'This magic link has already been used once. For security, links are single-use only.');
         }
 
-        $now      = new DateTimeImmutable('now');
-        $expires  = new DateTimeImmutable($row['expires_at']);
+        $now     = new DateTimeImmutable('now');
+        $expires = new DateTimeImmutable($row['expires_at']);
 
         if ($now > $expires) {
-            pf_redirect('/login');
+            $showDebug('Token expired', 'This magic link has expired. Please request a new one.');
         }
 
         // Mark token as consumed
@@ -475,12 +490,12 @@ function handle_magic_verify(): void
         $_SESSION['user_id'] = (int)$row['user_id'];
 
     } catch (Throwable $e) {
-        // TODO: log $e
-        pf_redirect('/login');
+        $showDebug('Verification error', 'An internal error occurred while verifying the link.');
     }
 
     pf_redirect('/');
 }
+
 
 function handle_logout(): void
 {
