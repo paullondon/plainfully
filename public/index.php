@@ -490,8 +490,14 @@ function handle_magic_verify(): void
         $_SESSION['user_id'] = (int)$row['user_id'];
 
     } catch (Throwable $e) {
-        $showDebug('Verification error', 'An internal error occurred while verifying the link.');
+        $showDebug(
+            'Verification error',
+            'Exception: ' . $e->getMessage()
+            . "\n\nFile: " . $e->getFile()
+            . "\nLine: " . $e->getLine()
+        );
     }
+
 
     pf_redirect('/');
 }
