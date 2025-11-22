@@ -1,5 +1,14 @@
-# Basic front-controller friendly settings if you want later.
-# For now, just ensure UTF-8 and no directory listings.
-
 Options -Indexes
 AddDefaultCharset utf-8
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # If the request is for an existing file or directory, serve it directly
+    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^ - [L]
+
+    # Otherwise, send everything to index.php (front controller)
+    RewriteRule ^ index.php [QSA,L]
+</IfModule>
