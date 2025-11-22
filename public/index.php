@@ -100,6 +100,7 @@ require dirname(__DIR__) . '/app/support/auth_middleware.php';
 require dirname(__DIR__) . '/app/auth/login.php';
 require dirname(__DIR__) . '/app/auth/magic_link.php';
 require dirname(__DIR__) . '/app/controllers/main_controller.php';
+require dirname(__DIR__) . '/app/views/render.php';
 
 // ---------------------------------------------------------
 // 5. Small helper functions
@@ -109,32 +110,6 @@ function pf_redirect(string $path, int $status = 302): never
 {
     header('Location: ' . $path, true, $status);
     exit;
-}
-
-/**
- * Render a simple HTML page shell with a central card.
- */
-function pf_render_shell(string $title, string $innerHtml): void
-{
-    ?>
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <title><?= htmlspecialchars($title, ENT_QUOTES, 'UTF-8') ?></title>
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <link rel="stylesheet" href="/assets/css/app.css">
-        <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
-    </head>
-    <body>
-    <main class="pf-auth-shell">
-        <section class="pf-auth-card">
-            <?= $innerHtml ?>
-        </section>
-    </main>
-    </body>
-    </html>
-    <?php
 }
 
 /**
