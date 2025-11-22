@@ -334,7 +334,7 @@ if ($path !== '/' && str_ends_with($path, '/')) {
 
 switch (true) {
     case $path === '/' && $method === 'GET':
-        require_guest();
+        require_login();   // ✅ must be logged in to see /
         handle_welcome();
         break;
 
