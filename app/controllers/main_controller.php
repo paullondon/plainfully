@@ -12,25 +12,17 @@ function handle_welcome(): void
 {
     $userId = $_SESSION['user_id'] ?? null;
 
-    if ($userId) {
-        $inner = '
-            <h1 class="pf-auth-title">Plainfully</h1>
-            <p class="pf-auth-subtitle">
-                You’re signed in. (User ID: ' . (int)$userId . ')
-            </p>
-            <form method="post" action="/logout">
-                <button type="submit" class="pf-button">Sign out</button>
-            </form>
-        ';
-    } else {
-        $inner = '
-            <h1 class="pf-auth-title">Welcome to Plainfully</h1>
-            <p class="pf-auth-subtitle">
-                You’re not logged in yet. Use a magic link to sign in.
-            </p>
-            <a class="pf-button" href="/login">Go to login</a>
-        ';
+    // If not logged in, this should never be called because require_login() blocks it.
+    if (!$userId) {
+        pf_redirect('/login');
     }
+
+    // make user available to the view
+    $userId = (int)$userId;
+
+    ob_start();
+    require __DIR__ . '/../views/home.php';
+    $inner = ob_get_clean();
 
     pf_render_shell('Plainfully', $inner);
 }
