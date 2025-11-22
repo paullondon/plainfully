@@ -1,0 +1,5 @@
+# Basic front-controller friendly settings if you want later.
+# For now, just ensure UTF-8 and no directory listings.
+
+Options -Indexes
+AddDefaultCharset utf-8
