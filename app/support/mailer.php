@@ -36,11 +36,9 @@ if (!class_exists(PHPMailer::class)) {
 }
 
 if (!class_exists(PHPMailer::class)) {
-    $env = getenv('APP_ENV') ?: 'local';
     $msg = 'PHPMailer is not available. '
          . 'Ensure PHPMailer.php, SMTP.php and Exception.php '
          . 'exist in app/support/phpmailer on the server.';
-
     throw new RuntimeException($msg);
 }
 
@@ -92,7 +90,16 @@ function pf_send_email(string $toEmail, string $subject, string $body): bool
         $mailer->send();
         return true;
     } catch (Exception $e) {
-        // In production: log $e->getMessage() somewhere safe
-        return false;
+        // In Live: fail quietly, just return false
+        $env = getenv('APP_ENV') ?: 'local';
+        if (in_array(strtolower($env), ['live', 'production'], true)) {
+            // TODO: log $e->getMessage()
+            return false;
+        }
+
+        // In local/dev: throw with detailed info so we can see the cause
+        throw new RuntimeException(
+            'Mail send failed: ' . $e->getMessage()
+        );
     }
 }
