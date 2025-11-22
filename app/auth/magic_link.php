@@ -93,14 +93,14 @@ function handle_magic_verify(): void
     $env = getenv('APP_ENV') ?: 'local';
     $debug = !in_array(strtolower($env), ['live', 'production'], true);
 
-    $showDebug = function ($title, $msg) use ($debug) {
-    if (!$debug) {
+    $showDebug = function () {
         ob_start();
         require __DIR__ . '/../views/auth_invalid_link.php';
         $inner = ob_get_clean();
         pf_render_shell('Link invalid', $inner);
         exit;
-    }
+    };
+
 
     // Debug mode (dev only)
     pf_render_shell($title, '<pre>' . htmlspecialchars($msg, ENT_QUOTES, 'UTF-8') . '</pre>');

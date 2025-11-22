@@ -2,17 +2,11 @@
 
 require dirname(__DIR__) . '/bootstrap/app.php';
 
-// 7. Very small router
-$method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
-$path   = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
+$method = pf_request_method();
+$path   = pf_request_path();
 
 // 🔐 GLOBAL SESSION SECURITY
 pf_verify_session_security();
-
-// Normalise trailing slash
-if ($path !== '/' && str_ends_with($path, '/')) {
-    $path = rtrim($path, '/');
-}
 
 // Run router
 $routes = pf_register_routes();
