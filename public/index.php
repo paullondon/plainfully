@@ -95,6 +95,8 @@ $config = require dirname(__DIR__) . '/config/app.php';
 require dirname(__DIR__) . '/app/support/db.php';
 require dirname(__DIR__) . '/app/support/mailer.php';
 require dirname(__DIR__) . '/app/support/rate_limiter.php';
+require dirname(__DIR__) . '/app/support/session_hardening.php';
+require dirname(__DIR__) . '/app/support/auth_middleware.php';
 
 // ---------------------------------------------------------
 // 5. Small helper functions
@@ -484,10 +486,14 @@ function handle_magic_verify(): void
              WHERE id = :id'
         );
         $update->execute([':id' => $row['id']]);
-
+z
         // Log user in
         session_regenerate_id(true);
         $_SESSION['user_id'] = (int)$row['user_id'];
+        $_SESSION['pf_fingerprint'] = pf_generate_fingerprint();
+        $_SESSION['pf_ip_prefix']   = implode('.', array_slice(explode('.', $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0'), 0, 3));
+        $_SESSION['pf_last_active'] = time();
+        $_SESSION['pf_created_at']  = time();
 
     } catch (Throwable $e) {
         $showDebug(
@@ -568,6 +574,9 @@ function handle_health(array $config): void
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $path   = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
 
+// 🔐 GLOBAL SESSION SECURITY (only affects logged-in users)
+pf_verify_session_security();
+
 // Normalise trailing slash (except root)
 if ($path !== '/' && str_ends_with($path, '/')) {
     $path = rtrim($path, '/');
@@ -575,18 +584,22 @@ if ($path !== '/' && str_ends_with($path, '/')) {
 
 switch (true) {
     case $path === '/' && $method === 'GET':
+        require_guest();
         handle_welcome();
         break;
 
     case $path === '/login' && $method === 'GET':
+        require_guest();
         handle_login_form($config);
         break;
 
     case $path === '/magic/request' && $method === 'POST':
+        require_guest();
         handle_magic_request($config);
         break;
 
     case $path === '/magic/verify' && $method === 'GET':
+        require_guest();
         handle_magic_verify();
         break;
 
@@ -595,6 +608,7 @@ switch (true) {
         break;
 
     case $path === '/health' && $method === 'GET':
+        require_guest();
         handle_health($config);
         break;
 
