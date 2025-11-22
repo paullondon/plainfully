@@ -13,7 +13,8 @@ function pf_db(): PDO
         return $pdo;
     }
 
-    $config = require dirname(__DIR__) . '/config/app.php';
+    // NOTE: support/ → app/ → project root → config/app.php
+    $config = require __DIR__ . '/../../config/app.php';
 
     $dsn  = $config['db']['dsn']  ?? '';
     $user = $config['db']['user'] ?? '';
