@@ -51,9 +51,11 @@ set_error_handler(function (int $severity, string $message, string $file, int $l
 set_exception_handler(function (Throwable $e): void {
     // TODO: log to file / monitoring here
     http_response_code(500);
-    echo '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Plainfully – Error</title></head><body>';
-    echo '<h1>Something went wrong</h1>';
-    echo '<p>Please try again in a moment.</p>';
+    ob_start();
+    require dirname(__DIR__) . '/app/views/errors/500.php';
+    $inner = ob_get_clean();
+    pf_render_shell('Error', $inner);
+
     // In non-live envs, show message for debugging
     $env = getenv('APP_ENV') ?: 'local';
     if (strtolower($env) !== 'live' && strtolower($env) !== 'production') {
@@ -273,10 +275,10 @@ foreach ($routes as $route) {
 
 if (!$matched) {
     http_response_code(404);
-    pf_render_shell(
-        'Not found',
-        '<h1 class="pf-auth-title">404</h1>
-         <p class="pf-auth-subtitle">Page not found.</p>'
-    );
+    ob_start();
+    require dirname(__DIR__) . '/app/views/errors/404.php';
+    $inner = ob_get_clean();
+
+    pf_render_shell('Not Found', $inner);
 }
 
