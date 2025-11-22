@@ -99,6 +99,7 @@ require dirname(__DIR__) . '/app/support/session_hardening.php';
 require dirname(__DIR__) . '/app/support/auth_middleware.php';
 require dirname(__DIR__) . '/app/auth/login.php';
 require dirname(__DIR__) . '/app/auth/magic_link.php';
+require dirname(__DIR__) . '/app/controllers/main_controller.php';
 
 // ---------------------------------------------------------
 // 5. Small helper functions
@@ -232,56 +233,6 @@ function pf_send_magic_link_email(string $toEmail, string $link): bool
 // 6. Route handlers
 // ---------------------------------------------------------
 
-function handle_welcome(): void
-{
-    $userId = $_SESSION['user_id'] ?? null;
-
-    if ($userId) {
-        $inner = '
-            <h1 class="pf-auth-title">Plainfully</h1>
-            <p class="pf-auth-subtitle">
-                You’re signed in. (User ID: ' . (int)$userId . ')
-            </p>
-            <form method="post" action="/logout">
-                <button type="submit" class="pf-button">Sign out</button>
-            </form>
-        ';
-    } else {
-        $inner = '
-            <h1 class="pf-auth-title">Welcome to Plainfully</h1>
-            <p class="pf-auth-subtitle">
-                You’re not logged in yet. Use a magic link to sign in.
-            </p>
-            <a class="pf-button" href="/login">Go to login</a>
-        ';
-    }
-
-    pf_render_shell('Plainfully', $inner);
-}
-
-function handle_logout(): void
-{
-    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-        pf_redirect('/');
-    }
-
-    $_SESSION = [];
-    if (ini_get('session.use_cookies')) {
-        $params = session_get_cookie_params();
-        setcookie(
-            session_name(),
-            '',
-            time() - 42000,
-            $params['path'],
-            $params['domain'],
-            $params['secure'],
-            $params['httponly']
-        );
-    }
-    session_destroy();
-    pf_redirect('/login');
-}
-
 function handle_health(array $config): void
 {
     $debugToken = getenv('DEBUG_TOKEN') ?: '';
@@ -354,6 +305,7 @@ switch (true) {
         break;
 
     case $path === '/logout' && $method === 'POST':
+        require_login();   // ✅ must be logged in to see /
         handle_logout();
         break;
 
