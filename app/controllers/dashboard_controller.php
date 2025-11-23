@@ -2,21 +2,27 @@
 
 function handle_dashboard(): void
 {
-    // Ensure logged in
-    if (!isset($_SESSION['user_id'])) {
-        pf_redirect('/login');
-    }
+    // Basic placeholder HTML
+    $html = '
+        <h1 class="pf-page-title">Welcome to your dashboard</h1>
+        <p class="pf-page-subtitle">
+            You are now signed in and ready to use Plainfully.
+        </p>
 
-    $userId = $_SESSION['user_id'];
+        <div class="pf-dashboard-cards">
+            <div class="pf-card">
+                <h2>New clarification</h2>
+                <p>Create a new plain-English breakdown.</p>
+                <a href="#" class="pf-button">Create</a>
+            </div>
 
-    // In the future: fetch user profile, settings, etc.
-    $data = [
-        'userId' => $userId,
-    ];
+            <div class="pf-card">
+                <h2>Your history</h2>
+                <p>View all your previous clarifications.</p>
+                <a href="#" class="pf-button">Open</a>
+            </div>
+        </div>
+    ';
 
-    ob_start();
-    require dirname(__DIR__, 2) . '/app/views/dashboard.php';
-    $inner = ob_get_clean();
-
-    pf_render_shell('Dashboard', $inner, $data);
+    pf_render_shell('Dashboard', $html);
 }

@@ -115,6 +115,7 @@ require dirname(__DIR__) . '/app/support/request.php';
 // controllers
 require dirname(__DIR__) . '/app/controllers/main_controller.php';
 require dirname(__DIR__) . '/app/controllers/health_controller.php';
+require dirname(__DIR__) . '/app/controllers/dashboard_controller.php';
 
 // auth
 require dirname(__DIR__) . '/app/auth/login.php';
