@@ -1,31 +1,11 @@
 <?php declare(strict_types=1);
 
+/**
+ * Plainfully – front controller
+ *
+ * All web requests come through here and are bootstrapped
+ * by /bootstrap/app.php, which loads config, helpers,
+ * controllers and routes/web.php.
+ */
+
 require dirname(__DIR__) . '/bootstrap/app.php';
-
-$method = pf_request_method();
-$path   = pf_request_path();
-
-// 🔐 GLOBAL SESSION SECURITY
-pf_verify_session_security();
-
-// Run router
-$routes = pf_register_routes();
-$matched = false;
-
-foreach ($routes as $route) {
-    if ($route['method'] === $method && $route['path'] === $path) {
-        $matched = true;
-        ($route['action'])();
-        exit;
-    }
-}
-
-if (!$matched) {
-    http_response_code(404);
-
-    ob_start();
-    require dirname(__DIR__) . '/app/views/errors/404.php';
-    $inner = ob_get_clean();
-
-    pf_render_shell('Not Found', $inner);
-}
