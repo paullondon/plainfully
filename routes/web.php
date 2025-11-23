@@ -1,87 +1,96 @@
 <?php declare(strict_types=1);
 
 /**
- * Web Routes for Plainfully
+ * Plainfully – main router
  *
- * Each route maps a path + HTTP method
- * to a controller function.
+ * Handles:
+ *  - GET  /            → redirect to /dashboard (if logged in)
+ *  - GET  /login       → magic-link login form
+ *  - POST /login       → request magic link
+ *  - GET  /magic/verify→ verify magic link
+ *  - POST /logout      → logout
+ *  - GET  /dashboard   → main app dashboard
+ *  - GET  /health      → health check
  */
 
-function pf_register_routes(): array
-{
-    return [
+// HTTP method + path
+$method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+$path   = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
 
-        // Home (logged-in)
-        [
-            'method' => 'GET',
-            'path'   => '/',
-            'action' => function() {
-                require_login();
-                pf_redirect('/dashboard');;
-            },
-        ],
+// 🔐 Global session security (only affects logged-in users)
+pf_verify_session_security();
 
-        // Login page
-        [
-            'method' => 'GET',
-            'path'   => '/login',
-            'action' => function() {
-                require_guest();
-                handle_login_form($GLOBALS['config']);
-            },
-        ],
+// Normalise trailing slash (except root)
+if ($path !== '/' && str_ends_with($path, '/')) {
+    $path = rtrim($path, '/');
+}
 
-        // Magic link request
-        [
-            'method' => 'POST',
-            'path'   => '/magic/request',
-            'action' => function() {
-                require_guest();
-                handle_magic_request($GLOBALS['config']);
-            },
-        ],
+switch (true) {
 
-        // Magic link verify
-        [
-            'method' => 'GET',
-            'path'   => '/magic/verify',
-            'action' => function() {
-                require_guest();
-                handle_magic_verify();
-            },
-        ],
+    // -------------------------------------------------
+    // Home → redirect to dashboard (must be logged in)
+    // -------------------------------------------------
+    case $path === '/' && $method === 'GET':
+        require_login();
+        pf_redirect('/dashboard');
+        break;
 
-        // Logout
-        [
-            'method' => 'POST',
-            'path'   => '/logout',
-            'action' => function() {
-                require_login();
-                handle_logout();
-            },
-        ],
+    // -------------------------------------------------
+    // Login form (guest only)
+    // -------------------------------------------------
+    case $path === '/login' && $method === 'GET':
+        require_guest();
+        handle_login_form($config);
+        break;
 
-        // Health check
-        [
-            'method' => 'GET',
-            'path'   => '/health',
-            'action' => function() {
-                require_guest();
-                handle_health($GLOBALS['config']);
-            },
-        ],
+    // -------------------------------------------------
+    // Magic link request (POST /login)
+    // -------------------------------------------------
+    case $path === '/login' && $method === 'POST':
+        require_guest();
+        handle_magic_request($config);
+        break;
 
-        // dashboard
-        [
-            'method' => 'GET',
-            'path'   => '/dashboard',
-            'action' => function () {
-                require_login();
-                handle_dashboard();
-            }
-        ],
+    // -------------------------------------------------
+    // Magic link verification
+    // -------------------------------------------------
+    case $path === '/magic/verify' && $method === 'GET':
+        require_guest();
+        handle_magic_verify();
+        break;
 
+    // -------------------------------------------------
+    // Dashboard (logged-in only)
+    // -------------------------------------------------
+    case $path === '/dashboard' && $method === 'GET':
+        require_login();
+        handle_dashboard();
+        break;
 
-// new routes abover here
-    ];
+    // -------------------------------------------------
+    // Logout
+    // -------------------------------------------------
+    case $path === '/logout' && $method === 'POST':
+        require_login();
+        handle_logout();
+        break;
+
+    // -------------------------------------------------
+    // Health check
+    // -------------------------------------------------
+    case $path === '/health' && $method === 'GET':
+        require_guest();
+        handle_health($config);
+        break;
+
+    // -------------------------------------------------
+    // 404 fallback
+    // -------------------------------------------------
+    default:
+        http_response_code(404);
+        pf_render_shell(
+            'Not found',
+            '<h1 class="pf-auth-title">404</h1><p class="pf-auth-subtitle">Page not found.</p>'
+        );
+        break;
 }
