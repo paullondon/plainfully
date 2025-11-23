@@ -6,11 +6,11 @@ function handle_magic_request(array $config): void
         pf_redirect('/login');
     }
 
-    $baseUrl = rtrim($config['app']['base_url'], '/');
+    $baseUrl   = rtrim($config['app']['base_url'], '/');
     $ttlMinutes = (int)($config['auth']['magic_link_ttl_minutes'] ?? 30);
 
     $emailRaw = $_POST['email'] ?? '';
-    $email = pf_normalise_email($emailRaw);
+    $email    = pf_normalise_email($emailRaw);
 
     if ($email === null) {
         $_SESSION['magic_link_error'] = 'Please enter a valid email address.';
@@ -38,8 +38,8 @@ function handle_magic_request(array $config): void
         // user find/create
         $stmt = $pdo->prepare('SELECT id FROM users WHERE email = :email LIMIT 1');
         $stmt->execute([':email' => $email]);
-        $user = $stmt->fetch();
-        $userId = $user ? (int) $user['id'] : null;
+        $user   = $stmt->fetch();
+        $userId = $user ? (int)$user['id'] : null;
 
         if (!$userId) {
             $stmt = $pdo->prepare('INSERT INTO users (email) VALUES (:email)');
@@ -48,10 +48,10 @@ function handle_magic_request(array $config): void
         }
 
         // magic token
-        $rawToken = pf_generate_magic_token();
+        $rawToken  = pf_generate_magic_token();
         $tokenHash = hash('sha256', $rawToken);
         $expiresAt = (new DateTimeImmutable("+{$ttlMinutes} minutes"))->format('Y-m-d H:i:s');
-        $agent = $_SERVER['HTTP_USER_AGENT'] ?? '';
+        $agent     = $_SERVER['HTTP_USER_AGENT'] ?? '';
 
         $insert = $pdo->prepare(
             'INSERT INTO magic_login_tokens
@@ -61,11 +61,11 @@ function handle_magic_request(array $config): void
         );
 
         $insert->execute([
-            ':user_id' => $userId,
+            ':user_id'    => $userId,
             ':token_hash' => $tokenHash,
             ':expires_at' => $expiresAt,
-            ':ip' => $ip,
-            ':agent' => mb_substr($agent, 0, 255)
+            ':ip'         => $ip,
+            ':agent'      => mb_substr($agent, 0, 255),
         ]);
 
         $pdo->commit();
@@ -90,10 +90,8 @@ function handle_magic_request(array $config): void
 
 function handle_magic_verify(): void
 {
-    $env = getenv('APP_ENV') ?: 'local';
-    $debug = !in_array(strtolower($env), ['live', 'production'], true);
-
-    $showDebug = function () {
+    // Always use friendly page for invalid/expired/used links
+    $showDebug = function (string $title, string $msg): void {
         ob_start();
         require __DIR__ . '/../views/auth_invalid_link.php';
         $inner = ob_get_clean();
@@ -101,18 +99,14 @@ function handle_magic_verify(): void
         exit;
     };
 
-
-    // Debug mode (dev only)
-    pf_render_shell($title, '<pre>' . htmlspecialchars($msg, ENT_QUOTES, 'UTF-8') . '</pre>');
-    exit;
-    };
-
     if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
         $showDebug('Invalid', 'Must be GET.');
     }
 
     $token = trim($_GET['token'] ?? '');
-    if ($token === '') $showDebug('Missing token', 'No token provided.');
+    if ($token === '') {
+        $showDebug('Missing token', 'No token provided.');
+    }
 
     $tokenHash = hash('sha256', $token);
 
@@ -128,13 +122,19 @@ function handle_magic_verify(): void
         $stmt->execute([':h' => $tokenHash]);
         $row = $stmt->fetch();
 
-        if (!$row) $showDebug('Not found', 'Token missing.');
+        if (!$row) {
+            $showDebug('Not found', 'Token missing.');
+        }
 
-        if ($row['consumed_at']) $showDebug('Used', 'This link was already used.');
+        if ($row['consumed_at']) {
+            $showDebug('Used', 'This link was already used.');
+        }
 
-        $now = new DateTimeImmutable();
+        $now     = new DateTimeImmutable();
         $expires = new DateTimeImmutable($row['expires_at']);
-        if ($now > $expires) $showDebug('Expired', 'This link is expired.');
+        if ($now > $expires) {
+            $showDebug('Expired', 'This link is expired.');
+        }
 
         // consume
         $update = $pdo->prepare('UPDATE magic_login_tokens SET consumed_at = NOW() WHERE id = :id');
@@ -142,11 +142,11 @@ function handle_magic_verify(): void
 
         // login user
         session_regenerate_id(true);
-        $_SESSION['user_id'] = (int) $row['user_id'];
-        $_SESSION['pf_fingerprint'] = pf_generate_fingerprint();
-        $_SESSION['pf_ip_prefix'] = implode('.', array_slice(explode('.', $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0'), 0, 3));
-        $_SESSION['pf_last_active'] = time();
-        $_SESSION['pf_created_at']  = time();
+        $_SESSION['user_id']         = (int)$row['user_id'];
+        $_SESSION['pf_fingerprint']  = pf_generate_fingerprint();
+        $_SESSION['pf_ip_prefix']    = implode('.', array_slice(explode('.', $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0'), 0, 3));
+        $_SESSION['pf_last_active']  = time();
+        $_SESSION['pf_created_at']   = time();
 
     } catch (Throwable $e) {
         $showDebug('Exception', $e->getMessage() . "\n" . $e->getFile() . ':' . $e->getLine());
