@@ -42,11 +42,10 @@ function pf_verify_turnstile(string $token = null): bool
 {
     $env = strtolower(getenv('APP_ENV') ?: 'local');
 
-    $token = trim($token ?? '');
-    $config = require dirname(__DIR__) . '/config/app.php';
-    $secret = $config['security']['turnstile_secret_key'] ?? '';
+    $token  = trim($token ?? '');
+    $secret = getenv('TURNSTILE_SECRET_KEY') ?: '';
 
-    // In non-live envs, don't block login if token is missing.
+    // In non-live envs, don't block login if token/secret are missing.
     if ($env !== 'live' && $env !== 'production') {
         if ($token === '' || $secret === '') {
             return true;
@@ -85,7 +84,7 @@ function pf_verify_turnstile(string $token = null): bool
         );
 
         if ($result === false) {
-            // If the verify call itself fails, only hard-fail in live
+            // If verify call itself fails, only hard-fail in live
             return ($env !== 'live' && $env !== 'production');
         }
 
@@ -103,6 +102,7 @@ function pf_verify_turnstile(string $token = null): bool
         return ($env !== 'live' && $env !== 'production');
     }
 }
+
 
 
 /**
