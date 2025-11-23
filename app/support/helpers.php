@@ -40,18 +40,25 @@ function pf_generate_magic_token(): string
  */
 function pf_verify_turnstile(string $token = null): bool
 {
+    $env = strtolower(getenv('APP_ENV') ?: 'local');
+
     $token = trim($token ?? '');
-    if ($token === '') {
+    $config = require dirname(__DIR__) . '/config/app.php';
+    $secret = $config['security']['turnstile_secret_key'] ?? '';
+
+    // In non-live envs, don't block login if token is missing.
+    if ($env !== 'live' && $env !== 'production') {
+        if ($token === '' || $secret === '') {
+            return true;
+        }
+    }
+
+    // In live/prod, token and secret must both be present.
+    if ($token === '' || $secret === '') {
         return false;
     }
 
-    $config = require dirname(__DIR__, 2) . '/config/app.php';
-    $secret = $config['security']['turnstile_secret_key'] ?? '';
     $remoteIp = $_SERVER['REMOTE_ADDR'] ?? '';
-
-    if ($secret === '') {
-        return false; // fail-safe
-    }
 
     $payload = http_build_query([
         'secret'   => $secret,
@@ -78,16 +85,25 @@ function pf_verify_turnstile(string $token = null): bool
         );
 
         if ($result === false) {
-            return false;
+            // If the verify call itself fails, only hard-fail in live
+            return ($env !== 'live' && $env !== 'production');
         }
 
         $data = json_decode($result, true, 16, JSON_THROW_ON_ERROR);
-        return isset($data['success']) && $data['success'] === true;
+        $ok   = isset($data['success']) && $data['success'] === true;
 
+        if (!$ok && $env !== 'live' && $env !== 'production') {
+            // In dev, don't block on Turnstile failures
+            return true;
+        }
+
+        return $ok;
     } catch (Throwable $e) {
-        return false;
+        // Network/JSON errors: don't block in dev, do block in live
+        return ($env !== 'live' && $env !== 'production');
     }
 }
+
 
 /**
  * Send magic-link email via PHPMailer wrapper.
