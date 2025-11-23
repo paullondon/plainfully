@@ -1,30 +1,40 @@
 <?php declare(strict_types=1);
 
-/**
- * View rendering helpers for Plainfully
- */
-
-/**
- * Render a basic container page.
- */
-function pf_render_shell(string $title, string $innerHtml): void
+function pf_render_shell(string $title, string $innerHtml, array $data = []): void
 {
+    $isLoggedIn = isset($_SESSION['user_id']);
+
     ?>
-    <!DOCTYPE html>
+    <!doctype html>
     <html lang="en">
     <head>
-        <meta charset="UTF-8">
-        <title><?= htmlspecialchars($title, ENT_QUOTES, 'UTF-8') ?></title>
+        <meta charset="utf-8">
+        <title><?= htmlspecialchars($title) ?> | Plainfully</title>
         <meta name="viewport" content="width=device-width, initial-scale=1">
+
         <link rel="stylesheet" href="/assets/css/app.css">
-        <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
     </head>
-    <body>
-    <main class="pf-auth-shell">
-        <section class="pf-auth-card">
+
+    <body class="<?= $isLoggedIn ? 'pf-shell-loggedin' : 'pf-shell-auth' ?>">
+
+        <?php if ($isLoggedIn): ?>
+            <nav class="pf-topnav">
+                <div class="pf-topnav-left">
+                    <a href="/dashboard" class="pf-brand">Plainfully</a>
+                </div>
+
+                <div class="pf-topnav-right">
+                    <form action="/logout" method="POST">
+                        <button class="pf-nav-button">Logout</button>
+                    </form>
+                </div>
+            </nav>
+        <?php endif; ?>
+
+        <main class="pf-main">
             <?= $innerHtml ?>
-        </section>
-    </main>
+        </main>
+
     </body>
     </html>
     <?php

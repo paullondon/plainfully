@@ -17,7 +17,7 @@ function pf_register_routes(): array
             'path'   => '/',
             'action' => function() {
                 require_login();
-                handle_welcome();
+                pf_redirect('/dashboard');;
             },
         ],
 
@@ -71,5 +71,17 @@ function pf_register_routes(): array
             },
         ],
 
+        // dashboard
+        [
+            'method' => 'GET',
+            'path'   => '/dashboard',
+            'action' => function () {
+                require_login();
+                handle_dashboard();
+            }
+        ],
+
+
+// new routes abover here
     ];
 }
