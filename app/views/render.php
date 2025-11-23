@@ -4,9 +4,10 @@ function pf_render_shell(string $title, string $innerHtml, array $data = []): vo
 {
     $isLoggedIn = isset($_SESSION['user_id']);
 
-    // Use different body/main classes for auth vs app
-    $bodyClass = $isLoggedIn ? 'pf-shell-loggedin' : 'pf-auth-body';
-    $mainClass = $isLoggedIn ? 'pf-main'           : 'pf-auth-layout';
+    // Distinct classes for logged-in vs auth pages
+    $bodyClass = $isLoggedIn ? 'pf-shell-loggedin' : 'pf-shell-auth';
+    $mainClass = $isLoggedIn ? 'pf-main'           : 'pf-auth-card';
+
     ?>
     <!doctype html>
     <html lang="en">
@@ -14,6 +15,7 @@ function pf_render_shell(string $title, string $innerHtml, array $data = []): vo
         <meta charset="utf-8">
         <title><?= htmlspecialchars($title) ?> | Plainfully</title>
         <meta name="viewport" content="width=device-width, initial-scale=1">
+
         <link rel="stylesheet" href="/assets/css/app.css">
     </head>
 
