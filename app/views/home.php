@@ -8,5 +8,6 @@
 </p>
 
 <form method="post" action="/logout">
+    <?php pf_csrf_field(); ?>
     <button type="submit" class="pf-button">Sign out</button>
 </form>

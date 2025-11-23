@@ -6,6 +6,9 @@ function handle_magic_request(array $config): void
         pf_redirect('/login');
     }
 
+    // CSRF protection
+    pf_verify_csrf_or_abort();
+
     $baseUrl   = rtrim($config['app']['base_url'], '/');
     $ttlMinutes = (int)($config['auth']['magic_link_ttl_minutes'] ?? 30);
 

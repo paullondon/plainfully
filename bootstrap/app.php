@@ -111,6 +111,7 @@ require dirname(__DIR__) . '/app/support/rate_limiter.php';
 require dirname(__DIR__) . '/app/support/session_hardening.php';
 require dirname(__DIR__) . '/app/support/auth_middleware.php';
 require dirname(__DIR__) . '/app/support/request.php';
+require dirname(__DIR__) . '/app/support/csrf.php';
 
 // controllers
 require dirname(__DIR__) . '/app/controllers/main_controller.php';

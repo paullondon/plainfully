@@ -28,6 +28,7 @@ function pf_render_shell(string $title, string $innerHtml, array $data = []): vo
             </div>
             <div class="pf-topnav-right">
                 <form action="/logout" method="POST">
+                    <?php pf_csrf_field(); ?>
                     <button class="pf-nav-button">Logout</button>
                 </form>
             </div>

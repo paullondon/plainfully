@@ -29,6 +29,8 @@ function handle_welcome(): void
 
 function handle_logout(): void
 {
+    pf_verify_csrf_or_abort();
+
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
         pf_redirect('/');
     }
