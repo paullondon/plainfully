@@ -77,16 +77,23 @@ header("Content-Security-Policy: default-src 'self'; style-src 'self' 'unsafe-in
 // ---------------------------------------------------------
 // 3. Sessions – secure cookie flags
 // ---------------------------------------------------------
-$cookieParams = session_get_cookie_params();
+$cookieParams   = session_get_cookie_params();
+$sessionDays   = (int)(getenv('SESSION_LIFETIME_DAYS') ?: 7);
+$sessionHours  = (int)(getenv('SESSION_IDLE_HOURS') ?: 12);
+
+$cookieLifetime = 60 * 60 * 24 * $sessionDays;
+
 session_set_cookie_params([
-    'lifetime' => 0,
+    'lifetime' => $cookieLifetime,
     'path'     => $cookieParams['path'],
     'domain'   => $cookieParams['domain'],
-    'secure'   => true,
-    'httponly' => true,
-    'samesite' => 'Lax',
+    'secure'   => true,      // HTTPS only
+    'httponly' => true,      // not accessible to JS
+    'samesite' => 'Lax',     // good default for auth
 ]);
+
 session_start();
+
 
 // ---------------------------------------------------------
 // 4. Load config + helpers + modules

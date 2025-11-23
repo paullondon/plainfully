@@ -1,108 +1,31 @@
 <?php declare(strict_types=1);
 
 /**
- * Session Hardening for Plainfully
+ * Session hardening for Plainfully
  *
- * Provides:
- *  - Device/browser fingerprint binding
- *  - IP drift protection
- *  - Session inactivity + absolute timeout
+ * - Absolute lifetime (SESSION_LIFETIME_DAYS, default 7)
+ * - Idle timeout (SESSION_IDLE_HOURS, default 12)
+ * - Fingerprint binding (user agent)
+ * - IP prefix binding (first 3 octets)
  */
 
-// How long a session can sit idle before forcing re-login
-const PF_SESSION_INACTIVITY_LIMIT = 3600; // 1 hour
+// Read config from env and expose as constants
+define('PF_SESSION_ABSOLUTE_LIFETIME', 60 * 60 * 24 * (int)(getenv('SESSION_LIFETIME_DAYS') ?: 7));
+define('PF_SESSION_IDLE_TIMEOUT',      60 * 60 *      (int)(getenv('SESSION_IDLE_HOURS')   ?: 12));
 
-// Max total life of a session regardless of activity
-const PF_SESSION_MAX_LIFETIME = 86400; // 24 hours
-
-/**
- * Generate the user's fingerprint and return a short stable hash.
- */
 function pf_generate_fingerprint(): string
 {
-    $ua  = $_SERVER['HTTP_USER_AGENT']     ?? '';
-    $lang = $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '';
-    $salt = 'PF_STATIC_SALT_CHANGE_ME'; // you can swap this string for a secret env value
-
-    // Normalisation to avoid false positives
-    $data = strtolower(trim($ua . '|' . $lang));
-
-    return hash('sha256', $data . $salt);
+    $ua = $_SERVER['HTTP_USER_AGENT'] ?? 'unknown';
+    return hash('sha256', $ua);
 }
 
 /**
- * Check session hardening constraints.
- * If any fail, the user is logged out and must re-authenticate.
+ * Force logout and redirect to login.
  */
-function pf_verify_session_security(): void
-{
-    // If user is not logged in, do nothing
-    if (!isset($_SESSION['user_id'])) {
-        return;
-    }
-
-    // ---------------------------------------------------------
-    // Fingerprint validation
-    // ---------------------------------------------------------
-    $currentFp = pf_generate_fingerprint();
-    $storedFp  = $_SESSION['pf_fingerprint'] ?? null;
-
-    if ($storedFp === null) {
-        // First time storing the fingerprint
-        $_SESSION['pf_fingerprint'] = $currentFp;
-    } elseif (!hash_equals($storedFp, $currentFp)) {
-        // Fingerprint mismatch → potential stolen cookie
-        pf_force_logout();
-        return;
-    }
-
-    // ---------------------------------------------------------
-    // IP drift protection
-    // Use /24 mask to allow home WiFi/mobile networks changing IP slightly
-    // ---------------------------------------------------------
-    $currentIp = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
-    $storedIp  = $_SESSION['pf_ip_prefix'] ?? null;
-
-    $prefix = implode('.', array_slice(explode('.', $currentIp), 0, 3)); // e.g. 192.168.1
-
-    if ($storedIp === null) {
-        $_SESSION['pf_ip_prefix'] = $prefix;
-    } elseif ($storedIp !== $prefix) {
-        pf_force_logout();
-        return;
-    }
-
-    // ---------------------------------------------------------
-    // Inactivity timeout
-    // ---------------------------------------------------------
-    $now = time();
-    $last = $_SESSION['pf_last_active'] ?? null;
-
-    if ($last !== null && ($now - $last) > PF_SESSION_INACTIVITY_LIMIT) {
-        pf_force_logout();
-        return;
-    }
-
-    $_SESSION['pf_last_active'] = $now;
-
-    // ---------------------------------------------------------
-    // Absolute max lifetime
-    // ---------------------------------------------------------
-    $createdAt = $_SESSION['pf_created_at'] ?? null;
-    if ($createdAt === null) {
-        $_SESSION['pf_created_at'] = $now;
-    } elseif (($now - $createdAt) > PF_SESSION_MAX_LIFETIME) {
-        pf_force_logout();
-        return;
-    }
-}
-
-/**
- * Force logout with sanitised session kill.
- */
-function pf_force_logout(): void
+function pf_force_logout_and_redirect(): never
 {
     $_SESSION = [];
+
     if (ini_get('session.use_cookies')) {
         $params = session_get_cookie_params();
         setcookie(
@@ -115,7 +38,59 @@ function pf_force_logout(): void
             $params['httponly']
         );
     }
+
     session_destroy();
-    header('Location: /login', true, 302);
-    exit;
+    pf_redirect('/login');
+}
+
+/**
+ * Verify session security on every request.
+ * Only runs for logged-in users.
+ */
+function pf_verify_session_security(): void
+{
+    // Guests: nothing to do
+    if (!isset($_SESSION['user_id'])) {
+        return;
+    }
+
+    $now = time();
+
+    // 1) Absolute lifetime (max N days from creation)
+    $createdAt = $_SESSION['pf_created_at'] ?? null;
+    if ($createdAt === null || ($now - (int)$createdAt) > PF_SESSION_ABSOLUTE_LIFETIME) {
+        pf_force_logout_and_redirect();
+    }
+
+    // 2) Idle timeout (no activity for > PF_SESSION_IDLE_TIMEOUT)
+    $lastActive = $_SESSION['pf_last_active'] ?? null;
+    if ($lastActive !== null && ($now - (int)$lastActive) > PF_SESSION_IDLE_TIMEOUT) {
+        pf_force_logout_and_redirect();
+    }
+
+    // 3) Fingerprint check (bind to user agent)
+    $currentFingerprint = pf_generate_fingerprint();
+    $storedFingerprint  = $_SESSION['pf_fingerprint'] ?? null;
+
+    if ($storedFingerprint === null) {
+        // initialise for older sessions
+        $_SESSION['pf_fingerprint'] = $currentFingerprint;
+    } elseif (!hash_equals($storedFingerprint, $currentFingerprint)) {
+        pf_force_logout_and_redirect();
+    }
+
+    // 4) IP prefix check (first 3 octets of IPv4)
+    $ip       = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+    $parts    = explode('.', $ip);
+    $ipPrefix = count($parts) >= 3 ? implode('.', array_slice($parts, 0, 3)) : $ip;
+    $storedIp = $_SESSION['pf_ip_prefix'] ?? null;
+
+    if ($storedIp === null) {
+        $_SESSION['pf_ip_prefix'] = $ipPrefix;
+    } elseif ($storedIp !== $ipPrefix) {
+        pf_force_logout_and_redirect();
+    }
+
+    // 5) Refresh last active timestamp (sliding idle window)
+    $_SESSION['pf_last_active'] = $now;
 }
