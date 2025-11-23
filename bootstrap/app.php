@@ -93,6 +93,9 @@ session_start();
 // ---------------------------------------------------------
 $config = require dirname(__DIR__) . '/config/app.php';
 
+// views
+require dirname(__DIR__) . '/app/views/render.php';
+
 // support
 require dirname(__DIR__) . '/app/support/helpers.php';
 require dirname(__DIR__) . '/app/support/db.php';
@@ -109,9 +112,6 @@ require dirname(__DIR__) . '/app/controllers/health_controller.php';
 // auth
 require dirname(__DIR__) . '/app/auth/login.php';
 require dirname(__DIR__) . '/app/auth/magic_link.php';
-
-// views
-require dirname(__DIR__) . '/app/views/render.php';
 
 // router
 require dirname(__DIR__) . '/routes/web.php';
