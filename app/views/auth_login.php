@@ -7,9 +7,11 @@
 </p>
 
 <form method="post"
-      action="/magic/request"
+      action="/login"
       novalidate
       id="magic-link-form">
+
+    <?php pf_csrf_field(); ?>
 
     <div class="pf-field">
         <label for="email" class="pf-label">Email address</label>
