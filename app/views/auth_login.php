@@ -11,6 +11,7 @@ $loginOk    = $loginOk    ?? '';
     <meta charset="UTF-8">
     <title>Login | Plainfully</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!--
     <link rel="stylesheet" href="/assets/css/app.css">
             <style>
         .pf-auth-card {
@@ -117,7 +118,7 @@ $loginOk    = $loginOk    ?? '';
             color: #b5b5b5;
         }
     </style>
-
+-->
 </head>
 <body class="pf-shell">
 <main class="pf-page-center">

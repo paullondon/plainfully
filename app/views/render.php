@@ -15,8 +15,8 @@ function pf_render_shell(string $title, string $innerHtml, array $data = []): vo
         <meta charset="utf-8">
         <title><?= htmlspecialchars($title) ?> | Plainfully</title>
         <meta name="viewport" content="width=device-width, initial-scale=1">
-
-        <link rel="stylesheet" href="/assets/css/app.css">
+        <link rel="stylesheet"
+              href="/assets/css/app.css?v=<?= htmlspecialchars($config['css'], ENT_QUOTES) ?>">
     </head>
 
     <body class="<?= $bodyClass ?>">
