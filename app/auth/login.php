@@ -5,7 +5,7 @@
 // TODO: make sure this require points to the file
 // where handle_magic_request(array $config): void is defined.
 // If your file is named differently, just change the filename below.
-require __DIR__ . '/magic_link.php'; // e.g. 'magic_request.php' or 'magic_link.php'
+require_once __DIR__ . '/magic_link.php'; // e.g. 'magic_request.php' or 'magic_link.php'
 
 /**
  * Handle the /login route.
