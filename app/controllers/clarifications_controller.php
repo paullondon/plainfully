@@ -31,22 +31,21 @@ function handle_clarifications_index(): void
         error_log('Clarifications index failed: ' . $e->getMessage());
     }
 
-    // Pull any flash messages then clear them
     $ok    = $_SESSION['clarifications_ok']    ?? null;
     $error = $_SESSION['clarifications_error'] ?? null;
     unset($_SESSION['clarifications_ok'], $_SESSION['clarifications_error']);
 
-    ob_start();
     $clarifications = $rows;
     $flashOk        = $ok;
     $flashError     = $error;
-    require dirname(__DIR__, 2) . '/app/views/clarifications_index.php';
+
+    ob_start();
+    require dirname(__DIR__, 2) . '/app/views/clarifications/index.php';
     $inner = ob_get_clean();
 
-    pf_render_shell('Your clarifications', $inner, [
-        'clarifications' => $clarifications,
-    ]);
+    pf_render_shell('Your clarifications', $inner);
 }
+
 
 function handle_clarifications_new(): void
 {
@@ -55,17 +54,18 @@ function handle_clarifications_new(): void
         pf_redirect('/login');
     }
 
-    // Pull + clear any error message
     $error = $_SESSION['clarifications_error'] ?? null;
     unset($_SESSION['clarifications_error']);
 
-    ob_start();
     $flashError = $error;
-    require dirname(__DIR__, 2) . '/app/views/clarifications_new.php';
+
+    ob_start();
+    require dirname(__DIR__, 2) . '/app/views/clarifications/new.php';
     $inner = ob_get_clean();
 
     pf_render_shell('New clarification', $inner);
 }
+
 
 function handle_clarifications_store(): void
 {
@@ -85,7 +85,7 @@ function handle_clarifications_store(): void
 
     if ($text === '') {
         $_SESSION['clarifications_error'] = 'Please paste or type something to clarify.';
-        pf_redirect('/clarifications/new');
+        pf_redirect('/clarifications');
     }
 
     // Normalise + hash the text for dedupe
@@ -142,3 +142,46 @@ function handle_clarifications_store(): void
     pf_redirect('/clarifications');
 }
 
+function handle_clarification_view(): void
+{
+    $userId = $_SESSION['user_id'] ?? null;
+    if ($userId === null) {
+        pf_redirect('/login');
+    }
+
+    $id = (int)($_GET['id'] ?? 0);
+    if ($id < 1) {
+        pf_redirect('/clarifications');
+    }
+
+    try {
+        $pdo = pf_db();
+        $stmt = $pdo->prepare(
+            'SELECT id, user_id, title, original_text, clarified_text, status,
+                    created_at, updated_at
+             FROM clarifications
+             WHERE id = :id AND user_id = :uid
+             LIMIT 1'
+        );
+        $stmt->execute([
+            ':id'  => $id,
+            ':uid' => $userId,
+        ]);
+        $row = $stmt->fetch();
+
+        if (!$row) {
+            pf_redirect('/clarifications');
+        }
+
+        // expose $row to the view
+        ob_start();
+        require dirname(__DIR__, 2) . '/app/views/clarifications/view.php';
+        $inner = ob_get_clean();
+
+        pf_render_shell('Clarification', $inner);
+    } catch (Throwable $e) {
+        error_log('Clarification view failed: ' . $e->getMessage());
+        $_SESSION['clarifications_error'] = 'Unable to load that clarification.';
+        pf_redirect('/clarifications');
+    }
+}

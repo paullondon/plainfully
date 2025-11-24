@@ -40,13 +40,12 @@
         </thead>
         <tbody>
         <?php foreach ($clarifications as $row): ?>
-            <tr>
-                <td><?= htmlspecialchars($row['created_at'], ENT_QUOTES, 'UTF-8') ?></td>
-                <td>
+            <td>
+                <a class="pf-link-inline"
+                href="/clarifications/view?id=<?= (int)$row['id'] ?>">
                     <?= htmlspecialchars($row['title'] ?? '(Untitled)', ENT_QUOTES, 'UTF-8') ?>
-                </td>
-                <td><?= htmlspecialchars($row['status'], ENT_QUOTES, 'UTF-8') ?></td>
-            </tr>
+                </a>
+            </td>
         <?php endforeach; ?>
         </tbody>
     </table>

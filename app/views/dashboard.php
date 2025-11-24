@@ -8,12 +8,12 @@
 </p>
 
 <div class="pf-dashboard-grid">
-    <a href="/new" class="pf-card">
+    <a href="/clarification/new" class="pf-card">
         <h2>New Clarification</h2>
         <p>Create a new explanation request.</p>
     </a>
 
-    <a href="/history" class="pf-card">
+    <a href="/clarification/list" class="pf-card">
         <h2>Your History</h2>
         <p>View previous clarifications.</p>
     </a>
