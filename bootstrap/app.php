@@ -112,11 +112,13 @@ require dirname(__DIR__) . '/app/support/session_hardening.php';
 require dirname(__DIR__) . '/app/support/auth_middleware.php';
 require dirname(__DIR__) . '/app/support/request.php';
 require dirname(__DIR__) . '/app/support/csrf.php';
+require dirname(__DIR__) . '/app/support/auth_log.php';
 
 // controllers
-require dirname(__DIR__) . '/app/controllers/main_controller.php';
+require dirname(__DIR__) . '/app/controllers/welcome_controller.php';
 require dirname(__DIR__) . '/app/controllers/health_controller.php';
 require dirname(__DIR__) . '/app/controllers/dashboard_controller.php';
+require dirname(__DIR__) . '/app/controllers/logout_controller.php';
 
 // auth
 require dirname(__DIR__) . '/app/auth/login.php';

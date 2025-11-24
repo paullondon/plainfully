@@ -6,10 +6,10 @@ function handle_magic_request(array $config): void
         pf_redirect('/login');
     }
 
-    // CSRF protection
+    // CSRF protection (if enabled)
     pf_verify_csrf_or_abort();
 
-    $baseUrl   = rtrim($config['app']['base_url'], '/');
+    $baseUrl    = rtrim($config['app']['base_url'], '/');
     $ttlMinutes = (int)($config['auth']['magic_link_ttl_minutes'] ?? 30);
 
     $emailRaw = $_POST['email'] ?? '';
@@ -17,6 +17,7 @@ function handle_magic_request(array $config): void
 
     if ($email === null) {
         $_SESSION['magic_link_error'] = 'Please enter a valid email address.';
+        pf_log_auth_event('magic_link_invalid_email', null, $emailRaw, 'Invalid email format');
         pf_redirect('/login');
     }
 
@@ -24,6 +25,7 @@ function handle_magic_request(array $config): void
     $turnstileToken = $_POST['cf-turnstile-response'] ?? null;
     if (!pf_verify_turnstile($turnstileToken)) {
         $_SESSION['magic_link_error'] = 'Verification failed. Please try again.';
+        pf_log_auth_event('magic_link_turnstile_failed', null, $email, 'Turnstile verification failed');
         pf_redirect('/login');
     }
 
@@ -31,6 +33,7 @@ function handle_magic_request(array $config): void
     $ip = $_SERVER['REMOTE_ADDR'] ?? '';
     if (pf_rate_limit_magic_link($email, $ip)) {
         $_SESSION['magic_link_error'] = 'Too many requests. Please wait.';
+        pf_log_auth_event('magic_link_rate_limited', null, $email, 'Rate limit hit');
         pf_redirect('/login');
     }
 
@@ -48,6 +51,7 @@ function handle_magic_request(array $config): void
             $stmt = $pdo->prepare('INSERT INTO users (email) VALUES (:email)');
             $stmt->execute([':email' => $email]);
             $userId = (int)$pdo->lastInsertId();
+            pf_log_auth_event('user_created', $userId, $email, 'User created via magic link');
         }
 
         // magic token
@@ -77,8 +81,10 @@ function handle_magic_request(array $config): void
 
         if (!pf_send_magic_link_email($email, $link)) {
             $_SESSION['magic_link_error'] = 'Something went wrong sending your link.';
+            pf_log_auth_event('magic_link_email_failed', $userId, $email, 'Email send failed');
         } else {
             $_SESSION['magic_link_ok'] = 'If that email is registered, a sign-in link will arrive shortly.';
+            pf_log_auth_event('magic_link_email_sent', $userId, $email, 'Magic link email sent');
         }
 
     } catch (Throwable $e) {
@@ -86,10 +92,12 @@ function handle_magic_request(array $config): void
             $pdo->rollBack();
         }
         $_SESSION['magic_link_error'] = 'We had trouble processing that request.';
+        pf_log_auth_event('magic_link_exception', $userId ?? null, $email ?? null, $e->getMessage());
     }
 
     pf_redirect('/login');
 }
+
 
 function handle_magic_verify(): void
 {
@@ -103,11 +111,13 @@ function handle_magic_verify(): void
     };
 
     if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+        pf_log_auth_event('magic_verify_invalid_method', null, null, 'Non-GET request');
         $showDebug('Invalid', 'Must be GET.');
     }
 
     $token = trim($_GET['token'] ?? '');
     if ($token === '') {
+        pf_log_auth_event('magic_verify_missing_token', null, null, 'No token provided');
         $showDebug('Missing token', 'No token provided.');
     }
 
@@ -126,16 +136,19 @@ function handle_magic_verify(): void
         $row = $stmt->fetch();
 
         if (!$row) {
+            pf_log_auth_event('magic_verify_not_found', null, null, 'Token not found');
             $showDebug('Not found', 'Token missing.');
         }
 
         if ($row['consumed_at']) {
+            pf_log_auth_event('magic_verify_already_used', (int)$row['user_id'], null, 'Token already consumed');
             $showDebug('Used', 'This link was already used.');
         }
 
         $now     = new DateTimeImmutable();
         $expires = new DateTimeImmutable($row['expires_at']);
         if ($now > $expires) {
+            pf_log_auth_event('magic_verify_expired', (int)$row['user_id'], null, 'Token expired');
             $showDebug('Expired', 'This link is expired.');
         }
 
@@ -151,7 +164,10 @@ function handle_magic_verify(): void
         $_SESSION['pf_last_active']  = time();
         $_SESSION['pf_created_at']   = time();
 
+        pf_log_auth_event('login_success', (int)$row['user_id'], null, 'Magic link verified');
+
     } catch (Throwable $e) {
+        pf_log_auth_event('magic_verify_exception', null, null, $e->getMessage());
         $showDebug('Exception', $e->getMessage() . "\n" . $e->getFile() . ':' . $e->getLine());
     }
 
