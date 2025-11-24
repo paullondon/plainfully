@@ -26,7 +26,7 @@ unset($_SESSION['magic_link_error']);
 
             <!-- LOGO (inline or include) -->
             <div class="pf-logo pf-logo--large" style="margin-bottom: 1.5rem;">
-                <?php include __DIR__ . '/../partials/plainfully-logo-icon.svg.php'; ?>
+                <?php include __DIR__ . '/../assets/img/logo-icon.php'; ?>
             </div>
             <h1 class="pf-auth-title">Sign in to Plainfully</h1>
             <p class="pf-auth-subtitle">
