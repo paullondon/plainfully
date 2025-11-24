@@ -71,24 +71,28 @@ unset($_SESSION['magic_link_error']);
             </p>
 
             <?php if (!empty($loginOk)): ?>
-                <p class="pf-message-ok"><?= htmlspecialchars($loginOk, ENT_QUOTES, 'UTF-8') ?></p>
-            <?php endif; ?>
+            <p class="pf-message-ok">
+                <?= htmlspecialchars($loginOk, ENT_QUOTES, 'UTF-8') ?>
+            </p>
+        <?php endif; ?>
 
-            <?php if (!empty($loginError)): ?>
-                <p class="pf-message-error"><?= htmlspecialchars($loginError, ENT_QUOTES, 'UTF-8') ?></p>
-            <?php endif; ?>
+        <?php if (!empty($loginError)): ?>
+            <p class="pf-message-error">
+                <?= htmlspecialchars($loginError, ENT_QUOTES, 'UTF-8') ?>
+            </p>
+        <?php endif; ?>
 
-            <script>
-                function pfOnTurnstileSuccess() {
-                    const form = document.getElementById('magic-link-form');
-                    if (form && !form.dataset.submitted) {
-                        form.dataset.submitted = '1';
-                        form.submit();
-                    }
-                }
-            </script>
-            <?php include __DIR__ . '/login_form.php'; ?>
-        </section>
-    </main>
+    </section>
+</main>
+
+<script>
+    function pfOnTurnstileSuccess() {
+        const form = document.getElementById('magic-link-form');
+        if (form && !form.dataset.submitted) {
+            form.dataset.submitted = '1';
+            form.submit();
+        }
+    }
+</script>
 </body>
 </html>
