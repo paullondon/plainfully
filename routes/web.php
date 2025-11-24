@@ -92,19 +92,11 @@ switch (true) {
 // ======================
 
     // -------------------------------------------------
-    // Login form (guest only)
+    // Login (GET + POST) – unified handler
     // -------------------------------------------------
-    case $path === '/login' && $method === 'GET':
+    case $path === '/login':
         require_guest();
         handle_login_form($config);
-        break;
-
-    // -------------------------------------------------
-    // Magic link request (POST /login)
-    // -------------------------------------------------
-    case $path === '/login' && $method === 'POST':
-        require_guest();
-        handle_magic_request($config);
         break;
 
     // -------------------------------------------------
