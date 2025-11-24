@@ -1,0 +1,49 @@
+<svg width="256" height="256" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Centre fade -->
+    <radialGradient id="core" cx="50%" cy="50%" r="50%">
+      <stop offset="40%" stop-color="#171717"/>
+      <stop offset="85%" stop-color="#171717" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Chaos gradients -->
+    <radialGradient id="g1" cx="50%" cy="50%" r="100%">
+      <stop offset="0%" stop-color="#C32148"/>
+      <stop offset="100%" stop-color="#C32148" stop-opacity="0"/>
+    </radialGradient>
+
+    <radialGradient id="g2" cx="50%" cy="50%" r="100%">
+      <stop offset="0%" stop-color="#8A122F"/>
+      <stop offset="100%" stop-color="#8A122F" stop-opacity="0"/>
+    </radialGradient>
+
+    <radialGradient id="g3" cx="50%" cy="50%" r="100%">
+      <stop offset="0%" stop-color="#1AB385"/>
+      <stop offset="100%" stop-color="#1AB385" stop-opacity="0"/>
+    </radialGradient>
+
+    <radialGradient id="g4" cx="50%" cy="50%" r="100%">
+      <stop offset="0%" stop-color="#0C6349"/>
+      <stop offset="100%" stop-color="#0C6349" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Outer chaos rings -->
+  <circle cx="128" cy="76"  r="64" fill="url(#g1)" stroke="#C32148" stroke-width="10"/>
+  <circle cx="180" cy="128" r="64" fill="url(#g2)" stroke="#8A122F" stroke-width="10"/>
+  <circle cx="128" cy="180" r="64" fill="url(#g3)" stroke="#1AB385" stroke-width="10"/>
+  <circle cx="76"  cy="128" r="64" fill="url(#g4)" stroke="#0C6349" stroke-width="10"/>
+
+  <!-- Centre clarity fade -->
+  <circle cx="128" cy="128" r="70" fill="url(#core)"/>
+
+  <!-- The P -->
+  <text x="130" y="154"
+        font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI'"
+        font-weight="600"
+        font-size="72"
+        fill="#E8E8E8"
+        text-anchor="middle">
+    P
+  </text>
+</svg>
