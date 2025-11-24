@@ -1,101 +1,110 @@
 <?php declare(strict_types=1);
 
-function handle_magic_request(array $config): void
-{
-    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-        pf_redirect('/login');
-    }
+// app/auth/magic_link.php
 
-    // CSRF protection (if enabled)
-    pf_verify_csrf_or_abort();
+if (!function_exists('handle_magic_request')) {
 
-    $baseUrl    = rtrim($config['app']['base_url'], '/');
-    $ttlMinutes = (int)($config['auth']['magic_link_ttl_minutes'] ?? 30);
+    function handle_magic_request(array $config): void
+    {
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+            pf_redirect('/login');
+        }
 
-    $emailRaw = $_POST['email'] ?? '';
-    $email    = pf_normalise_email($emailRaw);
+        pf_verify_csrf_or_abort();
 
-    if ($email === null) {
+        $baseUrl    = rtrim($config['app']['base_url'], '/');
+        $ttlMinutes = (int)($config['auth']['magic_link_ttl_minutes'] ?? 30);
+
+        $emailRaw = $_POST['email'] ?? '';
+        $email    = pf_normalise_email($emailRaw);
+
+        if ($email === null) {
+            $_SESSION['magic_link_error'] = 'Please enter a valid email address.';
+            pf_redirect('/login');
+        }
+    
+        if ($email === null) {
         $_SESSION['magic_link_error'] = 'Please enter a valid email address.';
         pf_log_auth_event('magic_link_invalid_email', null, $emailRaw, 'Invalid email format');
         pf_redirect('/login');
-    }
+        }
 
-    // Turnstile
-    $turnstileToken = $_POST['cf-turnstile-response'] ?? null;
-    if (!pf_verify_turnstile($turnstileToken)) {
-        $_SESSION['magic_link_error'] = 'Verification failed. Please try again.';
-        pf_log_auth_event('magic_link_turnstile_failed', null, $email, 'Turnstile verification failed');
-        pf_redirect('/login');
-    }
+        // Turnstile
+        $turnstileToken = $_POST['cf-turnstile-response'] ?? null;
+        if (!pf_verify_turnstile($turnstileToken)) {
+            $_SESSION['magic_link_error'] = 'Verification failed. Please try again.';
+            pf_log_auth_event('magic_link_turnstile_failed', null, $email, 'Turnstile verification failed');
+            pf_redirect('/login');
+        }
 
-    // Rate limit
-    $ip = $_SERVER['REMOTE_ADDR'] ?? '';
-    if (pf_rate_limit_magic_link($email, $ip)) {
-        $_SESSION['magic_link_error'] = 'Too many requests. Please wait.';
-        pf_log_auth_event('magic_link_rate_limited', null, $email, 'Rate limit hit');
-        pf_redirect('/login');
-    }
+        // Rate limit
+        $ip = $_SERVER['REMOTE_ADDR'] ?? '';
+        if (pf_rate_limit_magic_link($email, $ip)) {
+            $_SESSION['magic_link_error'] = 'Too many requests. Please wait.';
+            pf_log_auth_event('magic_link_rate_limited', null, $email, 'Rate limit hit');
+            pf_redirect('/login');
+        }
 
-    try {
-        $pdo = pf_db();
-        $pdo->beginTransaction();
+        try {
+            $pdo = pf_db();
+            $pdo->beginTransaction();
 
-        // user find/create
-        $stmt = $pdo->prepare('SELECT id FROM users WHERE email = :email LIMIT 1');
-        $stmt->execute([':email' => $email]);
-        $user   = $stmt->fetch();
-        $userId = $user ? (int)$user['id'] : null;
-
-        if (!$userId) {
-            $stmt = $pdo->prepare('INSERT INTO users (email) VALUES (:email)');
+            // user find/create
+            $stmt = $pdo->prepare('SELECT id FROM users WHERE email = :email LIMIT 1');
             $stmt->execute([':email' => $email]);
-            $userId = (int)$pdo->lastInsertId();
-            pf_log_auth_event('user_created', $userId, $email, 'User created via magic link');
+            $user   = $stmt->fetch();
+            $userId = $user ? (int)$user['id'] : null;
+
+            if (!$userId) {
+                $stmt = $pdo->prepare('INSERT INTO users (email) VALUES (:email)');
+                $stmt->execute([':email' => $email]);
+                $userId = (int)$pdo->lastInsertId();
+                pf_log_auth_event('user_created', $userId, $email, 'User created via magic link');
+            }
+
+            // magic token
+            $rawToken  = pf_generate_magic_token();
+            $tokenHash = hash('sha256', $rawToken);
+            $expiresAt = (new DateTimeImmutable("+{$ttlMinutes} minutes"))->format('Y-m-d H:i:s');
+            $agent     = $_SERVER['HTTP_USER_AGENT'] ?? '';
+
+            $insert = $pdo->prepare(
+                'INSERT INTO magic_login_tokens
+                    (user_id, token_hash, expires_at, created_ip, created_agent)
+                VALUES
+                    (:user_id, :token_hash, :expires_at, :ip, :agent)'
+            );
+
+            $insert->execute([
+                ':user_id'    => $userId,
+                ':token_hash' => $tokenHash,
+                ':expires_at' => $expiresAt,
+                ':ip'         => $ip,
+                ':agent'      => mb_substr($agent, 0, 255),
+            ]);
+
+            $pdo->commit();
+
+            $link = $baseUrl . '/magic/verify?token=' . urlencode($rawToken);
+
+            if (!pf_send_magic_link_email($email, $link)) {
+                $_SESSION['magic_link_error'] = 'Something went wrong sending your link.';
+                pf_log_auth_event('magic_link_email_failed', $userId, $email, 'Email send failed');
+            } else {
+                $_SESSION['magic_link_ok'] = 'If that email is registered, a sign-in link will arrive shortly.';
+                pf_log_auth_event('magic_link_email_sent', $userId, $email, 'Magic link email sent');
+            }
+
+        } catch (Throwable $e) {
+            if (isset($pdo) && $pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            $_SESSION['magic_link_error'] = 'We had trouble processing that request.';
+            pf_log_auth_event('magic_link_exception', $userId ?? null, $email ?? null, $e->getMessage());
         }
 
-        // magic token
-        $rawToken  = pf_generate_magic_token();
-        $tokenHash = hash('sha256', $rawToken);
-        $expiresAt = (new DateTimeImmutable("+{$ttlMinutes} minutes"))->format('Y-m-d H:i:s');
-        $agent     = $_SERVER['HTTP_USER_AGENT'] ?? '';
-
-        $insert = $pdo->prepare(
-            'INSERT INTO magic_login_tokens
-                (user_id, token_hash, expires_at, created_ip, created_agent)
-             VALUES
-                (:user_id, :token_hash, :expires_at, :ip, :agent)'
-        );
-
-        $insert->execute([
-            ':user_id'    => $userId,
-            ':token_hash' => $tokenHash,
-            ':expires_at' => $expiresAt,
-            ':ip'         => $ip,
-            ':agent'      => mb_substr($agent, 0, 255),
-        ]);
-
-        $pdo->commit();
-
-        $link = $baseUrl . '/magic/verify?token=' . urlencode($rawToken);
-
-        if (!pf_send_magic_link_email($email, $link)) {
-            $_SESSION['magic_link_error'] = 'Something went wrong sending your link.';
-            pf_log_auth_event('magic_link_email_failed', $userId, $email, 'Email send failed');
-        } else {
-            $_SESSION['magic_link_ok'] = 'If that email is registered, a sign-in link will arrive shortly.';
-            pf_log_auth_event('magic_link_email_sent', $userId, $email, 'Magic link email sent');
-        }
-
-    } catch (Throwable $e) {
-        if (isset($pdo) && $pdo->inTransaction()) {
-            $pdo->rollBack();
-        }
-        $_SESSION['magic_link_error'] = 'We had trouble processing that request.';
-        pf_log_auth_event('magic_link_exception', $userId ?? null, $email ?? null, $e->getMessage());
+        pf_redirect('/login');
     }
-
-    pf_redirect('/login');
 }
 
 

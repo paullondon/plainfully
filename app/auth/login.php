@@ -1,5 +1,7 @@
 <?php declare(strict_types=1);
 
+require_once __DIR__ . '/magic_link.php';
+
 /**
  * Handle GET + POST for /login
  */

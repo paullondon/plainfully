@@ -123,7 +123,6 @@ require dirname(__DIR__) . '/app/controllers/clarifications_controller.php';
 
 // auth
 require dirname(__DIR__) . '/app/auth/login.php';
-require dirname(__DIR__) . '/magic_link.php';
 
 // router
 require dirname(__DIR__) . '/routes/web.php';
