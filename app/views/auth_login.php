@@ -31,10 +31,10 @@ unset($_SESSION['magic_link_error']);
                         src="/assets/img/logo-icon.svg"
                         alt="Plainfully logo"
                         class="pf-logo-img">
+                    <h1 class="pf-auth-title">Sign in to Plainfully</h1>
                 </div>
 
                 <div class="pf-auth-heading">
-                    <h1 class="pf-auth-title">Sign in to Plainfully</h1>
                     <p class="pf-auth-subtitle">
                         We’ll email you a one-time magic link to sign in.
                     </p>
