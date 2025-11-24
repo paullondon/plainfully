@@ -13,68 +13,65 @@ unset($_SESSION['magic_link_error']);
     <meta charset="UTF-8">
     <title>Login | Plainfully</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-
     <link rel="stylesheet" href="/assets/css/app.css">
 </head>
 <body class="pf-shell">
+<main class="pf-page-center">
+    <section class="pf-auth-card">
 
-    <!-- FULL PAGE CENTRE WRAPPER -->
-    <main class="pf-page-center">
+        <!-- HEADER: logo + text inline -->
+        <header class="pf-auth-header">
+            <div class="pf-logo">
+                <img
+                    src="/assets/img/logo-icon.svg"
+                    alt="Plainfully logo"
+                    class="pf-logo-img">
+            </div>
 
-        <!-- CARD THAT SITS IN THE MIDDLE -->
-        <section class="pf-auth-card">
+            <div class="pf-auth-heading">
+                <h1 class="pf-auth-title">Sign in to Plainfully</h1>
+                <p class="pf-auth-subtitle">
+                    We’ll email you a one-time magic link to sign in.
+                </p>
+            </div>
+        </header>
 
-            <!-- HEADER: logo + text inline -->
-            <header class="pf-auth-header">
-                <div class="pf-logo pf-logo--large">
-                    <img
-                        src="/assets/img/logo-icon.svg"
-                        alt="Plainfully logo"
-                        class="pf-logo-img">
-                </div>
+        <form method="post"
+            action="/login"
+            novalidate
+            id="magic-link-form">
 
-                <div class="pf-auth-heading">
-                    <h1 class="pf-auth-title">Sign in to Plainfully</h1>
-                    <p class="pf-auth-subtitle">
-                        We’ll email you a one-time magic link to sign in.
-                    </p>
-                </div>
-            </header>
+            <?php pf_csrf_field(); ?>
 
-            <form method="post"
-                action="/login"
-                novalidate
-                id="magic-link-form">
+            <div class="pf-field">
+                <label for="email" class="pf-label">Email address</label>
+                <input
+                    id="email"
+                    name="email"
+                    type="email"
+                    required
+                    autocomplete="email"
+                    class="pf-input"
+                    placeholder="you@example.com">
+            </div>
 
-                <?php pf_csrf_field(); ?>
+            <div class="cf-turnstile"
+                data-sitekey="<?= htmlspecialchars((string)$siteKey, ENT_QUOTES, 'UTF-8') ?>"
+                data-callback="pfOnTurnstileSuccess"
+                data-size="invisible"
+                data-action="magic_link">
+            </div>
 
-                <div class="pf-field">
-                    <label for="email" class="pf-label">Email address</label>
-                    <input
-                        id="email"
-                        name="email"
-                        type="email"
-                        required
-                        autocomplete="email"
-                        class="pf-input"
-                        placeholder="you@example.com">
-                </div>
+            <button type="submit" class="pf-button">
+                Send magic link
+            </button>
+        </form>
 
-                <div class="cf-turnstile"
-                    data-sitekey="<?= htmlspecialchars((string)$siteKey, ENT_QUOTES, 'UTF-8') ?>"
-                    data-callback="pfOnTurnstileSuccess"
-                    data-size="invisible"
-                    data-action="magic_link">
-                </div>
+        <p class="pf-note">
+            This link expires in about 30 minutes and can only be used once.
+        </p>
 
-                <button type="submit" class="pf-button">Send magic link</button>
-            </form>
-
-            <p class="pf-note">
-                This link expires in about 30 minutes and can only be used once.
-            </p>
-
-            <?php if (!empty($loginOk)): ?>
+        <?php if (!empty($loginOk)): ?>
             <p class="pf-message-ok">
                 <?= htmlspecialchars($loginOk, ENT_QUOTES, 'UTF-8') ?>
             </p>
@@ -85,7 +82,7 @@ unset($_SESSION['magic_link_error']);
                 <?= htmlspecialchars($loginError, ENT_QUOTES, 'UTF-8') ?>
             </p>
         <?php endif; ?>
-
+        
     </section>
 </main>
 
