@@ -20,7 +20,7 @@ function handle_welcome(): void
     $userId = (int)$userId;
 
     ob_start();
-    require __DIR__ . '/../views/home.php';
+    require __DIR__ . '/../views/index.php';
     $inner = ob_get_clean();
 
     pf_render_shell('Plainfully', $inner);
