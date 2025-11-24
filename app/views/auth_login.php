@@ -1,11 +1,9 @@
 <?php
-// View: login form inner HTML
-?>
-<?php
-// login.php - visual login page wrapper
-$siteKey = $config['turnstile.site_key'] ?? '';
-$loginError = $_SESSION['magic_link_error'] ?? '';
-unset($_SESSION['magic_link_error']);
+// app/views/auth_login.php
+
+$siteKey    = $siteKey    ?? '';
+$loginError = $loginError ?? '';
+$loginOk    = $loginOk    ?? '';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -19,9 +17,9 @@ unset($_SESSION['magic_link_error']);
 <main class="pf-page-center">
     <section class="pf-auth-card">
 
-        <!-- HEADER: logo + text inline -->
+        <!-- HEADER: logo + heading inline -->
         <header class="pf-auth-header">
-            <div class="pf-logo pf-logo--large">
+            <div class="pf-logo">
                 <img
                     src="/assets/img/logo-icon.svg"
                     alt="Plainfully logo"
@@ -36,10 +34,11 @@ unset($_SESSION['magic_link_error']);
             </div>
         </header>
 
+        <!-- FORM -->
         <form method="post"
-            action="/login"
-            novalidate
-            id="magic-link-form">
+              action="/login"
+              novalidate
+              id="magic-link-form">
 
             <?php pf_csrf_field(); ?>
 
@@ -56,10 +55,10 @@ unset($_SESSION['magic_link_error']);
             </div>
 
             <div class="cf-turnstile"
-                data-sitekey="<?= htmlspecialchars((string)$siteKey, ENT_QUOTES, 'UTF-8') ?>"
-                data-callback="pfOnTurnstileSuccess"
-                data-size="invisible"
-                data-action="magic_link">
+                 data-sitekey="<?= htmlspecialchars((string)$siteKey, ENT_QUOTES, 'UTF-8') ?>"
+                 data-callback="pfOnTurnstileSuccess"
+                 data-size="invisible"
+                 data-action="magic_link">
             </div>
 
             <button type="submit" class="pf-button">
@@ -67,10 +66,12 @@ unset($_SESSION['magic_link_error']);
             </button>
         </form>
 
+        <!-- NOTE -->
         <p class="pf-note">
             This link expires in about 30 minutes and can only be used once.
         </p>
 
+        <!-- MESSAGES -->
         <?php if (!empty($loginOk)): ?>
             <p class="pf-message-ok">
                 <?= htmlspecialchars($loginOk, ENT_QUOTES, 'UTF-8') ?>
