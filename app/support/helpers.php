@@ -120,3 +120,74 @@ function pf_send_magic_link_email(string $toEmail, string $link): bool
 
     return pf_send_email($toEmail, $subject, $body);
 }
+
+/**
+ *  Clarifications and plans
+ * 
+ */
+function pf_normalise_clarification_text(string $text): string
+{
+    // Trim, normalise whitespace
+    $text = trim($text);
+    $text = preg_replace('/\s+/', ' ', $text);
+    return $text;
+}
+
+function pf_clarification_text_hash(string $text): string
+{
+    $norm = pf_normalise_clarification_text($text);
+    return hash('sha256', $norm);
+}
+function pf_get_user_plan_limits(int $userId): array
+{
+    $pdo = pf_db();
+
+    $stmt = $pdo->prepare('SELECT plan FROM users WHERE id = :id LIMIT 1');
+    $stmt->execute([':id' => $userId]);
+    $row = $stmt->fetch();
+
+    $plan = $row['plan'] ?? 'free';
+
+    switch ($plan) {
+        case 'pro':
+            return ['plan' => 'pro', 'max_28d' => 10];
+        case 'unlimited':
+            return ['plan' => 'unlimited', 'max_28d' => null]; // null = no effective cap
+        default:
+            return ['plan' => 'free', 'max_28d' => 3];
+    }
+}
+
+function pf_count_user_clarifications_28d(int $userId): int
+{
+    $pdo = pf_db();
+    $stmt = $pdo->prepare(
+        'SELECT COUNT(*) AS c
+         FROM clarifications
+         WHERE user_id = :uid
+           AND created_at >= (NOW() - INTERVAL 28 DAY)'
+    );
+    $stmt->execute([':uid' => $userId]);
+    $row = $stmt->fetch();
+    return (int)($row['c'] ?? 0);
+}
+
+function pf_find_duplicate_clarification_28d(int $userId, string $textHash): ?array
+{
+    $pdo = pf_db();
+    $stmt = $pdo->prepare(
+        'SELECT id, title, status, created_at
+         FROM clarifications
+         WHERE user_id = :uid
+           AND text_hash = :hash
+           AND created_at >= (NOW() - INTERVAL 28 DAY)
+         ORDER BY created_at DESC
+         LIMIT 1'
+    );
+    $stmt->execute([
+        ':uid'  => $userId,
+        ':hash' => $textHash,
+    ]);
+    $row = $stmt->fetch();
+    return $row ?: null;
+}

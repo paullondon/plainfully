@@ -25,7 +25,7 @@ function pf_render_shell(string $title, string $innerHtml, array $data = []): vo
         <nav class="pf-topnav">
             <div class="pf-topnav-left">
                 <a href="/dashboard" class="pf-brand">Plainfully</a>
-                <a href="/clarifications" class="pf-nav-link">Clarifications</a>
+                <a href="/clarifications/new" class="pf-nav-link">Clarifications</a>
             </div>
             <div class="pf-topnav-right">
                 <form action="/logout" method="POST">

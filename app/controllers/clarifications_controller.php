@@ -88,21 +88,52 @@ function handle_clarifications_store(): void
         pf_redirect('/clarifications/new');
     }
 
+    // Normalise + hash the text for dedupe
+    $textHash = pf_clarification_text_hash($text);
+
+    // 1) Check for duplicate in last 28 days
+    $duplicate = pf_find_duplicate_clarification_28d((int)$userId, $textHash);
+    if ($duplicate) {
+        // Be open and honest: don’t consume quota, just point them at the existing one.
+        $_SESSION['clarifications_error'] =
+            'You have already asked this recently. '
+            . 'View your existing clarification instead of using another request.';
+
+        // (Later we can add a direct link like `/clarifications/{id}`)
+        pf_redirect('/clarifications');
+    }
+
+    // 2) Quota check (rolling 28 days)
+    $limits   = pf_get_user_plan_limits((int)$userId);
+    $used     = pf_count_user_clarifications_28d((int)$userId);
+    $max_28d  = $limits['max_28d'];
+
+    if ($max_28d !== null && $used >= $max_28d) {
+        $_SESSION['clarifications_error'] =
+            'You have reached your ' . $limits['plan'] . ' plan limit of '
+            . $max_28d . ' clarifications in 28 days. '
+            . 'Upgrade your plan to submit more.';
+        pf_redirect('/clarifications');
+    }
+
+    // 3) Store clarification
     try {
         $pdo = pf_db();
         $stmt = $pdo->prepare(
-            'INSERT INTO clarifications (user_id, title, original_text, status)
-             VALUES (:uid, :title, :text, :status)'
+            'INSERT INTO clarifications (user_id, title, original_text, text_hash, status)
+             VALUES (:uid, :title, :text, :hash, :status)'
         );
         $stmt->execute([
             ':uid'    => $userId,
             ':title'  => $title !== '' ? $title : null,
             ':text'   => $text,
+            ':hash'   => $textHash,
             ':status' => 'pending',
         ]);
 
         $_SESSION['clarifications_ok'] = 'Your request has been saved.';
         pf_log_auth_event('clarification_created', (int)$userId, null, 'New clarification created');
+
     } catch (Throwable $e) {
         error_log('Clarification store failed: ' . $e->getMessage());
         $_SESSION['clarifications_error'] = 'We could not save that request. Please try again.';
@@ -110,3 +141,4 @@ function handle_clarifications_store(): void
 
     pf_redirect('/clarifications');
 }
+
