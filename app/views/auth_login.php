@@ -21,7 +21,7 @@ unset($_SESSION['magic_link_error']);
 
         <!-- HEADER: logo + text inline -->
         <header class="pf-auth-header">
-            <div class="pf-logo">
+            <div class="pf-logo pf-logo--large">
                 <img
                     src="/assets/img/logo-icon.svg"
                     alt="Plainfully logo"
@@ -82,7 +82,7 @@ unset($_SESSION['magic_link_error']);
                 <?= htmlspecialchars($loginError, ENT_QUOTES, 'UTF-8') ?>
             </p>
         <?php endif; ?>
-        
+
     </section>
 </main>
 
