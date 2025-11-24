@@ -102,6 +102,7 @@ $config = require dirname(__DIR__) . '/config/app.php';
 
 // views
 require dirname(__DIR__) . '/app/views/render.php';
+require dirname(__DIR__) . '/app/dashboard.php';
 
 // support
 require dirname(__DIR__) . '/app/support/helpers.php';
