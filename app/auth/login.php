@@ -1,96 +1,38 @@
-<?php
-// app/views/auth_login.php
+<?php declare(strict_types=1);
 
-// $siteKey, $loginError, $loginOk are expected to be set by the handler
-$siteKey    = $siteKey    ?? '';
-$loginError = $loginError ?? '';
-$loginOk    = $loginOk    ?? '';
-?>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Login | Plainfully</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="stylesheet" href="/assets/css/app.css">
-</head>
-<body class="pf-shell">
-<main class="pf-page-center">
-    <section class="pf-auth-card">
+// app/auth/login.php
 
-        <!-- LOGO -->
-        <div class="pf-logo pf-logo--large" style="margin-bottom: 1.5rem;">
-            <img
-                src="/assets/img/logo-icon.svg"
-                alt="Plainfully logo"
-                class="pf-logo-img">
-        </div>
+// TODO: make sure this require points to the file
+// where handle_magic_request(array $config): void is defined.
+// If your file is named differently, just change the filename below.
+require __DIR__ . '/magic_link.php'; // e.g. 'magic_request.php' or 'magic_link.php'
 
-        <!-- HEADING / SUBTITLE -->
-        <h1 class="pf-auth-title">Sign in to Plainfully</h1>
-        <p class="pf-auth-subtitle">
-            We’ll email you a one-time magic link to sign in.
-        </p>
-
-        <!-- FORM -->
-        <form method="post"
-              action="/login"
-              novalidate
-              id="magic-link-form">
-
-            <?php pf_csrf_field(); ?>
-
-            <div class="pf-field">
-                <label for="email" class="pf-label">Email address</label>
-                <input
-                    id="email"
-                    name="email"
-                    type="email"
-                    required
-                    autocomplete="email"
-                    class="pf-input"
-                    placeholder="you@example.com">
-            </div>
-
-            <div class="cf-turnstile"
-                 data-sitekey="<?= htmlspecialchars((string)$siteKey, ENT_QUOTES, 'UTF-8') ?>"
-                 data-callback="pfOnTurnstileSuccess"
-                 data-size="invisible"
-                 data-action="magic_link">
-            </div>
-
-            <button type="submit" class="pf-button">
-                Send magic link
-            </button>
-        </form>
-
-        <p class="pf-note">
-            This link expires in about 30 minutes and can only be used once.
-        </p>
-
-        <?php if (!empty($loginOk)): ?>
-            <p class="pf-message-ok">
-                <?= htmlspecialchars($loginOk, ENT_QUOTES, 'UTF-8') ?>
-            </p>
-        <?php endif; ?>
-
-        <?php if (!empty($loginError)): ?>
-            <p class="pf-message-error">
-                <?= htmlspecialchars($loginError, ENT_QUOTES, 'UTF-8') ?>
-            </p>
-        <?php endif; ?>
-
-    </section>
-</main>
-
-<script>
-    function pfOnTurnstileSuccess() {
-        const form = document.getElementById('magic-link-form');
-        if (form && !form.dataset.submitted) {
-            form.dataset.submitted = '1';
-            form.submit();
-        }
+/**
+ * Handle the /login route.
+ *
+ * - GET  => render login form
+ * - POST => delegate to magic link handler
+ */
+function handle_login_form(array $config): void
+{
+    // If POST, hand off to the existing magic-link handler
+    if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
+        handle_magic_request($config);
+        return;
     }
-</script>
-</body>
-</html>
+
+    // Otherwise, we're on GET -> show the login page
+
+    // Turnstile site key
+    $siteKey = $config['turnstile.site_key'] ?? '';
+
+    // Read and clear any flash messages
+    $loginError = $_SESSION['magic_link_error'] ?? '';
+    unset($_SESSION['magic_link_error']);
+
+    $loginOk = $_SESSION['magic_link_ok'] ?? '';
+    unset($_SESSION['magic_link_ok']);
+
+    // Render the view
+    require __DIR__ . '/../views/auth_login.php';
+}
