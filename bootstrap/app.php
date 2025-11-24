@@ -119,6 +119,7 @@ require dirname(__DIR__) . '/app/controllers/welcome_controller.php';
 require dirname(__DIR__) . '/app/controllers/health_controller.php';
 require dirname(__DIR__) . '/app/controllers/dashboard_controller.php';
 require dirname(__DIR__) . '/app/controllers/logout_controller.php';
+require dirname(__DIR__) . '/app/controllers/clarifications_controller.php';
 
 // auth
 require dirname(__DIR__) . '/app/auth/login.php';

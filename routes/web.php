@@ -26,6 +26,9 @@ if ($path !== '/' && str_ends_with($path, '/')) {
 }
 
 switch (true) {
+// ======================
+// !! LOGGED IN ROUTES !!
+// ======================
 
     // -------------------------------------------------
     // Home → redirect to dashboard (must be logged in)
@@ -34,6 +37,50 @@ switch (true) {
         require_login();
         pf_redirect('/dashboard');
         break;
+
+    // -------------------------------------------------
+    // Clarifications – list (logged-in only)
+    // -------------------------------------------------
+    case $path === '/clarifications' && $method === 'GET':
+        require_login();
+        handle_clarifications_index();
+        break;
+
+    // -------------------------------------------------
+    // Clarifications – new form
+    // -------------------------------------------------
+    case $path === '/clarifications/new' && $method === 'GET':
+        require_login();
+        handle_clarifications_new();
+        break;
+
+    // -------------------------------------------------
+    // Clarifications – store
+    // -------------------------------------------------
+    case $path === '/clarifications' && $method === 'POST':
+        require_login();
+        handle_clarifications_store();
+        break;
+
+    // -------------------------------------------------
+    // Dashboard (logged-in only)
+    // -------------------------------------------------
+    case $path === '/dashboard' && $method === 'GET':
+        require_login();
+        handle_dashboard();
+        break;
+    
+    // -------------------------------------------------
+    // Logout
+    // -------------------------------------------------
+    case $path === '/logout' && $method === 'POST':
+        require_login();
+        handle_logout();
+        break;
+
+// ======================
+// !! GUEST ROUTES     !!
+// ======================
 
     // -------------------------------------------------
     // Login form (guest only)
@@ -57,22 +104,6 @@ switch (true) {
     case $path === '/magic/verify' && $method === 'GET':
         require_guest();
         handle_magic_verify();
-        break;
-
-    // -------------------------------------------------
-    // Dashboard (logged-in only)
-    // -------------------------------------------------
-    case $path === '/dashboard' && $method === 'GET':
-        require_login();
-        handle_dashboard();
-        break;
-
-    // -------------------------------------------------
-    // Logout
-    // -------------------------------------------------
-    case $path === '/logout' && $method === 'POST':
-        require_login();
-        handle_logout();
         break;
 
     // -------------------------------------------------
