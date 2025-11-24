@@ -27,7 +27,7 @@ unset($_SESSION['magic_link_error']);
             <!-- LOGO (inline or include) -->
             <div class="pf-logo pf-logo--large" style="margin-bottom: 1.5rem;">
                 <img 
-                    src="/assets/img/plainfully-logo-icon.svg" 
+                    src="/assets/img/logo-icon.svg" 
                     alt="Plainfully logo"
                     class="pf-logo-img">
             </div>
