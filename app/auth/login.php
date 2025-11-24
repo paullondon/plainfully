@@ -1,9 +1,5 @@
 <?php declare(strict_types=1);
 
-// app/auth/login.php
-
-require_once __DIR__ . '/magic_link.php';
-
 /**
  * Handle GET + POST for /login
  */
