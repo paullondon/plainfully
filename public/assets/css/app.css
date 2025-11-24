@@ -177,3 +177,22 @@ a:hover {
     color: var(--pf-text-muted);
     font-size: 0.95rem;
 }
+
+/* Full-page centre wrapper for auth / single-panel pages */
+.pf-page-center {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+}
+
+.pf-auth-card {
+    background: var(--pf-surface);
+    border-radius: var(--pf-radius-lg);
+    box-shadow: var(--pf-shadow-subtle);
+    border: 1px solid var(--pf-border-subtle);
+    padding: 2rem 2.5rem;
+    max-width: 480px;
+    width: 100%;
+}
