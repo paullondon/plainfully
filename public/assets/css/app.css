@@ -4,46 +4,44 @@
 
 :root {
     /* Core surfaces */
-    --pf-bg: #171717;          /* Main page background */
-    --pf-surface: #1f1f1f;     /* Cards, panels */
-    --pf-surface-soft: #232323;/* Softer panels / hovers */
+    --pf-bg: #171717;
+    --pf-surface: #1f1f1f;
+    --pf-surface-soft: #232323;
     --pf-border-subtle: #2b2b2b;
 
     /* Text */
-    --pf-text-main: #E8E8E8;   /* Primary text (matches P colour) */
+    --pf-text-main: #E8E8E8;
     --pf-text-muted: #b5b5b5;
     --pf-text-soft: #8c8c8c;
 
-    /* Logo chaos colours (outer rings) */
-    --pf-chaos-1: #C32148;     /* Top / top-left feel */
-    --pf-chaos-2: #8A122F;     /* Deeper red/maroon */
-    --pf-chaos-3: #1AB385;     /* Fresh green/teal */
-    --pf-chaos-4: #0C6349;     /* Deep green */
+    /* Logo chaos colours */
+    --pf-chaos-1: #C32148;
+    --pf-chaos-2: #8A122F;
+    --pf-chaos-3: #1AB385;
+    --pf-chaos-4: #0C6349;
 
-    /* Functional accents (buttons, links, states) */
-    --pf-accent: #1AB385;      /* Primary CTA – taken from chaos-3 */
-    --pf-accent-strong: #0C6349;/* Hover / pressed state */
+    /* Accents */
+    --pf-accent: #1AB385;
+    --pf-accent-strong: #0C6349;
     --pf-accent-soft: rgba(26, 179, 133, 0.16);
 
-    /* Feedback colours (optional; reuse chaos tones) */
+    /* Feedback */
     --pf-danger: #C32148;
     --pf-danger-soft: rgba(195, 33, 72, 0.16);
 
-    /* Radius / shadows for consistent cards/buttons */
+    /* Radii & Shadows */
     --pf-radius-lg: 18px;
     --pf-radius-md: 10px;
     --pf-radius-sm: 6px;
-
     --pf-shadow-soft: 0 18px 45px rgba(0, 0, 0, 0.45);
     --pf-shadow-subtle: 0 10px 24px rgba(0, 0, 0, 0.35);
 }
 
 /* ============================
-   Global layout + typography
+   Base Layout + Typography
    ============================ */
 
-html,
-body {
+html, body {
     margin: 0;
     padding: 0;
     background: var(--pf-bg);
@@ -51,15 +49,19 @@ body {
     font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
-/* Main content wrapper */
+/* App Shell */
 .pf-shell {
     min-height: 100vh;
     display: flex;
     flex-direction: column;
     background: radial-gradient(circle at top, #202020 0, var(--pf-bg) 45%, #050505 100%);
+    color: var(--pf-text-main);
 }
 
-/* Generic card / panel */
+/* ============================
+   Generic Cards / Panels
+   ============================ */
+
 .pf-card {
     background: var(--pf-surface);
     border-radius: var(--pf-radius-lg);
@@ -69,28 +71,24 @@ body {
 }
 
 /* ============================
-   Buttons + links
+   Buttons
    ============================ */
 
 .pf-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 0.5rem;
-    padding: 0.75rem 1.25rem;
+    gap: .5rem;
+    padding: .75rem 1.25rem;
     border-radius: var(--pf-radius-md);
     border: 1px solid transparent;
-    font-size: 0.95rem;
+    font-size: .95rem;
     font-weight: 600;
     cursor: pointer;
-    transition:
-        background-color 150ms ease-out,
-        border-color 150ms ease-out,
-        box-shadow 150ms ease-out,
-        transform 120ms ease-out;
+    transition: background-color 150ms ease, border-color 150ms ease,
+                box-shadow 150ms ease, transform 120ms ease;
 }
 
-/* Primary action (uses core accent from palette) */
 .pf-btn--primary {
     background: var(--pf-accent);
     color: #07110e;
@@ -107,7 +105,6 @@ body {
     box-shadow: none;
 }
 
-/* Ghost / secondary buttons – subtle outline using chaos tones */
 .pf-btn--ghost {
     background: transparent;
     color: var(--pf-text-main);
@@ -119,46 +116,10 @@ body {
     background: var(--pf-accent-soft);
 }
 
-/* Links */
-a {
-    color: var(--pf-accent);
-    text-decoration: none;
-}
+/* ============================
+   Auth Page Layout
+   ============================ */
 
-a:hover {
-    color: var(--pf-accent-strong);
-}
-
-/* ===== Plainfully – logo sizing (auth) ===== */
-.pf-logo {
-    width: 120px;
-    height: 120px;
-    margin: 0 auto 1.5rem auto;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.pf-logo-img {
-    width: 100%;
-    height: 100%;
-    display: block;
-    object-fit: contain;
-}
-
-/* =====================================
-   Plainfully – Auth page layout & form
-   ===================================== */
-
-.pf-shell {
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    background: radial-gradient(circle at top, #202020 0, var(--pf-bg) 45%, #050505 100%);
-    color: var(--pf-text-main);
-}
-
-/* centre the card */
 .pf-page-center {
     min-height: 100vh;
     display: flex;
@@ -167,7 +128,6 @@ a:hover {
     padding: 2rem;
 }
 
-/* card itself */
 .pf-auth-card {
     max-width: 480px;
     width: 100%;
@@ -178,39 +138,91 @@ a:hover {
     box-shadow: var(--pf-shadow-subtle);
 }
 
-/* headings */
+/* ----- Logo + heading inline ----- */
+
+.pf-auth-header {
+    display: flex;
+    align-items: center;
+    gap: 1.4rem;
+    margin-bottom: 1.75rem;
+}
+
+.pf-auth-heading {
+    display: flex;
+    flex-direction: column;
+}
+
+/* Logo */
+.pf-logo {
+    width: 80px;
+    height: 80px;
+    flex-shrink: 0;
+}
+
+.pf-logo-img {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: contain;
+}
+
+/* Stack on very small screens */
+@media (max-width: 480px) {
+    .pf-auth-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .pf-logo {
+        width: 72px;
+        height: 72px;
+    }
+}
+
+/* ============================
+   Auth Headings
+   ============================ */
+
 .pf-auth-title {
     font-size: 2rem;
     font-weight: 700;
-    margin: 0 0 0.5rem;
+    margin: 0 0 .4rem;
 }
 
 .pf-auth-subtitle {
-    margin: 0 0 1.75rem;
-    font-size: 0.95rem;
+    margin: 0;
+    font-size: .95rem;
     color: var(--pf-text-muted);
 }
 
-/* fields */
+/* ============================
+   Form Fields
+   ============================ */
+
 .pf-field {
+    margin-top: 1.75rem;
     margin-bottom: 1.25rem;
 }
 
 .pf-label {
     display: block;
-    margin-bottom: 0.4rem;
-    font-size: 0.9rem;
+    margin-bottom: .4rem;
+    font-size: .9rem;
     color: var(--pf-text-muted);
 }
 
 .pf-input {
     width: 100%;
-    padding: 0.75rem 1rem;
+    padding: .75rem 1rem;
     border-radius: var(--pf-radius-md);
     border: 1px solid var(--pf-border-subtle);
     background: #111;
     color: var(--pf-text-main);
     font-size: 1rem;
+    box-sizing: border-box;
+}
+
+.pf-input::placeholder {
+    color: #555;
 }
 
 .pf-input:focus {
@@ -219,41 +231,51 @@ a:hover {
     box-shadow: 0 0 0 2px var(--pf-accent-soft);
 }
 
-/* primary button */
+/* ============================
+   Primary Submit Button
+   ============================ */
+
 .pf-button {
     width: 100%;
     background: var(--pf-accent);
     color: #05150f;
     border: none;
-    padding: 0.9rem 1.2rem;
+    padding: .9rem 1.2rem;
     border-radius: var(--pf-radius-md);
     font-size: 1rem;
     font-weight: 600;
-    margin-top: 0.5rem;
+    margin-top: .5rem;
     cursor: pointer;
-    transition: background 0.18s ease;
+    transition: background 180ms ease, transform 100ms ease;
 }
 
 .pf-button:hover {
     background: var(--pf-accent-strong);
+    transform: translateY(-1px);
 }
 
-/* note text under button ("This link expires…") */
+.pf-button:active {
+    transform: translateY(0);
+}
+
+/* ============================
+   Note & Status Messaging
+   ============================ */
+
 .pf-note {
     margin-top: 1rem;
-    font-size: 0.85rem;
+    font-size: .85rem;
     color: var(--pf-text-muted);
 }
 
-/* success / error messages (4) */
 .pf-message-ok {
-    margin-top: 0.75rem;
-    font-size: 0.85rem;
+    margin-top: .75rem;
+    font-size: .85rem;
     color: var(--pf-accent);
 }
 
 .pf-message-error {
-    margin-top: 0.75rem;
-    font-size: 0.85rem;
+    margin-top: .75rem;
+    font-size: .85rem;
     color: var(--pf-danger);
 }

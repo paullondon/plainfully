@@ -24,18 +24,22 @@ unset($_SESSION['magic_link_error']);
         <!-- CARD THAT SITS IN THE MIDDLE -->
         <section class="pf-auth-card">
 
-            <!-- LOGO (inline or include) -->
-            <div class="pf-logo pf-logo--large" style="margin-bottom: 1.5rem;">
-                <img 
-                    src="/assets/img/logo-icon.svg" 
-                    alt="Plainfully logo"
-                    class="pf-logo-img">
-            </div>
+            <!-- HEADER: logo + text inline -->
+            <header class="pf-auth-header">
+                <div class="pf-logo pf-logo--large">
+                    <img
+                        src="/assets/img/logo-icon.svg"
+                        alt="Plainfully logo"
+                        class="pf-logo-img">
+                </div>
 
-            <h1 class="pf-auth-title">Sign in to Plainfully</h1>
-            <p class="pf-auth-subtitle">
-                We’ll email you a one-time magic link to sign in.
-            </p>
+                <div class="pf-auth-heading">
+                    <h1 class="pf-auth-title">Sign in to Plainfully</h1>
+                    <p class="pf-auth-subtitle">
+                        We’ll email you a one-time magic link to sign in.
+                    </p>
+                </div>
+            </header>
 
             <form method="post"
                 action="/login"
