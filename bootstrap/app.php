@@ -98,32 +98,32 @@ session_start();
 // ---------------------------------------------------------
 // 4. Load config + helpers + modules
 // ---------------------------------------------------------
-$config = require dirname(__DIR__) . '/config/app.php';
+$config = require_once dirname(__DIR__) . '/config/app.php';
 
 // views
-require dirname(__DIR__) . '/app/views/render.php';
-require dirname(__DIR__) . '/app/dashboard.php';
+require_once dirname(__DIR__) . '/app/views/render.php';
+require_once dirname(__DIR__) . '/app/dashboard.php';
 
 // support
-require dirname(__DIR__) . '/app/support/helpers.php';
-require dirname(__DIR__) . '/app/support/db.php';
-require dirname(__DIR__) . '/app/support/mailer.php';
-require dirname(__DIR__) . '/app/support/rate_limiter.php';
-require dirname(__DIR__) . '/app/support/session_hardening.php';
-require dirname(__DIR__) . '/app/support/auth_middleware.php';
-require dirname(__DIR__) . '/app/support/request.php';
-require dirname(__DIR__) . '/app/support/csrf.php';
-require dirname(__DIR__) . '/app/support/auth_log.php';
+require_once dirname(__DIR__) . '/app/support/helpers.php';
+require_once dirname(__DIR__) . '/app/support/db.php';
+require_once dirname(__DIR__) . '/app/support/mailer.php';
+require_once dirname(__DIR__) . '/app/support/rate_limiter.php';
+require_once dirname(__DIR__) . '/app/support/session_hardening.php';
+require_once dirname(__DIR__) . '/app/support/auth_middleware.php';
+require_once dirname(__DIR__) . '/app/support/request.php';
+require_once dirname(__DIR__) . '/app/support/csrf.php';
+require_once dirname(__DIR__) . '/app/support/auth_log.php';
 
 // controllers
-require dirname(__DIR__) . '/app/controllers/welcome_controller.php';
-require dirname(__DIR__) . '/app/controllers/health_controller.php';
-require dirname(__DIR__) . '/app/controllers/dashboard_controller.php';
-require dirname(__DIR__) . '/app/controllers/logout_controller.php';
-require dirname(__DIR__) . '/app/controllers/clarifications_controller.php';
+require_once dirname(__DIR__) . '/app/controllers/welcome_controller.php';
+require_once dirname(__DIR__) . '/app/controllers/health_controller.php';
+require_once dirname(__DIR__) . '/app/controllers/dashboard_controller.php';
+require_once dirname(__DIR__) . '/app/controllers/logout_controller.php';
+require_once dirname(__DIR__) . '/app/controllers/clarifications_controller.php';
 
 // auth
-require dirname(__DIR__) . '/app/auth/login.php';
+require_once dirname(__DIR__) . '/app/auth/login.php';
 
 // router
 require dirname(__DIR__) . '/routes/web.php';
