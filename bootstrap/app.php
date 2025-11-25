@@ -102,7 +102,6 @@ $config = require dirname(__DIR__) . '/config/app.php';
 
 // Debug toggle from config
 if (strtolower($env) !== 'live' {
-    error_reporting(E_ALL);
     ini_set('display_errors', '1');
     ini_set('display_startup_errors', '1');
 } else {
