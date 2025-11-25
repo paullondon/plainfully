@@ -119,7 +119,7 @@ require_once dirname(__DIR__) . '/app/support/auth_log.php';
 // controllers
 require_once dirname(__DIR__) . '/app/controllers/welcome_controller.php';
 require_once dirname(__DIR__) . '/app/controllers/health_controller.php';
-require_once dirname(__DIR__) . '/app/controllers/dashboard_controller.php';
+//require_once dirname(__DIR__) . '/app/controllers/dashboard_controller.php';
 require_once dirname(__DIR__) . '/app/controllers/logout_controller.php';
 require_once dirname(__DIR__) . '/app/controllers/clarifications_controller.php';
 
