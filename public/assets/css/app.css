@@ -209,7 +209,7 @@ body {
     display: flex;
     align-items: center;
     gap: 1.4rem;
-    margin-bottom: 1.75rem;
+    margin-bottom: 1.25rem;
 }
 
 .pf-auth-heading {
@@ -327,7 +327,7 @@ body {
     justify-content: space-between;
     align-items: flex-start;
     gap: 2rem;
-    margin-bottom: 2.5rem;
+    margin-bottom: 1.25rem;
     flex-wrap: wrap; /* prevents overflow/overlap */
 }
 
