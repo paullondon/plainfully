@@ -100,6 +100,16 @@ session_start();
 // ---------------------------------------------------------
 $config = require_once dirname(__DIR__) . '/config/app.php';
 
+// Debug toggle from config
+if (strtolower($env) !== 'live' {
+    error_reporting(E_ALL);
+    ini_set('display_errors', '1');
+    ini_set('display_startup_errors', '1');
+} else {
+    ini_set('display_errors', '0');
+    ini_set('display_startup_errors', '0');
+}
+
 // views
 require_once dirname(__DIR__) . '/app/views/render.php';
 require_once dirname(__DIR__) . '/app/dashboard.php';
