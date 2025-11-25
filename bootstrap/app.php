@@ -4,7 +4,7 @@
  * Plainfully Bootstrapper
  * 
  * Loads environment, config, handlers, middleware,
- * support libraries and all required controllers.
+ * support libraries and all require_onced controllers.
  */
 
 // ---------------------------------------------------------
@@ -58,7 +58,7 @@ set_exception_handler(function (Throwable $e): void {
     } else {
         // user friendly
         ob_start();
-        require dirname(__DIR__) . '/app/views/errors/500.php';
+        require_once dirname(__DIR__) . '/app/views/errors/500.php';
         $inner = ob_get_clean();
         pf_render_shell('Error', $inner);
     }
@@ -92,36 +92,36 @@ session_set_cookie_params([
     'samesite' => 'Lax',     // good default for auth
 ]);
 
-session_start();
--
 // ---------------------------------------------------------
 // 4. Load config + helpers + modules
 // ---------------------------------------------------------
 $config = require dirname(__DIR__) . '/config/app.php';
 
+session_start();
+
 // views
-require dirname(__DIR__) . '/app/views/render.php';
-
-// support
-require dirname(__DIR__) . '/app/support/helpers.php';
-require dirname(__DIR__) . '/app/support/db.php';
-require dirname(__DIR__) . '/app/support/mailer.php';
-require dirname(__DIR__) . '/app/support/rate_limiter.php';
-require dirname(__DIR__) . '/app/support/session_hardening.php';
-require dirname(__DIR__) . '/app/support/auth_middleware.php';
-require dirname(__DIR__) . '/app/support/request.php';
-require dirname(__DIR__) . '/app/support/csrf.php';
-require dirname(__DIR__) . '/app/support/auth_log.php';
-
-// controllers
-require dirname(__DIR__) . '/app/controllers/welcome_controller.php';
-require dirname(__DIR__) . '/app/controllers/health_controller.php';
-require dirname(__DIR__) . '/app/controllers/logout_controller.php';
-require dirname(__DIR__) . '/app/controllers/clarifications_controller.php';
-require dirname(__DIR__) . '/app/controllers/dashboard.php';
+require_once dirname(__DIR__) . '/app/views/render.php';
 
 // auth
-require dirname(__DIR__) . '/app/auth/login.php';
+require_once dirname(__DIR__) . '/app/auth/login.php';
+
+// support
+require_once dirname(__DIR__) . '/app/support/helpers.php';
+require_once dirname(__DIR__) . '/app/support/db.php';
+require_once dirname(__DIR__) . '/app/support/mailer.php';
+require_once dirname(__DIR__) . '/app/support/rate_limiter.php';
+require_once dirname(__DIR__) . '/app/support/session_hardening.php';
+require_once dirname(__DIR__) . '/app/support/auth_middleware.php';
+require_once dirname(__DIR__) . '/app/support/request.php';
+require_once dirname(__DIR__) . '/app/support/csrf.php';
+require_once dirname(__DIR__) . '/app/support/auth_log.php';
+
+// controllers
+require_once dirname(__DIR__) . '/app/controllers/welcome_controller.php';
+require_once dirname(__DIR__) . '/app/controllers/health_controller.php';
+require_once dirname(__DIR__) . '/app/controllers/logout_controller.php';
+require_once dirname(__DIR__) . '/app/controllers/clarifications_controller.php';
+require_once dirname(__DIR__) . '/app/controllers/dashboard.php';
 
 // router
-require dirname(__DIR__) . '/routes/web.php';
+require_once dirname(__DIR__) . '/routes/web.php';
