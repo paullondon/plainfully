@@ -103,7 +103,7 @@ session_start();
 
 // views
 require dirname(__DIR__) . '/app/views/render.php';
-require dirname(__DIR__) . '/app/dashboard.php';
+//require dirname(__DIR__) . '/app/dashboard.php';
 
 // support
 require dirname(__DIR__) . '/app/support/helpers.php';
@@ -119,7 +119,7 @@ require dirname(__DIR__) . '/app/support/auth_log.php';
 // controllers
 require dirname(__DIR__) . '/app/controllers/welcome_controller.php';
 require dirname(__DIR__) . '/app/controllers/health_controller.php';
-//require dirname(__DIR__) . '/app/controllers/dashboard_controller.php';
+require dirname(__DIR__) . '/app/controllers/dashboard_controller.php';
 require dirname(__DIR__) . '/app/controllers/logout_controller.php';
 require dirname(__DIR__) . '/app/controllers/clarifications_controller.php';
 
