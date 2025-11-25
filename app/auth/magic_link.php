@@ -180,5 +180,5 @@ function handle_magic_verify(): void
         $showDebug('Exception', $e->getMessage() . "\n" . $e->getFile() . ':' . $e->getLine());
     }
 
-    pf_redirect('/');
+    pf_redirect('/dashboard'');
 }

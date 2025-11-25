@@ -19,8 +19,12 @@ function pf_is_logged_in(): bool
  */
 function require_login(): void
 {
-    if (!pf_is_logged_in()) {
-        header('Location: /login', true, 302);
+    if (empty($_SESSION['user_id'])) {
+        // TEMP DEBUG
+        header('Content-Type: text/plain; charset=utf-8');
+        echo "DEBUG: require_login() thinks you are NOT logged in.\n\n";
+        echo "SESSION DUMP:\n";
+        var_export($_SESSION);
         exit;
     }
 }

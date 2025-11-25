@@ -92,14 +92,12 @@ session_set_cookie_params([
     'samesite' => 'Lax',     // good default for auth
 ]);
 
-
-
+session_start();
+-
 // ---------------------------------------------------------
 // 4. Load config + helpers + modules
 // ---------------------------------------------------------
 $config = require dirname(__DIR__) . '/config/app.php';
-
-session_start();
 
 // views
 require dirname(__DIR__) . '/app/views/render.php';
