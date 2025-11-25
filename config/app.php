@@ -12,7 +12,7 @@ return [
     'app' => [
         'base_url' => getenv('APP_BASE_URL') ?: 'https://plainfully.com',
         'env'      => getenv('APP_ENV') ?: 'local', // 'Live' is fine, we just treat it as a label
-        'css'      => '251125-002'
+        'css'      => '251125-003'
     ],
 
     // Database connection (MariaDB / MySQL)
