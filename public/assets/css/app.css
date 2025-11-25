@@ -483,3 +483,260 @@ html, body {
         grid-template-columns: 1fr;
     }
 }
+/* ============================
+   Plainfully – Logged-in Shell
+   ============================ */
+
+.pf-shell-loggedin {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background: radial-gradient(circle at top, #202020 0, var(--pf-bg) 45%, #050505 100%);
+    color: var(--pf-text-main);
+}
+
+.pf-main {
+    max-width: 1080px;
+    width: 100%;
+    margin: 4rem auto 3rem;
+    padding: 0 1.5rem;
+    box-sizing: border-box;
+}
+
+/* ============================
+   Dashboard Layout
+   ============================ */
+
+.pf-dashboard {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+}
+
+/* Top header row */
+.pf-dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 2rem;
+    align-items: flex-start;
+}
+
+.pf-dashboard-title {
+    margin: 0 0 .5rem;
+    font-size: 2rem;
+}
+
+.pf-dashboard-subtitle {
+    margin: 0;
+    font-size: .95rem;
+    color: var(--pf-text-muted);
+}
+
+/* Plan / upsell card */
+.pf-dashboard-plan {
+    background: var(--pf-surface);
+    border-radius: var(--pf-radius-lg);
+    border: 1px solid var(--pf-border-subtle);
+    padding: 1.25rem 1.5rem;
+    min-width: 260px;
+    box-shadow: var(--pf-shadow-subtle);
+}
+
+.pf-plan-label {
+    font-size: .8rem;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--pf-text-soft);
+}
+
+.pf-plan-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: .25rem .75rem;
+    border-radius: 999px;
+    margin-top: .35rem;
+    font-weight: 600;
+    font-size: .9rem;
+    border: 1px solid var(--pf-border-subtle);
+    background: var(--pf-surface-soft);
+}
+
+.pf-plan-chip--basic {
+    border-color: var(--pf-chaos-3);
+    color: var(--pf-chaos-3);
+}
+
+.pf-plan-chip--pro {
+    border-color: var(--pf-chaos-1);
+    color: var(--pf-chaos-1);
+}
+
+.pf-plan-chip--unlimited {
+    border-color: var(--pf-chaos-4);
+    color: var(--pf-chaos-4);
+}
+
+.pf-plan-tagline {
+    margin: .75rem 0 1rem;
+    font-size: .9rem;
+    color: var(--pf-text-muted);
+}
+
+.pf-plan-upgrade {
+    margin: 0;
+}
+
+.pf-plan-note {
+    margin: .75rem 0 0;
+    font-size: .85rem;
+    color: var(--pf-text-muted);
+}
+
+/* Main grid: primary card + recent list */
+.pf-dashboard-main-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1.4fr);
+    gap: 1.75rem;
+}
+
+.pf-dashboard-card {
+    background: var(--pf-surface);
+    border-radius: var(--pf-radius-lg);
+    border: 1px solid var(--pf-border-subtle);
+    padding: 1.75rem 1.5rem;
+    box-shadow: var(--pf-shadow-subtle);
+}
+
+.pf-dashboard-card--primary {
+    border-color: var(--pf-accent);
+}
+
+.pf-dashboard-card--secondary {
+    border-style: dashed;
+}
+
+.pf-card-title {
+    margin: 0 0 .6rem;
+    font-size: 1.25rem;
+}
+
+.pf-card-text {
+    margin: 0 0 1.25rem;
+    font-size: .95rem;
+    color: var(--pf-text-muted);
+}
+
+.pf-card-text--muted {
+    font-size: .9rem;
+    color: var(--pf-text-soft);
+}
+
+.pf-dashboard-cta {
+    margin-top: .25rem;
+}
+
+/* Upsell banner inside primary card */
+.pf-upsell-banner {
+    margin-top: 1.5rem;
+    padding: .9rem 1rem;
+    border-radius: var(--pf-radius-md);
+    background: var(--pf-accent-soft);
+    border: 1px solid rgba(26, 179, 133, 0.35);
+}
+
+.pf-upsell-banner--soft {
+    background: rgba(195, 33, 72, 0.08);
+    border-color: rgba(195, 33, 72, 0.4);
+}
+
+.pf-upsell-text {
+    margin: 0 0 .35rem;
+    font-size: .9rem;
+    color: var(--pf-text-main);
+}
+
+/* Links */
+.pf-link {
+    text-decoration: none;
+    color: var(--pf-accent);
+}
+
+.pf-link:hover {
+    color: var(--pf-accent-strong);
+}
+
+.pf-link--inline {
+    font-size: .85rem;
+}
+
+.pf-link--subtle {
+    font-size: .85rem;
+    color: var(--pf-text-muted);
+}
+
+.pf-link--subtle:hover {
+    color: var(--pf-accent);
+}
+
+/* Recent list */
+.pf-list {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 1rem;
+}
+
+.pf-list-item + .pf-list-item {
+    margin-top: .5rem;
+}
+
+.pf-list-link {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: .5rem .6rem;
+    border-radius: var(--pf-radius-md);
+    text-decoration: none;
+    color: var(--pf-text-main);
+    background: transparent;
+    transition: background 120ms ease, transform 80ms ease;
+}
+
+.pf-list-link:hover {
+    background: var(--pf-surface-soft);
+    transform: translateY(-1px);
+}
+
+.pf-list-main {
+    display: flex;
+    flex-direction: column;
+    gap: .15rem;
+}
+
+.pf-list-title {
+    font-size: .95rem;
+}
+
+.pf-list-status {
+    font-size: .8rem;
+    color: var(--pf-text-muted);
+}
+
+.pf-list-meta {
+    font-size: .8rem;
+    color: var(--pf-text-soft);
+}
+
+/* Responsive tweaks */
+@media (max-width: 768px) {
+    .pf-dashboard-header {
+        flex-direction: column;
+    }
+
+    .pf-dashboard-main-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .pf-dashboard-plan {
+        width: 100%;
+    }
+}
