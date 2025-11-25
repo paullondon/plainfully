@@ -1,0 +1,63 @@
+<?php declare(strict_types=1);
+
+// app/controllers/dashboard.php
+
+/**
+ * Plainfully – Dashboard controller
+ *
+ * Logged-in landing page.
+ * Shows:
+ *  - Primary CTA to start a new consultation
+ *  - Current subscription plan + upgrade CTA
+ *  - Recent consultations (Plainfully's results only)
+ */
+function handle_dashboard(): void
+{
+    // We assume require_login() has already run in routes/web.php
+    $userName  = $_SESSION['user_name']         ?? 'there';
+    $planKey   = $_SESSION['subscription_plan'] ?? 'basic';
+
+    $planKey = strtolower((string)$planKey);
+
+    $planLabels = [
+        'basic'     => 'Basic',
+        'pro'       => 'Pro',
+        'unlimited' => 'Unlimited',
+    ];
+    $planTaglines = [
+        'basic'     => 'Great for occasional letters and one-off clarifications.',
+        'pro'       => 'For regular use with more consultations and faster responses.',
+        'unlimited' => 'Best for heavy use – maximum flexibility and priority handling.',
+    ];
+
+    $planLabel   = $planLabels[$planKey]   ?? $planLabels['basic'];
+    $planTagline = $planTaglines[$planKey] ?? $planTaglines['basic'];
+
+    /**
+     * IMPORTANT PRIVACY RULE:
+     * Only store/display Plainfully's *output*, not raw user input.
+     *
+     * Shape suggestion:
+     * [
+     *   'id'           => int,
+     *   'result_title' => string, // e.g. "Letter drafted: ESA reconsideration"
+     *   'created_at'   => string, // preformatted date/time
+     *   'status'       => string, // e.g. "sent", "draft"
+     * ]
+     */
+    $recentConsultations = []; // TODO: replace with real DB lookup later
+
+    // Prepare safe variables for the view
+    $userNameSafe     = htmlspecialchars($userName, ENT_QUOTES, 'UTF-8');
+    $planLabelSafe    = htmlspecialchars($planLabel, ENT_QUOTES, 'UTF-8');
+    $planKeySafe      = htmlspecialchars($planKey, ENT_QUOTES, 'UTF-8');
+    $planTaglineSafe  = htmlspecialchars($planTagline, ENT_QUOTES, 'UTF-8');
+
+    // Render the view into a buffer
+    ob_start();
+    require __DIR__ . '/../views/dashboard.php';
+    $innerHtml = (string)ob_get_clean();
+
+    // Wrap with the global shell (app/views/render.php)
+    pf_render_shell('Dashboard', $innerHtml);
+}
