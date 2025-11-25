@@ -349,9 +349,11 @@ body {
     color: var(--pf-text-muted);
 }
 
-/* Plan / upsell card */
+/* Plan / upsell card (fixed layout bug) */
 .pf-dashboard-plan {
-    flex: 0 0 260px;
+    flex: 0 1 320px;             /* Preferred width 320, but allowed to shrink */
+    min-width: 260px;            /* Never collapse below */
+    max-width: 380px;            /* Prevent over-expansion */
     background: var(--pf-surface);
     border-radius: var(--pf-radius-lg);
     border: 1px solid var(--pf-border-subtle);
@@ -536,10 +538,6 @@ body {
 
     .pf-dashboard-main-grid {
         grid-template-columns: 1fr;
-    }
-
-    .pf-dashboard-plan {
-        width: 100%;
     }
 }
 
