@@ -41,7 +41,8 @@
    Base Layout + Typography
    ============================ */
 
-html, body {
+html,
+body {
     margin: 0;
     padding: 0;
     background: var(--pf-bg);
@@ -49,7 +50,7 @@ html, body {
     font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
-/* App Shell */
+/* Legacy shell (used by login view that has its own <body class="pf-shell">) */
 .pf-shell {
     min-height: 100vh;
     display: flex;
@@ -58,10 +59,25 @@ html, body {
     color: var(--pf-text-main);
 }
 
-/* ============================
-   Generic Cards / Panels
-   ============================ */
+/* Logged-in shell (used via pf_render_shell) */
+.pf-shell-loggedin {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background: radial-gradient(circle at top, #202020 0, var(--pf-bg) 45%, #050505 100%);
+    color: var(--pf-text-main);
+}
 
+/* Main content wrapper for logged-in pages */
+.pf-main {
+    max-width: 1100px;
+    width: 100%;
+    margin: 4rem auto 3rem;
+    padding: 0 2rem;
+    box-sizing: border-box;
+}
+
+/* Generic card / panel */
 .pf-card {
     background: var(--pf-surface);
     border-radius: var(--pf-radius-lg);
@@ -71,7 +87,7 @@ html, body {
 }
 
 /* ============================
-   Buttons
+   Buttons & Links
    ============================ */
 
 .pf-btn {
@@ -85,8 +101,11 @@ html, body {
     font-size: .95rem;
     font-weight: 600;
     cursor: pointer;
-    transition: background-color 150ms ease, border-color 150ms ease,
-                box-shadow 150ms ease, transform 120ms ease;
+    transition:
+        background-color 150ms ease,
+        border-color 150ms ease,
+        box-shadow 150ms ease,
+        transform 120ms ease;
 }
 
 .pf-btn--primary {
@@ -116,8 +135,55 @@ html, body {
     background: var(--pf-accent-soft);
 }
 
+/* Primary form-style button */
+.pf-button {
+    width: 100%;
+    background: var(--pf-accent);
+    color: #05150f;
+    border: none;
+    padding: .9rem 1.2rem;
+    border-radius: var(--pf-radius-md);
+    font-size: 1rem;
+    font-weight: 600;
+    margin-top: .5rem;
+    cursor: pointer;
+    transition: background 180ms ease, transform 100ms ease;
+}
+
+.pf-button:hover {
+    background: var(--pf-accent-strong);
+    transform: translateY(-1px);
+}
+
+.pf-button:active {
+    transform: translateY(0);
+}
+
+/* Links */
+.pf-link {
+    text-decoration: none;
+    color: var(--pf-accent);
+}
+
+.pf-link:hover {
+    color: var(--pf-accent-strong);
+}
+
+.pf-link--inline {
+    font-size: .85rem;
+}
+
+.pf-link--subtle {
+    font-size: .85rem;
+    color: var(--pf-text-muted);
+}
+
+.pf-link--subtle:hover {
+    color: var(--pf-accent);
+}
+
 /* ============================
-   Auth Page Layout
+   Auth Page Layout (magic link)
    ============================ */
 
 .pf-page-center {
@@ -138,8 +204,7 @@ html, body {
     box-shadow: var(--pf-shadow-subtle);
 }
 
-/* ----- Logo + heading inline ----- */
-
+/* Header: logo + heading inline */
 .pf-auth-header {
     display: flex;
     align-items: center;
@@ -166,22 +231,7 @@ html, body {
     object-fit: contain;
 }
 
-/* Stack on very small screens */
-@media (max-width: 480px) {
-    .pf-auth-header {
-        flex-direction: column;
-        align-items: flex-start;
-    }
-    .pf-logo {
-        width: 72px;
-        height: 72px;
-    }
-}
-
-/* ============================
-   Auth Headings
-   ============================ */
-
+/* Auth headings */
 .pf-auth-title {
     font-size: 2rem;
     font-weight: 700;
@@ -194,10 +244,7 @@ html, body {
     color: var(--pf-text-muted);
 }
 
-/* ============================
-   Form Fields
-   ============================ */
-
+/* Auth form fields */
 .pf-field {
     margin-top: 1.75rem;
     margin-bottom: 1.25rem;
@@ -231,37 +278,7 @@ html, body {
     box-shadow: 0 0 0 2px var(--pf-accent-soft);
 }
 
-/* ============================
-   Primary Submit Button
-   ============================ */
-
-.pf-button {
-    width: 100%;
-    background: var(--pf-accent);
-    color: #05150f;
-    border: none;
-    padding: .9rem 1.2rem;
-    border-radius: var(--pf-radius-md);
-    font-size: 1rem;
-    font-weight: 600;
-    margin-top: .5rem;
-    cursor: pointer;
-    transition: background 180ms ease, transform 100ms ease;
-}
-
-.pf-button:hover {
-    background: var(--pf-accent-strong);
-    transform: translateY(-1px);
-}
-
-.pf-button:active {
-    transform: translateY(0);
-}
-
-/* ============================
-   Note & Status Messaging
-   ============================ */
-
+/* Auth note & messages */
 .pf-note {
     margin-top: 1rem;
     font-size: .85rem;
@@ -279,248 +296,48 @@ html, body {
     font-size: .85rem;
     color: var(--pf-danger);
 }
+
+/* Stack auth header on very small screens */
+@media (max-width: 480px) {
+    .pf-auth-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .pf-logo {
+        width: 72px;
+        height: 72px;
+    }
+}
+
 /* ============================
    Plainfully – Dashboard
    ============================ */
 
-.pf-shell-loggedin {
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    background: radial-gradient(circle at top, #202020 0, var(--pf-bg) 45%, #050505 100%);
-    color: var(--pf-text-main);
-}
-
-.pf-main {
-    max-width: 1080px;
-    width: 100%;
-    margin: 4rem auto 3rem;
-    padding: 0 1.5rem;
-    box-sizing: border-box;
-}
-
+/* Dashboard wrapper inside .pf-main */
 .pf-dashboard {
     display: flex;
     flex-direction: column;
     gap: 2rem;
 }
 
-/* Top header row */
+/* Top header row: welcome + plan box */
 .pf-dashboard-header {
     display: flex;
     justify-content: space-between;
-    gap: 2rem;
     align-items: flex-start;
-}
-
-.pf-dashboard-title {
-    margin: 0 0 .5rem;
-    font-size: 2rem;
-}
-
-.pf-dashboard-subtitle {
-    margin: 0;
-    color: var(--pf-text-muted);
-    font-size: .95rem;
-}
-
-/* Plan card / upsell */
-.pf-dashboard-plan {
-    background: var(--pf-surface);
-    border-radius: var(--pf-radius-lg);
-    border: 1px solid var(--pf-border-subtle);
-    padding: 1.25rem 1.5rem;
-    min-width: 260px;
-    box-shadow: var(--pf-shadow-subtle);
-}
-
-.pf-plan-label {
-    font-size: .8rem;
-    text-transform: uppercase;
-    letter-spacing: .08em;
-    color: var(--pf-text-soft);
-}
-
-.pf-plan-chip {
-    display: inline-flex;
-    align-items: center;
-    padding: .25rem .75rem;
-    border-radius: 999px;
-    margin-top: .35rem;
-    font-weight: 600;
-    font-size: .9rem;
-    border: 1px solid var(--pf-border-subtle);
-    background: var(--pf-surface-soft);
-}
-
-.pf-plan-chip--basic {
-    border-color: var(--pf-chaos-3);
-    color: var(--pf-chaos-3);
-}
-
-.pf-plan-chip--pro {
-    border-color: var(--pf-chaos-1);
-    color: var(--pf-chaos-1);
-}
-
-.pf-plan-chip--unlimited {
-    border-color: var(--pf-chaos-4);
-    color: var(--pf-chaos-4);
-}
-
-.pf-plan-tagline {
-    margin: .75rem 0 1rem;
-    font-size: .9rem;
-    color: var(--pf-text-muted);
-}
-
-.pf-plan-upgrade {
-    margin: 0;
-}
-
-.pf-plan-note {
-    margin: .75rem 0 0;
-    font-size: .85rem;
-    color: var(--pf-text-muted);
-}
-
-/* Main grid: new consultation + recent */
-.pf-dashboard-main-grid {
-    display: grid;
-    grid-template-columns: minmax(0, 2fr) minmax(0, 1.4fr);
-    gap: 1.75rem;
-}
-
-.pf-dashboard-card {
-    background: var(--pf-surface);
-    border-radius: var(--pf-radius-lg);
-    border: 1px solid var(--pf-border-subtle);
-    padding: 1.75rem 1.5rem;
-    box-shadow: var(--pf-shadow-subtle);
-}
-
-.pf-dashboard-card--primary {
-    border-color: var(--pf-accent);
-}
-
-.pf-dashboard-card--secondary {
-    border-style: dashed;
-}
-
-.pf-card-title {
-    margin: 0 0 .6rem;
-    font-size: 1.25rem;
-}
-
-.pf-card-text {
-    margin: 0 0 1.25rem;
-    font-size: .95rem;
-    color: var(--pf-text-muted);
-}
-
-.pf-card-text--muted {
-    font-size: .9rem;
-    color: var(--pf-text-soft);
-}
-
-.pf-dashboard-cta {
-    margin-top: .25rem;
-}
-
-/* Recent list */
-.pf-list {
-    list-style: none;
-    padding: 0;
-    margin: 0 0 1rem;
-}
-
-.pf-list-item + .pf-list-item {
-    margin-top: .5rem;
-}
-
-.pf-list-link {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    padding: .5rem .6rem;
-    border-radius: var(--pf-radius-md);
-    text-decoration: none;
-    color: var(--pf-text-main);
-    background: transparent;
-    transition: background 120ms ease, transform 80ms ease;
-}
-
-.pf-list-link:hover {
-    background: var(--pf-surface-soft);
-    transform: translateY(-1px);
-}
-
-.pf-list-title {
-    font-size: .95rem;
-}
-
-.pf-list-meta {
-    font-size: .8rem;
-    color: var(--pf-text-soft);
-}
-
-/* Subtle link */
-.pf-link--subtle {
-    font-size: .85rem;
-    color: var(--pf-text-muted);
-}
-
-.pf-link--subtle:hover {
-    color: var(--pf-accent);
-}
-
-/* Responsive */
-@media (max-width: 768px) {
-    .pf-dashboard-header {
-        flex-direction: column;
-    }
-    .pf-dashboard-main-grid {
-        grid-template-columns: 1fr;
-    }
-}
-/* ============================
-   Plainfully – Logged-in Shell
-   ============================ */
-
-.pf-shell-loggedin {
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    background: radial-gradient(circle at top, #202020 0, var(--pf-bg) 45%, #050505 100%);
-    color: var(--pf-text-main);
-}
-
-.pf-main {
-    max-width: 1080px;
-    width: 100%;
-    margin: 4rem auto 3rem;
-    padding: 0 1.5rem;
-    box-sizing: border-box;
-}
-
-/* ============================
-   Dashboard Layout
-   ============================ */
-
-.pf-dashboard {
-    display: flex;
-    flex-direction: column;
     gap: 2rem;
+    margin-bottom: 2.5rem;
+    flex-wrap: wrap; /* prevents overflow/overlap */
 }
 
-/* Top header row */
-.pf-dashboard-header {
-    display: flex;
-    justify-content: space-between;
-    gap: 2rem;
-    align-items: flex-start;
+/* Welcome block flex behaviour */
+.pf-dashboard-welcome {
+    flex: 1 1 320px;
+    min-width: 280px;
 }
 
+/* Title + subtitle */
 .pf-dashboard-title {
     margin: 0 0 .5rem;
     font-size: 2rem;
@@ -534,12 +351,13 @@ html, body {
 
 /* Plan / upsell card */
 .pf-dashboard-plan {
+    flex: 0 0 260px;
     background: var(--pf-surface);
     border-radius: var(--pf-radius-lg);
     border: 1px solid var(--pf-border-subtle);
     padding: 1.25rem 1.5rem;
-    min-width: 260px;
     box-shadow: var(--pf-shadow-subtle);
+    box-sizing: border-box;
 }
 
 .pf-plan-label {
@@ -592,27 +410,31 @@ html, body {
     color: var(--pf-text-muted);
 }
 
-/* Main grid: primary card + recent list */
+/* Main dashboard grid: new consultation + recent list */
 .pf-dashboard-main-grid {
     display: grid;
-    grid-template-columns: minmax(0, 2fr) minmax(0, 1.4fr);
-    gap: 1.75rem;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
 }
 
+/* Dashboard cards */
 .pf-dashboard-card {
     background: var(--pf-surface);
     border-radius: var(--pf-radius-lg);
     border: 1px solid var(--pf-border-subtle);
-    padding: 1.75rem 1.5rem;
+    padding: 2rem;
     box-shadow: var(--pf-shadow-subtle);
+    box-sizing: border-box;
 }
 
+/* Make primary card stand out */
 .pf-dashboard-card--primary {
-    border-color: var(--pf-accent);
+    border-left: 4px solid var(--pf-accent);
 }
 
+/* Secondary card */
 .pf-dashboard-card--secondary {
-    border-style: dashed;
+    border-left: 4px solid var(--pf-chaos-4);
 }
 
 .pf-card-title {
@@ -655,30 +477,7 @@ html, body {
     color: var(--pf-text-main);
 }
 
-/* Links */
-.pf-link {
-    text-decoration: none;
-    color: var(--pf-accent);
-}
-
-.pf-link:hover {
-    color: var(--pf-accent-strong);
-}
-
-.pf-link--inline {
-    font-size: .85rem;
-}
-
-.pf-link--subtle {
-    font-size: .85rem;
-    color: var(--pf-text-muted);
-}
-
-.pf-link--subtle:hover {
-    color: var(--pf-accent);
-}
-
-/* Recent list */
+/* Recent consultations list */
 .pf-list {
     list-style: none;
     padding: 0;
@@ -726,7 +525,10 @@ html, body {
     color: var(--pf-text-soft);
 }
 
-/* Responsive tweaks */
+/* ============================
+   Responsive Tweaks
+   ============================ */
+
 @media (max-width: 768px) {
     .pf-dashboard-header {
         flex-direction: column;
@@ -738,5 +540,12 @@ html, body {
 
     .pf-dashboard-plan {
         width: 100%;
+    }
+}
+
+@media (max-width: 800px) {
+    .pf-main {
+        margin-top: 2.5rem;
+        padding: 0 1.25rem;
     }
 }
