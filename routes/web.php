@@ -75,8 +75,8 @@ switch (true) {
     // -------------------------------------------------
     case $path === '/dashboard' && $method === 'GET':
         require_login();
-        handle_dashboard();
-        break;
+        pf_redirect('/dashboard');
+         break;
     
     // -------------------------------------------------
     // Logout
