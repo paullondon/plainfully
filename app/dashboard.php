@@ -12,12 +12,6 @@
  */
 function handle_dashboard(): void
 {
-    // Extra safety: should already be enforced by require_login()
-    if (empty($_SESSION['user_id'])) {
-        pf_redirect('/login');
-        return;
-    }
-
     $userName  = $_SESSION['user_name']         ?? 'there';
     $planKey   = $_SESSION['subscription_plan'] ?? 'basic';
 
