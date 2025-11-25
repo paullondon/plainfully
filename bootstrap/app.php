@@ -98,7 +98,7 @@ session_start();
 // ---------------------------------------------------------
 // 4. Load config + helpers + modules
 // ---------------------------------------------------------
-$config = require_once dirname(__DIR__) . '/config/app.php';
+$config = require dirname(__DIR__) . '/config/app.php';
 
 // Debug toggle from config
 if (strtolower($env) !== 'live' {
