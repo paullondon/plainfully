@@ -92,7 +92,6 @@ session_set_cookie_params([
     'samesite' => 'Lax',     // good default for auth
 ]);
 
-session_start();
 
 
 // ---------------------------------------------------------
@@ -108,6 +107,8 @@ if (strtolower($env) !== 'live' {
     ini_set('display_errors', '0');
     ini_set('display_startup_errors', '0');
 }
+
+session_start();
 
 // views
 require_once dirname(__DIR__) . '/app/views/render.php';
