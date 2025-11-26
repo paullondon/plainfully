@@ -323,18 +323,19 @@ body {
 
 /* Top header row: welcome + plan box */
 .pf-dashboard-header {
-    display: flex;
-    justify-content: space-between;
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr);
+    gap: 1.25rem;              /* smaller gap between welcome + plan */
+    margin-bottom: 1.25rem;    /* smaller gap before main cards */
     align-items: flex-start;
-    gap: 2rem;
-    margin-bottom: 1.25rem;
-    flex-wrap: wrap; /* prevents overflow/overlap */
 }
 
-/* Welcome block flex behaviour */
-.pf-dashboard-welcome {
-    flex: 1 1 320px;
-    min-width: 280px;
+/* On anything below ~1200px wide, stack vertically:
+   Welcome first, then plan card. This kills the giant "fake gap". */
+@media (max-width: 1200px) {
+    .pf-dashboard-header {
+        grid-template-columns: 1fr;
+    }
 }
 
 /* Title + subtitle */
@@ -412,11 +413,10 @@ body {
     color: var(--pf-text-muted);
 }
 
-/* Main dashboard grid: new consultation + recent list */
 .pf-dashboard-main-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 2rem;
+    gap: 1.25rem;   /* not 2rem */
 }
 
 /* Dashboard cards */
