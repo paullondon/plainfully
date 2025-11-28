@@ -45,7 +45,7 @@ return [
         'magic_link_ttl_minutes' => (int)(getenv('MAGIC_LINK_TTL_MINUTES') ?: 30),
     ],
     'debug' => [
-        'magic_links' => (bool)($_ENV['plainfully_debug_magic_links'] ?? false),
+        'magic_links' => (bool)(getenv('plainfully_debug_magic_links') ?: false),
     ],
 
     // Security options (Cloudflare Turnstile)
