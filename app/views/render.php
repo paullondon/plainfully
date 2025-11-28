@@ -11,7 +11,7 @@ function pf_render_shell(string $title, string $innerHtml, array $data = []): vo
     $mainClass = $isLoggedIn ? 'pf-main'           : 'pf-auth-card';
 
     // Defensive: default CSS version if config is missing
-    $cssVersion = htmlspecialchars((string)($config['css'] ?? '1'), ENT_QUOTES, 'UTF-8');
+    $cssVersion = htmlspecialchars((string)($config['app']['css'] ?? '1'), ENT_QUOTES, 'UTF-8');
     ?>
     <!doctype html>
     <html lang="en">
