@@ -581,6 +581,29 @@ body {
     white-space: pre-wrap;
 }
 
+.pf-actions {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 1.25rem;
+}
+
+.pf-actions--split {
+    justify-content: space-between;
+    flex-wrap: wrap;
+}
+
+.pf-button--ghost {
+    background: transparent;
+    border: 1px solid #272B33;
+    color: #F7F8FA;
+}
+
+.pf-button--ghost:hover {
+    border-color: #F26945;
+    color: #F26945;
+}
+
+
 /* ============================
    Responsive Tweaks
    ============================ */

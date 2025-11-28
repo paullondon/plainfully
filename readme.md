@@ -15,8 +15,6 @@ A structured roadmap of everything required before opening the platform to your 
 - [/] Isolate “financial data tables” that are exempt from 28-day deletion
 - [/] Document data-retention policy for compliance
 
----
-
 ### A2 — Start Consultation (Text-only flow)
 - [/] Build `GET /clarifications/new` form
 - [/] Add tone selector (Calm / Firm / Professional)
@@ -26,8 +24,6 @@ A structured roadmap of everything required before opening the platform to your 
 - [/] Store completed result text
 - [/] Redirect to `/clarifications/view?id=...`
 
----
-
 ### A3 — Consultation Result Page
 - [ ] Render final result with full Plainfully styling
 - [ ] Add subtle plan-based upsell banner
@@ -35,10 +31,22 @@ A structured roadmap of everything required before opening the platform to your 
 - [ ] NEVER show user’s original input text
 - [ ] Prevent deletion of real consultations (except 28-day auto-cleanup)
 - [ ] Abandoned consultations: destroy instantly + invisible to user
+- [ ] Ensure the user is able to return to dashboard
 
----
+### A4 - Aggressive cleaning / screening 
+- [ ] create logic for cleansing input text 
+- [ ] apply screening to text ready for upload to AI stream
+- [ ] create fake push and get for AI, ensuring that we have it tied to debug settings
+- [ ] ensure fake reply is tied to clarification
+- [ ] ensure all data inputted is wiped from system as discussed. Need evidence it’s removed.
 
-### A4 — Dashboard Completion
+### A5 - OpenAI link and prompting
+- [ ] create an effective prompt to achieve results every time
+- [ ] Self learn loop - was this helpful? self train for prompt management
+- [ ] create env api link if there is sandbox mode like stripe then hold test API, and live API.
+- [ ] QUESTION: ensure we cap the character sending to and from OpenAI to reduce costs
+
+### A6 — Dashboard Completion
 - [ ] Add Plainfully logo next to welcome message
 - [ ] Create Bronze / Silver / Gold badges (Basic / Pro / Unlimited)
 - [ ] Display badges near plan box
@@ -47,10 +55,12 @@ A structured roadmap of everything required before opening the platform to your 
 
 ---
 
-## B. OCR + Multi-Image Upload
+## B. OCR + Multi-Image Upload + AI
 
 ### B1 — Multi-image Upload Page
-- [ ] Support uploading 1–10 images
+- [ ] Support uploading 1-20 images
+- [ ] QUESTION: should we implement Virus scanning? or does cloudflare offer this when loading the images
+- [ ] QUESTION: we are uploading to Google OCR as we chose that is the quickest and cheapest solution. do we store images on cloudflare first then batch them or what?
 - [ ] Temporary storage for unvalidated uploads
 - [ ] Auto-delete after 28 days
 
@@ -58,6 +68,7 @@ A structured roadmap of everything required before opening the platform to your 
 - [ ] Use OpenAI Vision for clarity scoring
 - [ ] If poor quality → show: “Your photos are difficult to read. Continue?”
   - [ ] Retake → open guidance page
+       - [ ] create guidance page
   - [ ] Continue → user accepts risk
 
 ### B3 — OCR Pipeline

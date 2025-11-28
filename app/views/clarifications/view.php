@@ -38,9 +38,9 @@ $stmt->execute();
 $clar = $stmt->fetch();
 
 if (!$clar) {
-    http_response_code(404);
-    echo 'Clarification not found.';
-    return;
+    // Either it doesn't exist, or it doesn't belong to this user.
+    header('Location: /dashboard', true, 302);
+    exit;
 }
 
 // Load first detail row
@@ -89,8 +89,11 @@ if ($detail) {
             </div>
         </div>
 
-        <div class="pf-actions">
-            <a href="/clarifications/new" class="pf-button pf-button--secondary">
+        <div class="pf-actions pf-actions--split">
+            <a href="/dashboard" class="pf-button pf-button--ghost">
+                Back to your dashboard
+            </a>
+            <a href="/clarifications/new" class="pf-button pf-button--primary">
                 Start another clarification
             </a>
         </div>
