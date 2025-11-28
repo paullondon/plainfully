@@ -101,6 +101,7 @@ session_start();
 
 // views
 require dirname(__DIR__) . '/app/views/render.php';
+require dirname(__DIR__) . '/app/views/clarifications/new.php';
 
 // auth
 require dirname(__DIR__) . '/app/auth/login.php';
@@ -120,7 +121,7 @@ require dirname(__DIR__) . '/app/support/auth_log.php';
 require dirname(__DIR__) . '/app/controllers/welcome_controller.php';
 require dirname(__DIR__) . '/app/controllers/health_controller.php';
 require dirname(__DIR__) . '/app/controllers/logout_controller.php';
-require dirname(__DIR__) . '/app/controllers/clarifications_controller.php';
+//require dirname(__DIR__) . '/app/controllers/clarifications_controller.php';
 require dirname(__DIR__) . '/app/controllers/dashboard.php';
 
 // router

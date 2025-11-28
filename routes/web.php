@@ -38,37 +38,18 @@ switch (true) {
         pf_redirect('/dashboard');
         break;
 
+
     // -------------------------------------------------
     // Clarifications – list (logged-in only)
     // -------------------------------------------------
+    if ($path === '/clarifications/new') {
+    require __DIR__ . '/../app/views/clarifications/new.php';
+    return;
     case $path === '/clarifications' && $method === 'GET':
         require_login();
         handle_clarifications_index();
         break;
 
-    // -------------------------------------------------
-    // Clarifications – new form
-    // -------------------------------------------------
-    case $path === '/clarifications/new' && $method === 'GET':
-        require_login();
-        handle_clarifications_new();
-        break;
-
-    // -------------------------------------------------
-    // Clarifications – store
-    // -------------------------------------------------
-    case $path === '/clarifications' && $method === 'POST':
-        require_login();
-        handle_clarifications_store();
-        break;
-
-    // -------------------------------------------------
-    // Clarifications – View a single clarification
-    // -------------------------------------------------
-    case $path === '/clarifications/view' && $method === 'GET':
-        require_login();
-        handle_clarification_view();
-        break;
 
     // -------------------------------------------------
     // Dashboard (logged-in only)

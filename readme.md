@@ -7,13 +7,13 @@ A structured roadmap of everything required before opening the platform to your 
 ## A. Core Product Flow (Essential for MVP)
 
 ### A1 — Consultation Data Layer (with 28-day retention)
-- [ ] Create `consultations` table
-- [ ] Create `consultation_details` table (encrypted fields)
-- [ ] Create `consultation_uploads` table (OCR text + metadata)
-- [ ] Add `expires_at` column to all non-financial tables
-- [ ] Implement daily cleanup job to delete expired rows
-- [ ] Isolate “financial data tables” that are exempt from 28-day deletion
-- [ ] Document data-retention policy for compliance
+- [/] Create `consultations` table
+- [/] Create `consultation_details` table (encrypted fields)
+- [/] Create `consultation_uploads` table (OCR text + metadata)
+- [/] Add `expires_at` column to all non-financial tables
+- [/] Implement daily cleanup job to delete expired rows
+- [/] Isolate “financial data tables” that are exempt from 28-day deletion
+- [/] Document data-retention policy for compliance
 
 ---
 
