@@ -13,9 +13,16 @@ function plainfully_pdo(): \PDO
         return $pdo;
     }
 
-    $dsn      = $_ENV['plainfully_db_dsn']      ?? 'mysql:host=localhost;dbname=plainfully;charset=utf8mb4';
-    $user     = $_ENV['plainfully_db_user']     ?? 'plainfully';
-    $password = $_ENV['plainfully_db_password'] ?? '';
+    // If the core app has a DB helper, reuse it.
+    if (function_exists('pf_db')) {
+        $pdo = pf_db();   // <- uses your existing config from app/support/db.php
+        return $pdo;
+    }
+
+    // Fallback only if pf_db() doesn't exist (shouldn't normally happen)
+    $dsn      = getenv('plainfully_db_dsn')      ?: 'mysql:host=localhost;dbname=live_plainfully;charset=utf8mb4';
+    $user     = getenv('plainfully_db_user')     ?: 'plainfully';
+    $password = getenv('plainfully_db_password') ?: '';
 
     try {
         $pdo = new \PDO(
@@ -29,15 +36,13 @@ function plainfully_pdo(): \PDO
             ]
         );
     } catch (\PDOException $e) {
-        // Fail hard but clear
-        http_response_code(500);
-        echo 'Database connection failed.';
-        error_log('[Plainfully] DB connection failed: ' . $e->getMessage());
-        exit;
+        // Let the global exception handler show this nicely
+        throw new \RuntimeException('Plainfully DB connection failed: ' . $e->getMessage(), 0, $e);
     }
 
     return $pdo;
 }
+
 
 /**
  * Simple CSRF helpers (local to Plainfully; not using any external libs).
