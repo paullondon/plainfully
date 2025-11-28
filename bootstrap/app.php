@@ -103,7 +103,6 @@ require dirname(__DIR__) . '/app/auth/login.php';
 
 // views
 require dirname(__DIR__) . '/app/views/render.php';
-require dirname(__DIR__) . '/app/views/clarifications/new.php';
 
 // support
 require dirname(__DIR__) . '/app/support/helpers.php';

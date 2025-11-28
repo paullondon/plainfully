@@ -43,9 +43,9 @@ switch (true) {
     // Clarifications – list (logged-in only)
     // -------------------------------------------------
 
-    case $path === '/clarifications' && $method === 'GET':
-        require_login();
-        pf_redirect('/dashboard');
+    case $path === '/clarifications/new' && $method === 'GET':
+    case $path === '/clarifications/new' && $method === 'POST':
+        require dirname(__DIR__) . '/app/views/clarifications/new.php';
         break;
 
 

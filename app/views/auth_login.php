@@ -80,16 +80,19 @@ $cssVersion = htmlspecialchars((string)($config['css'] ?? '1'), ENT_QUOTES, 'UTF
 
         <!-- MESSAGES -->
         <?php
-        $config = require APP_ROOT . '/app/config/app.php';
+        // Use the global $config loaded by bootstrap/app.php
+        global $config;
 
-        if (!empty($config['debug']['magic_links'])) {
+        $debugMagicLinksEnabled = !empty($config['debug']['magic_links'] ?? false);
+
+        if ($debugMagicLinksEnabled) {
             if (session_status() !== PHP_SESSION_ACTIVE) {
                 session_start();
             }
 
             $debugMagicLink = $_SESSION['plainfully_debug_magic_link'] ?? null;
 
-            if ($debugMagicLink !== null) : ?>
+            if ($debugMagicLink !== null): ?>
                 <div class="pf-alert pf-alert--debug">
                     <strong>DEBUG:</strong>
                     Magic login link is active for this browser.
@@ -98,8 +101,11 @@ $cssVersion = htmlspecialchars((string)($config['css'] ?? '1'), ENT_QUOTES, 'UTF
                         Click here to log in without email.
                     </a>
                 </div>
-        <?php endif;} ?>
-        
+            <?php
+            endif;
+        }
+        ?>
+
         <?php if (!empty($loginOk)): ?>
             <p class="pf-message-ok">
                 <?= htmlspecialchars($loginOk, ENT_QUOTES, 'UTF-8') ?>
