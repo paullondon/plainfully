@@ -1,17 +1,15 @@
 <?php declare(strict_types=1);
 
-use PDO;
-use PDOException;
-
 /**
  * Get a PDO connection for Plainfully.
  * Adjust DSN / env variable names to match how you already store them.
  */
-function plainfully_pdo(): PDO
+
+function plainfully_pdo(): \PDO
 {
     static $pdo = null;
 
-    if ($pdo instanceof PDO) {
+    if ($pdo instanceof \PDO) {
         return $pdo;
     }
 
@@ -20,14 +18,14 @@ function plainfully_pdo(): PDO
     $password = $_ENV['plainfully_db_password'] ?? '';
 
     try {
-        $pdo = new PDO(
+        $pdo = new \PDO(
             $dsn,
             $user,
             $password,
             [
-                PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
-                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-                PDO::ATTR_EMULATE_PREPARES   => false,
+                \PDO::ATTR_ERRMODE            => \PDO::ERRMODE_EXCEPTION,
+                \PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC,
+                \PDO::ATTR_EMULATE_PREPARES   => false,
             ]
         );
     } catch (PDOException $e) {
