@@ -8,6 +8,13 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
 
 $id = $_GET['id'] ?? null;
 $id = is_numeric($id) ? (int)$id : null;
+$userId = plainfully_current_user_id();
+
+if ($userId === null) {
+    http_response_code(403);
+    echo 'You must be signed in to view this clarification.';
+    return;
+}
 
 if ($id === null || $id <= 0) {
     http_response_code(404);
@@ -22,9 +29,11 @@ $stmt = $pdo->prepare("
     SELECT id, user_id, status, source, tone, created_at
     FROM clarifications
     WHERE id = :id
+      AND user_id = :user_id
     LIMIT 1
 ");
 $stmt->bindValue(':id', $id, \PDO::PARAM_INT);
+$stmt->bindValue(':user_id', $userId, \PDO::PARAM_INT);
 $stmt->execute();
 $clar = $stmt->fetch();
 
@@ -72,13 +81,6 @@ if ($detail) {
             &nbsp;•&nbsp;
             Tone: <?= htmlspecialchars($clar['tone'] ?? '', ENT_QUOTES, 'UTF-8') ?>
         </p>
-
-        <div class="pf-field">
-            <h2 class="pf-label">Original text</h2>
-            <div class="pf-box pf-box--mono">
-                <pre><?= htmlspecialchars($originalText, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></pre>
-            </div>
-        </div>
 
         <div class="pf-field">
             <h2 class="pf-label">Plainfully’s version</h2>

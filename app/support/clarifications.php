@@ -141,3 +141,17 @@ function plainfully_decrypt(string $ciphertext): string
 
     return $plain;
 }
+function plainfully_current_user_id(): ?int
+{
+    // If your core app already exposes this, use it.
+    if (function_exists('pf_current_user_id')) {
+        return pf_current_user_id();
+    }
+
+    if (session_status() !== PHP_SESSION_ACTIVE) {
+        session_start();
+    }
+
+    $id = $_SESSION['user_id'] ?? null;
+    return is_numeric($id) ? (int)$id : null;
+}
