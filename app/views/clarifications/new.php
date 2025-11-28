@@ -138,9 +138,16 @@ function handle_plainfully_clarification_submit(): void
     $now     = new DateTimeImmutable('now', new DateTimeZone('UTC'));
     $expires = $now->modify("+{$ttlDays} days")->format('Y-m-d H:i:s');
 
-    // For now treat user as anonymous; wire real user_id later if needed
-    $userId    = null;
+    // Get logged-in user id
+    $userId    = plainfully_current_user_id();
     $emailHash = null;
+
+    // (optional safety net – if this ever happens, something is wrong with auth)
+    if ($userId === null) {
+        http_response_code(500);
+        echo 'Could not identify current user while saving clarification.';
+        return;
+    }
 
     $promptCiphertext = plainfully_encrypt($text);
 
