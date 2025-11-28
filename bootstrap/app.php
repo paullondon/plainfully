@@ -110,6 +110,7 @@ require dirname(__DIR__) . '/app/support/db.php';
 require dirname(__DIR__) . '/app/support/mailer.php';
 require dirname(__DIR__) . '/app/support/rate_limiter.php';
 require dirname(__DIR__) . '/app/support/session_hardening.php';
+pf_enforce_idle_timeout();
 require dirname(__DIR__) . '/app/support/auth_middleware.php';
 require dirname(__DIR__) . '/app/support/request.php';
 require dirname(__DIR__) . '/app/support/csrf.php';

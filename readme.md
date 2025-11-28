@@ -27,7 +27,6 @@ A structured roadmap of everything required before opening the platform to your 
 ### A3 — Consultation Result Page
 - [ ] Render final result with full Plainfully styling
 - [ ] Add subtle plan-based upsell banner
-- [ ] Add “Start another consultation” CTA
 - [ ] NEVER show user’s original input text
 - [ ] Prevent deletion of real consultations (except 28-day auto-cleanup)
 - [ ] Abandoned consultations: destroy instantly + invisible to user

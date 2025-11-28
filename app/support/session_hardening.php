@@ -94,3 +94,46 @@ function pf_verify_session_security(): void
     // 5) Refresh last active timestamp (sliding idle window)
     $_SESSION['pf_last_active'] = $now;
 }
+<?php declare(strict_types=1);
+
+function pf_enforce_idle_timeout(): void
+{
+    if (session_status() !== PHP_SESSION_ACTIVE) {
+        session_start();
+    }
+
+    $idleHours = (int)(getenv('SESSION_IDLE_HOURS') ?: 12);
+
+    // 0 or negative means "no idle timeout"
+    if ($idleHours <= 0) {
+        return;
+    }
+
+    $now = time();
+    $lastActivity = $_SESSION['last_activity'] ?? null;
+
+    if ($lastActivity === null) {
+        // First time we’ve seen this session
+        $_SESSION['last_activity'] = $now;
+        return;
+    }
+
+    $idleLimit = $idleHours * 3600;
+
+    if (($now - (int)$lastActivity) > $idleLimit) {
+        // Session has been idle too long – log out
+        $_SESSION = [];
+        if (ini_get('session.use_cookies')) {
+            $params = session_get_cookie_params();
+            setcookie(session_name(), '', time() - 42000, $params['path'], $params['domain'], $params['secure'], $params['httponly']);
+        }
+        session_destroy();
+
+        // Redirect to login with a friendly message
+        header('Location: /auth/login?session=expired');
+        exit;
+    }
+
+    // Still active – refresh the timestamp (sliding window)
+    $_SESSION['last_activity'] = $now;
+}

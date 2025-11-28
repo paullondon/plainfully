@@ -42,7 +42,7 @@ function render_plainfully_clarification_form(array $errors = [], array $old = [
             <h1 class="pf-heading">Start a new clarification</h1>
 
             <?php if ($errors): ?>
-                <div class="pf-alert pf-alert--error">
+                <div class="pf-alert pf-alert--debug">
                     <ul>
                         <?php foreach ($errors as $message): ?>
                             <li><?= htmlspecialchars($message, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></li>

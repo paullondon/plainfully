@@ -23,6 +23,11 @@ $cssVersion = htmlspecialchars((string)($config['css'] ?? '1'), ENT_QUOTES, 'UTF
 <body class="pf-shell">
 <main class="pf-page-center">
     <section class="pf-auth-card">
+        <?php if (($_GET['session'] ?? '') === 'expired'): ?>
+            <div class="pf-alert pf-alert--debug">
+                You were signed out because you were inactive for a while. Please sign in again.
+            </div>
+        <?php endif; ?>
 
         <!-- HEADER: logo + heading inline -->
         <header class="pf-auth-header">
