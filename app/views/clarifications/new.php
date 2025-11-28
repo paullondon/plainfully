@@ -7,7 +7,6 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
 $errors = $errors ?? [];
 $old    = $old ?? [];
 
-$csrfToken = plainfully_csrf_token();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -35,8 +34,7 @@ $csrfToken = plainfully_csrf_token();
         <?php endif; ?>
 
         <form method="POST" action="/clarifications/new">
-            <input type="hidden" name="_token"
-                   value="<?= htmlspecialchars($csrfToken, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>">
+            <?php pf_csrf_field(); ?>
 
             <div class="pf-field">
                 <label class="pf-label">What do you want Plainfully to clarify?</label>

@@ -14,7 +14,9 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 $idRaw = $_POST['id'] ?? null;
 $id    = is_numeric($idRaw) ? (int)$idRaw : null;
 
-if (!plainfully_verify_csrf_token($_POST['_token'] ?? null) || $id === null || $id <= 0) {
+pf_verify_csrf_or_abort();
+
+if ($id === null || $id <= 0) {
     header('Location: /dashboard', true, 302);
     exit;
 }
