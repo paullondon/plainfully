@@ -87,19 +87,18 @@ if (!function_exists('handle_magic_request')) {
 
             $link = $baseUrl . '/magic/verify?token=' . urlencode($rawToken);
 
-            // Make sure $config is visible here
+            // make sure $config is in scope
             global $config;
 
             if (!pf_send_magic_link_email($email, $link)) {
                 $_SESSION['magic_link_error'] = 'Something went wrong sending your link.';
                 pf_log_auth_event('magic_link_email_failed', $userId, $email, 'Email send failed');
             } else {
-                // --- DEBUG HOOK: show link without email when enabled ---
                 if (!empty($config['debug']['magic_links'])) {
-                    // Message for the banner
+                    // Human-friendly message
                     $_SESSION['magic_link_ok'] = 'Debug sign-in link is available below.';
 
-                    // Store the actual URL separately so the view can render it as a clickable link
+                    // Store the raw URL separately
                     $_SESSION['magic_link_debug_url'] = $link;
 
                     pf_log_auth_event(
@@ -110,7 +109,6 @@ if (!function_exists('handle_magic_request')) {
                     );
                 } else {
                     $_SESSION['magic_link_ok'] = 'If that email is registered, a sign-in link will arrive shortly.';
-
                     pf_log_auth_event(
                         'magic_link_email_sent',
                         $userId,
