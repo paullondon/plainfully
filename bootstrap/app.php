@@ -98,13 +98,12 @@ session_set_cookie_params([
 $config = require dirname(__DIR__) . '/config/app.php';
 
 session_start();
+// auth
+require dirname(__DIR__) . '/app/auth/login.php';
 
 // views
 require dirname(__DIR__) . '/app/views/render.php';
 require dirname(__DIR__) . '/app/views/clarifications/new.php';
-
-// auth
-require dirname(__DIR__) . '/app/auth/login.php';
 
 // support
 require dirname(__DIR__) . '/app/support/helpers.php';
