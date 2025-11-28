@@ -45,7 +45,7 @@ switch (true) {
 
     case $path === '/clarifications' && $method === 'GET':
         require_login();
-        require APP_ROOT . '/app/views/clarifications/index.php';
+        pf_redirect('/dashboard');
         break;
 
 
