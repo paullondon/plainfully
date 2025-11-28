@@ -87,22 +87,21 @@ if (!function_exists('handle_magic_request')) {
 
             $link = $baseUrl . '/magic/verify?token=' . urlencode($rawToken);
 
+            
+
             if (!pf_send_magic_link_email($email, $link)) {
                 $_SESSION['magic_link_error'] = 'Something went wrong sending your link.';
                 pf_log_auth_event('magic_link_email_failed', $userId, $email, 'Email send failed');
             } else {
-                $_SESSION['magic_link_ok'] = 'If that email is registered, a sign-in link will arrive shortly.';
-                pf_log_auth_event('magic_link_email_sent', $userId, $email, 'Magic link email sent');
-            }
-
-            // --- DEBUG HOOK: show link without email when enabled ---
-            if (session_status() !== PHP_SESSION_ACTIVE) {
-                session_start();
-            }
-
-            if (!empty($config['debug']['magic_links'])) {
-                // Store the most recent magic link in the session for this browser only
-                $_SESSION['plainfully_debug_magic_link'] = $loginUrl;
+                    // --- DEBUG HOOK: show link without email when enabled ---
+                    if (!empty($config['debug']['magic_links'])) {
+                        $_SESSION['magic_link_ok'] = 'Debug Token Link:' $link;
+                        pf_log_auth_event('magic_link_email_sent', $userId, $email, 'Debug Magic link Given');
+                    else { 
+                        $_SESSION['magic_link_ok'] = 'If that email is registered, a sign-in link will arrive shortly.';
+                        pf_log_auth_event('magic_link_email_sent', $userId, $email, 'Magic link email sent');
+                    }
+                }
             }
 
         } catch (Throwable $e) {
