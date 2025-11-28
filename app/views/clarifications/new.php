@@ -8,13 +8,13 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
 
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 
+// Allowed tones for the selector
 const PLAINFULLY_TONES = ['calm', 'firm', 'professional'];
 
 if ($method === 'POST') {
     handle_plainfully_clarification_submit();
 } else {
     render_plainfully_clarification_form();
-    // end script after rendering
     return;
 }
 
@@ -138,13 +138,13 @@ function handle_plainfully_clarification_submit(): void
     $now     = new DateTimeImmutable('now', new DateTimeZone('UTC'));
     $expires = $now->modify("+{$ttlDays} days")->format('Y-m-d H:i:s');
 
-    // For now we treat user as anonymous; you can wire real user_id later
+    // For now treat user as anonymous; wire real user_id later if needed
     $userId    = null;
     $emailHash = null;
 
     try {
         $promptCiphertext = plainfully_encrypt($text);
-    } catch (Throwable $e) {
+    } catch (\Throwable $e) {
         error_log('[Plainfully] Failed to encrypt prompt: ' . $e->getMessage());
         render_plainfully_clarification_form(
             ['Something went wrong securing your text. Please try again.'],
@@ -157,7 +157,7 @@ function handle_plainfully_clarification_submit(): void
 
     try {
         $responseCiphertext = plainfully_encrypt($stubOutputText);
-    } catch (Throwable $e) {
+    } catch (\Throwable $e) {
         error_log('[Plainfully] Failed to encrypt stub output: ' . $e->getMessage());
         render_plainfully_clarification_form(
             ['Something went wrong preparing your output. Please try again.'],
@@ -171,9 +171,9 @@ function handle_plainfully_clarification_submit(): void
     try {
         $pdo->beginTransaction();
 
-        // Insert consultation
-        $insertConsultation = $pdo->prepare("
-            INSERT INTO consultations (
+        // Insert into clarifications
+        $insertClarification = $pdo->prepare("
+            INSERT INTO clarifications (
                 user_id,
                 email_hash,
                 status,
@@ -195,27 +195,27 @@ function handle_plainfully_clarification_submit(): void
         ");
 
         if ($userId === null) {
-            $insertConsultation->bindValue(':user_id', null, PDO::PARAM_NULL);
+            $insertClarification->bindValue(':user_id', null, \PDO::PARAM_NULL);
         } else {
-            $insertConsultation->bindValue(':user_id', $userId, PDO::PARAM_INT);
+            $insertClarification->bindValue(':user_id', $userId, \PDO::PARAM_INT);
         }
 
         if ($emailHash === null) {
-            $insertConsultation->bindValue(':email_hash', null, PDO::PARAM_NULL);
+            $insertClarification->bindValue(':email_hash', null, \PDO::PARAM_NULL);
         } else {
-            $insertConsultation->bindValue(':email_hash', $emailHash, PDO::PARAM_LOB);
+            $insertClarification->bindValue(':email_hash', $emailHash, \PDO::PARAM_LOB);
         }
 
-        $insertConsultation->bindValue(':tone', $tone);
-        $insertConsultation->bindValue(':expires_at', $expires);
-        $insertConsultation->execute();
+        $insertClarification->bindValue(':tone', $tone);
+        $insertClarification->bindValue(':expires_at', $expires);
+        $insertClarification->execute();
 
-        $consultationId = (int)$pdo->lastInsertId();
+        $clarificationId = (int)$pdo->lastInsertId();
 
-        // Insert consultation_details (sequence 1)
+        // Insert into clarification_details
         $insertDetail = $pdo->prepare("
-            INSERT INTO consultation_details (
-                consultation_id,
+            INSERT INTO clarification_details (
+                clarification_id,
                 role,
                 sequence_no,
                 prompt_ciphertext,
@@ -224,7 +224,7 @@ function handle_plainfully_clarification_submit(): void
                 updated_at,
                 expires_at
             ) VALUES (
-                :consultation_id,
+                :clarification_id,
                 'system',
                 1,
                 :prompt_ciphertext,
@@ -235,18 +235,18 @@ function handle_plainfully_clarification_submit(): void
             )
         ");
 
-        $insertDetail->bindValue(':consultation_id', $consultationId, PDO::PARAM_INT);
-        $insertDetail->bindValue(':prompt_ciphertext', $promptCiphertext, PDO::PARAM_LOB);
-        $insertDetail->bindValue(':response_ciphertext', $responseCiphertext, PDO::PARAM_LOB);
+        $insertDetail->bindValue(':clarification_id', $clarificationId, \PDO::PARAM_INT);
+        $insertDetail->bindValue(':prompt_ciphertext', $promptCiphertext, \PDO::PARAM_LOB);
+        $insertDetail->bindValue(':response_ciphertext', $responseCiphertext, \PDO::PARAM_LOB);
         $insertDetail->bindValue(':expires_at', $expires);
         $insertDetail->execute();
 
         $pdo->commit();
-    } catch (Throwable $e) {
+    } catch (\Throwable $e) {
         if ($pdo->inTransaction()) {
             $pdo->rollBack();
         }
-        error_log('[Plainfully] Failed to save consultation: ' . $e->getMessage());
+        error_log('[Plainfully] Failed to save clarification: ' . $e->getMessage());
 
         render_plainfully_clarification_form(
             ['We could not save your clarification just now. Please try again.'],
@@ -256,7 +256,7 @@ function handle_plainfully_clarification_submit(): void
     }
 
     // Redirect to view page
-    header('Location: /clarifications/view?id=' . urlencode((string)$consultationId), true, 302);
+    header('Location: /clarifications/view?id=' . urlencode((string)$clarificationId), true, 302);
     exit;
 }
 

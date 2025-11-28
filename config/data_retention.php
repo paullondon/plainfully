@@ -3,9 +3,9 @@
 return [
     // Tables whose rows are eligible for deletion based on expires_at
     'purge_tables' => [
-        'consultation_uploads',
-        'consultation_details',
-        'consultations',
+        'clarification_uploads',
+        'clarification_details',
+        'clarifications',
         'magic_login_tokens',
         'auth_events',
         // 'api_logs',
