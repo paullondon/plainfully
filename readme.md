@@ -18,13 +18,13 @@ A structured roadmap of everything required before opening the platform to your 
 ---
 
 ### A2 — Start Consultation (Text-only flow)
-- [ ] Build `GET /clarifications/new` form
-- [ ] Add tone selector (Calm / Firm / Professional)
-- [ ] Validation rules for text inputs
-- [ ] Save consultation + details
-- [ ] Create “stub AI output” generator (temporary)
-- [ ] Store completed result text
-- [ ] Redirect to `/clarifications/view?id=...`
+- [/] Build `GET /clarifications/new` form
+- [/] Add tone selector (Calm / Firm / Professional)
+- [/] Validation rules for text inputs
+- [/] Save consultation + details
+- [/] Create “stub AI output” generator (temporary)
+- [/] Store completed result text
+- [/] Redirect to `/clarifications/view?id=...`
 
 ---
 

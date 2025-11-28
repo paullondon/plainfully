@@ -219,7 +219,9 @@ function handle_plainfully_clarification_submit(): void
                 role,
                 sequence_no,
                 prompt_ciphertext,
+                clarification_ciphertext,
                 model_response_ciphertext,
+                redacted_summary_ciphertext,
                 created_at,
                 updated_at,
                 expires_at
@@ -228,7 +230,9 @@ function handle_plainfully_clarification_submit(): void
                 'system',
                 1,
                 :prompt_ciphertext,
+                NULL,
                 :response_ciphertext,
+                NULL,
                 NOW(6),
                 NOW(6),
                 :expires_at
