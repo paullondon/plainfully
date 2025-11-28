@@ -79,6 +79,27 @@ $cssVersion = htmlspecialchars((string)($config['css'] ?? '1'), ENT_QUOTES, 'UTF
         </p>
 
         <!-- MESSAGES -->
+        <?php
+        $config = require APP_ROOT . '/app/config/app.php';
+
+        if (!empty($config['debug']['magic_links'])) {
+            if (session_status() !== PHP_SESSION_ACTIVE) {
+                session_start();
+            }
+
+            $debugMagicLink = $_SESSION['plainfully_debug_magic_link'] ?? null;
+
+            if ($debugMagicLink !== null) : ?>
+                <div class="pf-alert pf-alert--debug">
+                    <strong>DEBUG:</strong>
+                    Magic login link is active for this browser.
+                    <br>
+                    <a href="<?= htmlspecialchars($debugMagicLink, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>">
+                        Click here to log in without email.
+                    </a>
+                </div>
+        <?php endif;} ?>
+        
         <?php if (!empty($loginOk)): ?>
             <p class="pf-message-ok">
                 <?= htmlspecialchars($loginOk, ENT_QUOTES, 'UTF-8') ?>

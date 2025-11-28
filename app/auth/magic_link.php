@@ -95,6 +95,16 @@ if (!function_exists('handle_magic_request')) {
                 pf_log_auth_event('magic_link_email_sent', $userId, $email, 'Magic link email sent');
             }
 
+            // --- DEBUG HOOK: show link without email when enabled ---
+            if (session_status() !== PHP_SESSION_ACTIVE) {
+                session_start();
+            }
+
+            if (!empty($config['debug']['magic_links'])) {
+                // Store the most recent magic link in the session for this browser only
+                $_SESSION['plainfully_debug_magic_link'] = $loginUrl;
+            }
+
         } catch (Throwable $e) {
             if (isset($pdo) && $pdo->inTransaction()) {
                 $pdo->rollBack();

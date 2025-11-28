@@ -12,7 +12,7 @@ return [
     'app' => [
         'base_url' => getenv('APP_BASE_URL') ?: 'https://plainfully.com',
         'env'      => getenv('APP_ENV') ?: 'local', // 'Live' is fine, we just treat it as a label
-        'css'      => '261125-002'
+        'css'      => '281125-001'
     ],
 
     // Database connection (MariaDB / MySQL)
@@ -43,6 +43,9 @@ return [
     // Auth / magic-link settings
     'auth' => [
         'magic_link_ttl_minutes' => (int)(getenv('MAGIC_LINK_TTL_MINUTES') ?: 30),
+    ],
+    'debug' => [
+        'magic_links' => (bool)($_ENV['plainfully_debug_magic_links'] ?? false),
     ],
 
     // Security options (Cloudflare Turnstile)

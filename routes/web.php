@@ -42,12 +42,10 @@ switch (true) {
     // -------------------------------------------------
     // Clarifications – list (logged-in only)
     // -------------------------------------------------
-    if ($path === '/clarifications/new') {
-    require __DIR__ . '/../app/views/clarifications/new.php';
-    return;
+
     case $path === '/clarifications' && $method === 'GET':
         require_login();
-        handle_clarifications_index();
+        require APP_ROOT . '/app/views/clarifications/index.php';
         break;
 
 
@@ -55,9 +53,9 @@ switch (true) {
     // Dashboard (logged-in only)
     // -------------------------------------------------
     case $path === '/dashboard' && $method === 'GET':
-    require_login();
-    handle_dashboard();
-    break;
+        require_login();
+        handle_dashboard();
+        break;
     
     // -------------------------------------------------
     // Logout
