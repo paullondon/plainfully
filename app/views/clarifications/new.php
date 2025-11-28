@@ -142,29 +142,11 @@ function handle_plainfully_clarification_submit(): void
     $userId    = null;
     $emailHash = null;
 
-    try {
-        $promptCiphertext = plainfully_encrypt($text);
-    } catch (\Throwable $e) {
-        error_log('[Plainfully] Failed to encrypt prompt: ' . $e->getMessage());
-        render_plainfully_clarification_form(
-            ['Something went wrong securing your text. Please try again.'],
-            ['text' => $text, 'tone' => $tone]
-        );
-        return;
-    }
+    $promptCiphertext = plainfully_encrypt($text);
 
     $stubOutputText = plainfully_generate_stub_output($text, $tone);
 
-    try {
-        $responseCiphertext = plainfully_encrypt($stubOutputText);
-    } catch (\Throwable $e) {
-        error_log('[Plainfully] Failed to encrypt stub output: ' . $e->getMessage());
-        render_plainfully_clarification_form(
-            ['Something went wrong preparing your output. Please try again.'],
-            ['text' => $text, 'tone' => $tone]
-        );
-        return;
-    }
+    $responseCiphertext = plainfully_encrypt($stubOutputText);
 
     $pdo = plainfully_pdo();
 
