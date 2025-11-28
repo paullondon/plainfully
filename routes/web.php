@@ -53,6 +53,12 @@ switch (true) {
         require_login();
         require dirname(__DIR__) . '/app/views/clarifications/view.php';
         break;
+    
+    // Cancel (abandon) a very recent clarification
+    case $path === '/clarifications/cancel' && $method === 'POST':
+        require_login();
+        require dirname(__DIR__) . '/app/views/clarifications/cancel.php';
+        break;
 
 
     // -------------------------------------------------

@@ -29,7 +29,7 @@ A structured roadmap of everything required before opening the platform to your 
 - [ ] Add subtle plan-based upsell banner
 - [ ] NEVER show user’s original input text
 - [ ] Prevent deletion of real consultations (except 28-day auto-cleanup)
-- [ ] Abandoned consultations: destroy instantly + invisible to user
+- [ ] Abandoned consultations: handle abandon occurences and Add ability to cancel which destroy instantly + invisible to user
 - [ ] Ensure the user is able to return to dashboard
 
 ### A4 - Aggressive cleaning / screening 
