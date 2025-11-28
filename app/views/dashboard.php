@@ -17,7 +17,7 @@
         <div class="pf-dashboard-welcome">
             <h1 class="pf-dashboard-title">Welcome back, <?= $userNameSafe; ?></h1>
             <p class="pf-dashboard-subtitle">
-                Turn stressful letters and forms into clear, confident responses you’re happy to send.
+                Let us clarify <strong>stressful</strong> emails, letters and forms so they become <strong>plainfully</strong> easy to understand and read.
             </p>
         </div>
 
@@ -48,29 +48,29 @@
     <div class="pf-dashboard-main-grid">
         <!-- Left: Start new consultation -->
         <section class="pf-dashboard-card pf-dashboard-card--primary">
-            <h2 class="pf-card-title">Start a new consultation</h2>
+            <h2 class="pf-card-title">Start a new clarification</h2>
             <p class="pf-card-text">
-                Tell us the situation and share your draft or notes. Plainfully will help rewrite it
-                into something calm, clear, and direct – ready to send.
+                Let us help you gain clarity in something that you should feel confident in understanding. Plainfully will help rewrite it
+                into something calm and clearer.
             </p>
             <a href="/clarifications/new" class="pf-btn pf-btn--primary pf-dashboard-cta">
-                Start a new consultation
+                Begin new clarification
             </a>
 
             <!-- Upsell banner inside the primary card -->
             <?php if ($planKeySafe === 'basic'): ?>
                 <div class="pf-upsell-banner">
                     <p class="pf-upsell-text">
-                        On Basic you can run a limited number of consultations each month.
-                        Upgrade to <strong>Pro</strong> for more usage and faster queue priority.
+                        On Basic you can run a limited number of clarifications every 28 days.
+                        Upgrade to <strong>Pro</strong> for more usage and higher queue priority.
                     </p>
                     <a href="/billing/upgrade" class="pf-link pf-link--inline">See Pro benefits →</a>
                 </div>
             <?php elseif ($planKeySafe === 'pro'): ?>
                 <div class="pf-upsell-banner pf-upsell-banner--soft">
                     <p class="pf-upsell-text">
-                        Using Plainfully regularly? <strong>Unlimited</strong> removes usage caps,
-                        ideal if you’re supporting others or handling lots of letters.
+                        Using Plainfully regularly? <strong>Unlimited</strong> removes usage caps and sticks your request at the top no matter what,
+                        It's ideal if you’re supporting others or handling lots of letters/emails.
                     </p>
                     <a href="/billing/upgrade" class="pf-link pf-link--inline">View Unlimited →</a>
                 </div>
@@ -79,13 +79,13 @@
 
         <!-- Right: Recent consultations (Plainfully results only) -->
         <section class="pf-dashboard-card pf-dashboard-card--secondary">
-            <h2 class="pf-card-title">Recent consultations</h2>
+            <h2 class="pf-card-title">Recent clarifications</h2>
 
             <?php if (empty($recentConsultations)): ?>
                 <p class="pf-card-text pf-card-text--muted">
-                    You haven’t completed any consultations yet.
-                    When you use Plainfully, we’ll list the outcomes here –
-                    just the results we produced, not what you originally wrote.
+                    You haven’t completed any clarifications yet.
+                    When you use Plainfully, we’ll list the results we produced
+                    , not what you originally wrote or uploaded (those we've already deleted).
                 </p>
             <?php else: ?>
                 <ul class="pf-list pf-list--recent">
@@ -112,7 +112,7 @@
                     <?php endforeach; ?>
                 </ul>
                 <a href="/clarifications" class="pf-link pf-link--subtle">
-                    View all consultations
+                    View all clarifications
                 </a>
             <?php endif; ?>
         </section>

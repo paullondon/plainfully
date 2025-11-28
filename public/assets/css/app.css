@@ -185,13 +185,27 @@ body {
 /* ============================
    Auth Page Layout (magic link)
    ============================ */
+/* Debug panel styling */
 .pf-alert--debug {
-    border: 1px dashed #ff9800;
-    background: rgba(255, 152, 0, 0.06);
+    background: #1E1F24;            /* dark grey background */
+    border: 1px dashed #F26945;     /* eventform/brand orange */
+    color: #F7F8FA;                 /* white-ish text */
     padding: 0.75rem 1rem;
     margin-bottom: 1rem;
+    border-radius: 8px;
     font-size: 0.9rem;
 }
+
+/* Debug links */
+.pf-alert--debug a {
+    color: #F26945;                 /* on-brand orange */
+    text-decoration: underline;
+}
+
+.pf-alert--debug a:hover {
+    color: #ff8f6c;                 /* lighter orange on hover */
+}
+
 
 .pf-page-center {
     min-height: 100vh;
