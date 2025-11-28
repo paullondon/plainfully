@@ -45,7 +45,13 @@ switch (true) {
 
     case $path === '/clarifications/new' && $method === 'GET':
     case $path === '/clarifications/new' && $method === 'POST':
+        require_login();
         require dirname(__DIR__) . '/app/views/clarifications/new.php';
+        break;
+
+    case $path === '/clarifications/view' && $method === 'GET':
+        require_login();
+        require dirname(__DIR__) . '/app/views/clarifications/view.php';
         break;
 
 

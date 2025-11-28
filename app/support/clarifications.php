@@ -13,13 +13,12 @@ function plainfully_pdo(): \PDO
         return $pdo;
     }
 
-    // If the core app has a DB helper, reuse it.
     if (function_exists('pf_db')) {
-        $pdo = pf_db();   // <- uses your existing config from app/support/db.php
+        $pdo = pf_db();   // <- uses existing config from app/support/db.php
         return $pdo;
     }
 
-    // Fallback only if pf_db() doesn't exist (shouldn't normally happen)
+    // Fallback only if pf_db() doesn't exist (shouldn't normally happen as if it does the site will be fucked on login)
     $dsn      = getenv('plainfully_db_dsn')      ?: 'mysql:host=localhost;dbname=live_plainfully;charset=utf8mb4';
     $user     = getenv('plainfully_db_user')     ?: 'plainfully';
     $password = getenv('plainfully_db_password') ?: '';
@@ -36,7 +35,7 @@ function plainfully_pdo(): \PDO
             ]
         );
     } catch (\PDOException $e) {
-        // Let the global exception handler show this nicely
+        // on error we will let the global exception handler show this nicely... although again site>fucked.
         throw new \RuntimeException('Plainfully DB connection failed: ' . $e->getMessage(), 0, $e);
     }
 
@@ -94,7 +93,7 @@ function plainfully_encrypt(string $plaintext): string
     }
 
     // env is loaded via putenv(), so use getenv()
-    $keyBase64 = getenv('plainfully_secret_key') ?: '';
+    $keyBase64 = getenv('plainfully_secret_key') ?: ''; //secret key is loaded here
     $key       = $keyBase64 !== '' ? base64_decode($keyBase64, true) : null;
 
     if ($key === false || $key === null || strlen($key) !== SODIUM_CRYPTO_SECRETBOX_KEYBYTES) {
@@ -107,4 +106,38 @@ function plainfully_encrypt(string $plaintext): string
     $cipher = sodium_crypto_secretbox($plaintext, $nonce, $key);
 
     return base64_encode($nonce . $cipher);
+}
+
+function plainfully_decrypt(string $ciphertext): string
+{
+    if ($ciphertext === '') {
+        return '';
+    }
+
+    // If sodium not available or key bad, just return what we got. (Crap if this happens, as the users data is gone...)
+    if (!function_exists('sodium_crypto_secretbox_open')) {
+        return $ciphertext;
+    }
+
+    $keyBase64 = getenv('plainfully_secret_key') ?: '';
+    $key       = $keyBase64 !== '' ? base64_decode($keyBase64, true) : null;
+
+    if ($key === false || $key === null || strlen($key) !== SODIUM_CRYPTO_SECRETBOX_KEYBYTES) {
+        return $ciphertext;
+    }
+
+    $raw = base64_decode($ciphertext, true);
+    if ($raw === false || strlen($raw) <= SODIUM_CRYPTO_SECRETBOX_NONCEBYTES) {
+        return $ciphertext;
+    }
+
+    $nonce  = substr($raw, 0, SODIUM_CRYPTO_SECRETBOX_NONCEBYTES);
+    $boxed  = substr($raw, SODIUM_CRYPTO_SECRETBOX_NONCEBYTES);
+
+    $plain = sodium_crypto_secretbox_open($boxed, $nonce, $key);
+    if ($plain === false) {
+        return $ciphertext;
+    }
+
+    return $plain;
 }

@@ -548,6 +548,39 @@ body {
     color: var(--pf-text-soft);
 }
 
+/* Base box for output/preview sections */
+.pf-box {
+    background: #10131A;              /* matches your card backgrounds */
+    border: 1px solid #272B33;        /* subtle grey border */
+    border-radius: 10px;              /* same radius as other inputs */
+    padding: 16px 18px;
+    color: #F7F8FA;                   /* your white-ish text */
+    font-size: 0.95rem;
+    line-height: 1.45;
+    overflow-x: auto;                 /* prevent overflow on long lines */
+    white-space: pre-wrap;            /* wrap user text nicely */
+}
+
+/* Mono version (for raw/original text) */
+.pf-box--mono {
+    font-family: ui-monospace, 
+                 SFMono-Regular, 
+                 Menlo, 
+                 Consolas, 
+                 "Liberation Mono", 
+                 monospace;
+    background: #0D0F14;             /* slightly darker to differentiate */
+}
+
+/* Make pre tags inside behave nicely */
+.pf-box pre {
+    margin: 0;
+    padding: 0;
+    font-family: inherit;
+    color: inherit;
+    white-space: pre-wrap;
+}
+
 /* ============================
    Responsive Tweaks
    ============================ */
@@ -566,5 +599,14 @@ body {
     .pf-main {
         margin-top: 2.5rem;
         padding: 0 1.25rem;
+    }
+}
+
+
+/* Responsive behaviour */
+@media (max-width: 600px) {
+    .pf-box {
+        padding: 14px 16px;
+        font-size: 0.9rem;
     }
 }
