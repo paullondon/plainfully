@@ -94,7 +94,7 @@ function pf_verify_session_security(): void
     // 5) Refresh last active timestamp (sliding idle window)
     $_SESSION['pf_last_active'] = $now;
 }
-<?php declare(strict_types=1);
+
 
 function pf_enforce_idle_timeout(): void
 {
