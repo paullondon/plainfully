@@ -79,6 +79,12 @@ $cssVersion = htmlspecialchars((string)($config['css'] ?? '1'), ENT_QUOTES, 'UTF
         </p>
 
         <!-- MESSAGES -->
+        <?php if (!empty($loginOk)): ?>
+            <p class="pf-message-ok">
+                <?= htmlspecialchars($loginOk, ENT_QUOTES, 'UTF-8') ?>
+            </p>
+        <?php endif; ?>
+        
         <?php
         global $config;
 
@@ -86,7 +92,7 @@ $cssVersion = htmlspecialchars((string)($config['css'] ?? '1'), ENT_QUOTES, 'UTF
         $debugUrl = $_SESSION['magic_link_debug_url'] ?? null;
 
         if ($debugMagicLinksEnabled && $debugUrl): ?>
-            <div class="pf-alert pf-alert--debug">
+            <div class="pf-alert pf-alert--debug" style="margin-top: 0.5rem;">
                 <strong>DEBUG:</strong>
                 Direct sign-in link for this browser:
                 <br>
@@ -94,13 +100,11 @@ $cssVersion = htmlspecialchars((string)($config['css'] ?? '1'), ENT_QUOTES, 'UTF
                     Click here to sign in without email
                 </a>
             </div>
-        <?php endif; ?>
-
-        <?php if (!empty($loginOk)): ?>
-            <p class="pf-message-ok">
-                <?= htmlspecialchars($loginOk, ENT_QUOTES, 'UTF-8') ?>
-            </p>
-        <?php endif; ?>
+        <?php
+            // one-time use
+            unset($_SESSION['magic_link_debug_url']);
+        endif;
+        ?>
 
         <?php if (!empty($loginError)): ?>
             <p class="pf-message-error">
