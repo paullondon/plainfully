@@ -28,7 +28,7 @@ function plainfully_pdo(): \PDO
                 \PDO::ATTR_EMULATE_PREPARES   => false,
             ]
         );
-    } catch (PDOException $e) {
+    } catch (\PDOException $e) {
         // Fail hard but clear
         http_response_code(500);
         echo 'Database connection failed.';
