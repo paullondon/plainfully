@@ -83,20 +83,22 @@ function plainfully_encrypt(string $plaintext): string
     }
 
     if (!function_exists('sodium_crypto_secretbox')) {
-        // Fallback: DO NOT use in production without sodium.
+        // Dev fallback: store plaintext if libsodium is missing.
+        error_log('[Plainfully] libsodium not available, storing text unencrypted.');
         return $plaintext;
     }
 
-    $keyBase64 = $_ENV['plainfully_secret_key'] ?? '';
+    // We used putenv() in bootstrap, so use getenv() here.
+    $keyBase64 = getenv('plainfully_secret_key') ?: '';
     $key       = $keyBase64 !== '' ? base64_decode($keyBase64, true) : null;
 
     if ($key === false || $key === null || strlen($key) !== SODIUM_CRYPTO_SECRETBOX_KEYBYTES) {
+        // In live, this should hard-fail; in dev it’s just misconfig.
         throw new RuntimeException('Invalid Plainfully secret key configuration.');
     }
 
-    $nonce = random_bytes(SODIUM_CRYPTO_SECRETBOX_NONCEBYTES);
+    $nonce  = random_bytes(SODIUM_CRYPTO_SECRETBOX_NONCEBYTES);
     $cipher = sodium_crypto_secretbox($plaintext, $nonce, $key);
 
-    // Store nonce + cipher together (base64-encoded string)
     return base64_encode($nonce . $cipher);
 }
