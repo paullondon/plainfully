@@ -1,4 +1,4 @@
-/* Plainfully – Core UI Layer (simplified SaaS styling)
+/* Plainfully – SaaS UI Layer (tokens + auth + dashboard + clarifications)
    Drop this near the bottom of app.css so it overrides older rules.
 */
 
@@ -16,6 +16,12 @@
     --pf-text-main: #E8E8E8;
     --pf-text-muted: #b5b5b5;
     --pf-text-soft: #8c8c8c;
+
+    /* Logo chaos colours */
+    --pf-chaos-1: #C32148;
+    --pf-chaos-2: #8A122F;
+    --pf-chaos-3: #1AB385;
+    --pf-chaos-4: #0C6349;
 
     /* Accents */
     --pf-accent: #1AB385;
@@ -35,7 +41,7 @@
 }
 
 /* ============================
-   Base Layout
+   Base Layout + Typography
    ============================ */
 
 html,
@@ -57,7 +63,7 @@ body {
     color: var(--pf-text-main);
 }
 
-/* Main content wrapper */
+/* Main content wrapper for logged-in pages */
 .pf-main {
     max-width: 1100px;
     width: 100%;
@@ -87,7 +93,7 @@ body {
     margin: 0 auto;
 }
 
-/* Headings & meta */
+/* Headings & meta text */
 .pf-page-title,
 .pf-heading {
     font-size: 1.6rem;
@@ -158,6 +164,7 @@ body {
    Buttons & Actions
    ============================ */
 
+/* Form / action buttons */
 .pf-button {
     border: none;
     cursor: pointer;
@@ -207,6 +214,52 @@ body {
     color: #FFB4A9;
 }
 
+/* Small generic buttons (dashboard CTAs etc.) */
+.pf-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: .5rem;
+    padding: .6rem 1rem;
+    border-radius: var(--pf-radius-md);
+    border: 1px solid transparent;
+    font-size: .9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition:
+        background-color 150ms ease,
+        border-color 150ms ease,
+        box-shadow 150ms ease,
+        transform 120ms ease;
+}
+
+.pf-btn--primary {
+    background: var(--pf-accent);
+    color: #07110e;
+    box-shadow: var(--pf-shadow-soft);
+}
+
+.pf-btn--primary:hover {
+    background: var(--pf-accent-strong);
+    transform: translateY(-1px);
+}
+
+.pf-btn--primary:active {
+    transform: translateY(0);
+    box-shadow: none;
+}
+
+.pf-btn--ghost {
+    background: transparent;
+    color: var(--pf-text-main);
+    border-color: var(--pf-border-subtle);
+}
+
+.pf-btn--ghost:hover {
+    border-color: var(--pf-chaos-3);
+    background: var(--pf-accent-soft);
+}
+
 /* Action rows (e.g. submit + back buttons) */
 .pf-actions {
     display: flex;
@@ -218,6 +271,11 @@ body {
 
 .pf-actions--split {
     justify-content: space-between;
+}
+
+.pf-actions--inline-danger {
+    margin-top: 0.75rem;
+    justify-content: flex-end;
 }
 
 .pf-actions .pf-button {
@@ -234,6 +292,29 @@ body {
     .pf-actions .pf-button {
         width: 100%;
     }
+}
+
+/* Links */
+.pf-link {
+    text-decoration: none;
+    color: var(--pf-accent);
+}
+
+.pf-link:hover {
+    color: var(--pf-accent-strong);
+}
+
+.pf-link--inline {
+    font-size: .85rem;
+}
+
+.pf-link--subtle {
+    font-size: .85rem;
+    color: var(--pf-text-muted);
+}
+
+.pf-link--subtle:hover {
+    color: var(--pf-accent);
 }
 
 /* ============================
@@ -309,7 +390,96 @@ body {
 }
 
 /* ============================
-   Dashboard Basics
+   Auth Page Layout
+   ============================ */
+
+.pf-page-center {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+}
+
+.pf-auth-card {
+    max-width: 480px;
+    width: 100%;
+    padding: 2.5rem;
+    border-radius: 20px;
+    background: var(--pf-surface);
+    border: 1px solid var(--pf-border-subtle);
+    box-shadow: var(--pf-shadow-subtle);
+}
+
+.pf-auth-header {
+    display: flex;
+    align-items: center;
+    gap: 1.4rem;
+    margin-bottom: 1.25rem;
+}
+
+.pf-auth-heading {
+    display: flex;
+    flex-direction: column;
+}
+
+.pf-logo {
+    width: 80px;
+    height: 80px;
+    flex-shrink: 0;
+}
+
+.pf-logo-img {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: contain;
+}
+
+.pf-auth-title {
+    font-size: 2rem;
+    font-weight: 700;
+    margin: 0 0 .4rem;
+}
+
+.pf-auth-subtitle {
+    margin: 0;
+    font-size: .95rem;
+    color: var(--pf-text-muted);
+}
+
+.pf-note {
+    margin-top: 1rem;
+    font-size: .85rem;
+    color: var(--pf-text-muted);
+}
+
+.pf-message-ok {
+    margin-top: .75rem;
+    font-size: .85rem;
+    color: var(--pf-accent);
+}
+
+.pf-message-error {
+    margin-top: .75rem;
+    font-size: .85rem;
+    color: var(--pf-danger);
+}
+
+@media (max-width: 480px) {
+    .pf-auth-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .pf-logo {
+        width: 72px;
+        height: 72px;
+    }
+}
+
+/* ============================
+   Dashboard Layout
    ============================ */
 
 .pf-dashboard {
@@ -318,6 +488,7 @@ body {
     gap: 1.5rem;
 }
 
+/* Top header row: welcome + plan box */
 .pf-dashboard-header {
     display: grid;
     grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr);
@@ -333,16 +504,17 @@ body {
 }
 
 .pf-dashboard-title {
-    margin: 0 0 0.5rem;
+    margin: 0 0 .5rem;
     font-size: 2rem;
 }
 
 .pf-dashboard-subtitle {
     margin: 0;
-    font-size: 0.95rem;
+    font-size: .95rem;
     color: var(--pf-text-muted);
 }
 
+/* Plan / upsell card */
 .pf-dashboard-plan {
     flex: 0 1 320px;
     min-width: 260px;
@@ -353,4 +525,173 @@ body {
     padding: 1.25rem 1.5rem;
     box-shadow: var(--pf-shadow-subtle);
     box-sizing: border-box;
+}
+
+.pf-plan-label {
+    font-size: .8rem;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--pf-text-soft);
+}
+
+.pf-plan-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: .25rem .75rem;
+    border-radius: 999px;
+    margin-top: .35rem;
+    font-weight: 600;
+    font-size: .9rem;
+    border: 1px solid var(--pf-border-subtle);
+    background: var(--pf-surface-soft);
+}
+
+.pf-plan-chip--basic {
+    border-color: var(--pf-chaos-3);
+    color: var(--pf-chaos-3);
+}
+
+.pf-plan-chip--pro {
+    border-color: var(--pf-chaos-1);
+    color: var(--pf-chaos-1);
+}
+
+.pf-plan-chip--unlimited {
+    border-color: var(--pf-chaos-4);
+    color: var(--pf-chaos-4);
+}
+
+.pf-plan-tagline {
+    margin: .75rem 0 1rem;
+    font-size: .9rem;
+    color: var(--pf-text-muted);
+}
+
+.pf-plan-upgrade {
+    margin: 0;
+}
+
+.pf-plan-note {
+    margin: .75rem 0 0;
+    font-size: .85rem;
+    color: var(--pf-text-muted);
+}
+
+/* Main dashboard cards grid */
+.pf-dashboard-main-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.25rem;
+}
+
+@media (max-width: 768px) {
+    .pf-dashboard-main-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Dashboard cards */
+.pf-dashboard-card {
+    background: var(--pf-surface);
+    border-radius: var(--pf-radius-lg);
+    border: 1px solid var(--pf-border-subtle);
+    padding: 2rem;
+    box-shadow: var(--pf-shadow-subtle);
+    box-sizing: border-box;
+}
+
+.pf-dashboard-card--primary {
+    border-left: 4px solid var(--pf-accent);
+}
+
+.pf-dashboard-card--secondary {
+    border-left: 4px solid var(--pf-chaos-4);
+}
+
+.pf-card-title {
+    margin: 0 0 .6rem;
+    font-size: 1.25rem;
+}
+
+.pf-card-text {
+    margin: 0 0 1.25rem;
+    font-size: .95rem;
+    color: var(--pf-text-muted);
+}
+
+.pf-card-text--muted {
+    font-size: .9rem;
+    color: var(--pf-text-soft);
+}
+
+.pf-dashboard-cta {
+    margin-top: .25rem;
+}
+
+/* Upsell banner inside dashboard cards */
+.pf-upsell-banner {
+    margin-top: 1.5rem;
+    padding: .9rem 1rem;
+    border-radius: var(--pf-radius-md);
+    background: var(--pf-accent-soft);
+    border: 1px solid rgba(26, 179, 133, 0.35);
+}
+
+.pf-upsell-banner--soft {
+    background: rgba(195, 33, 72, 0.08);
+    border-color: rgba(195, 33, 72, 0.4);
+}
+
+.pf-upsell-text {
+    margin: 0 0 .35rem;
+    font-size: .9rem;
+    color: var(--pf-text-main);
+}
+
+/* Recent consultations list */
+.pf-list {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 1rem;
+}
+
+.pf-list-item + .pf-list-item {
+    margin-top: .5rem;
+}
+
+.pf-list-link {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: .5rem .6rem;
+    border-radius: var(--pf-radius-md);
+    text-decoration: none;
+    color: var(--pf-text-main);
+    background: transparent;
+    transition: background 120ms ease, transform 80ms ease;
+}
+
+.pf-list-link:hover {
+    background: var(--pf-surface-soft);
+    transform: translateY(-1px);
+}
+
+.pf-list-main {
+    display: flex;
+    flex-direction: column;
+    gap: .15rem;
+}
+
+.pf-list-title {
+    font-size: .95rem;
+}
+
+.pf-list-status {
+    font-size: .8rem;
+    color: var(--pf-text-muted);
+}
+
+.pf-list-meta {
+    font-size: .8rem;
+    color: var(--pf-text-soft);
 }
