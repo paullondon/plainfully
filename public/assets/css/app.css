@@ -331,6 +331,42 @@ body {
     }
 }
 
+/* Fix overlapping buttons inside action rows */
+.pf-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 1.25rem;
+}
+
+/* Two-button layout: dashboard + primary */
+.pf-actions--split {
+    justify-content: space-between;
+}
+
+/* Override the global full-width button style in action rows */
+.pf-actions .pf-button {
+    display: inline-flex;          /* nice centering */
+    align-items: center;
+    justify-content: center;
+    width: auto;                   /* stop stretching to 100% */
+    padding-inline: 1.25rem;
+    flex: 1 1 0;                   /* share space nicely */
+    min-width: 0;
+}
+
+/* On small screens, let them stack nicely */
+@media (max-width: 600px) {
+    .pf-actions {
+        flex-direction: column;
+    }
+
+    .pf-actions .pf-button {
+        width: 100%;
+        flex: 1 0 auto;
+    }
+}
+
 /* ============================
    Plainfully – Dashboard
    ============================ */
