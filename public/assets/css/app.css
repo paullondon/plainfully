@@ -726,3 +726,65 @@ body {
         font-size: 0.9rem;
     }
 }
+/* Action container */
+.pf-actions {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    margin-top: 1.5rem;
+    flex-wrap: wrap;
+}
+
+/* Make buttons fit content, not stretch the full page */
+.pf-actions .pf-button {
+    width: auto;
+    min-width: 180px;               /* consistent feel */
+    padding: 0.75rem 1.25rem;
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    border-radius: 10px;
+}
+
+/* PRIMARY BUTTON (generate clarification) */
+.pf-button--primary {
+    background: #18A57A;            /* your green/teal primary */
+    color: #0B0C0E;
+    font-weight: 600;
+    border: none;
+}
+
+.pf-button--primary:hover {
+    background: #1EC48F;            /* subtle lighter teal */
+}
+
+/* GHOST BUTTON (back to dashboard) */
+.pf-button--ghost {
+    background: transparent;
+    border: 1px solid #272B33;      /* subtle neutral border */
+    color: #F7F8FA;                 /* light grey text */
+}
+
+.pf-button--ghost:hover {
+    border-color: #18A57A;          /* match primary tone */
+    color: #18A57A;                 /* teal text on hover */
+}
+
+/* Danger ghost (if you use cancel buttons) */
+.pf-button--danger-ghost {
+    background: transparent;
+    border: 1px solid #8B2F2F;
+    color: #E28D8D;
+}
+
+.pf-button--danger-ghost:hover {
+    border-color: #E28D8D;
+    color: #FFB4A9;
+}
+
+/* Mobile tidy-up */
+@media (max-width: 600px) {
+    .pf-actions .pf-button {
+        width: 100%;
+    }
+}
