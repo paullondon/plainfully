@@ -41,7 +41,11 @@ function pf_verify_csrf_or_abort(): void
     $postedToken  = $_POST['_token']        ?? null;
 
     if (!$sessionToken || !$postedToken || !hash_equals($sessionToken, $postedToken)) {
-        // Kill session + send user back to login
+
+        // --- DEBUG: record why we died (non-live env only) ---
+        $env = getenv('APP_ENV') ?: 'local';
+
+        // clear old session
         $_SESSION = [];
         if (ini_get('session.use_cookies')) {
             $params = session_get_cookie_params();
@@ -59,6 +63,12 @@ function pf_verify_csrf_or_abort(): void
 
         session_start();
         $_SESSION['magic_link_error'] = 'Your session expired. Please try again.';
+
+        if (strtolower($env) !== 'live' && strtolower($env) !== 'production') {
+            $_SESSION['debug_logout_reason'] = 'csrf_failed';
+        }
+
         pf_redirect('/login');
     }
 }
+

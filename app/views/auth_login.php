@@ -106,10 +106,16 @@ $cssVersion = htmlspecialchars((string)($config['css'] ?? '1'), ENT_QUOTES, 'UTF
                 </a>
             </div>
         <?php
-            // one-time use
-            unset($_SESSION['magic_link_debug_url']);
-        endif;
-        ?>
+        // one-time use
+        unset($_SESSION['magic_link_debug_url']);
+                endif;
+                ?>
+        <?php if (!empty($_SESSION['debug_logout_reason'])): ?>
+            <p style="color:#ffb4a9;font-size:.8rem;margin-top:.5rem;">
+                DEBUG logout reason: <?= htmlspecialchars($_SESSION['debug_logout_reason'], ENT_QUOTES, 'UTF-8') ?>
+            </p>
+            <?php unset($_SESSION['debug_logout_reason']); ?>
+        <?php endif; ?>
 
         <?php if (!empty($loginError)): ?>
             <p class="pf-message-error">
