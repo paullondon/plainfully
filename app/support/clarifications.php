@@ -155,3 +155,182 @@ function plainfully_current_user_id(): ?int
     $id = $_SESSION['user_id'] ?? null;
     return is_numeric($id) ? (int)$id : null;
 }
+
+<?php
+// ... existing functions above ...
+
+/**
+ * Find a clarification for a given user.
+ * Returns associative array or null if not found / not owned.
+ */
+function plainfully_find_clarification_for_user(int $id, int $userId): ?array
+{
+    $pdo = plainfully_pdo();
+
+    $sql = <<<SQL
+SELECT
+    id,
+    user_id,
+    tone,
+    status,
+    result_text,
+    created_at,
+    completed_at,
+    expires_at
+FROM clarifications
+WHERE id = :id
+  AND user_id = :user_id
+LIMIT 1
+SQL;
+
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([
+        ':id'      => $id,
+        ':user_id' => $userId,
+    ]);
+
+    $row = $stmt->fetch();
+    return $row === false ? null : $row;
+}
+
+/**
+ * Handle GET /clarifications/view?id=...
+ * - Ensures the clarification belongs to the current user
+ * - Renders a styled result page
+ * - NEVER shows original input text (only result_text + meta)
+ */
+function plainfully_handle_clarification_view(): void
+{
+    $userId = plainfully_current_user_id();
+    if ($userId === null) {
+        pf_redirect('/login');
+    }
+
+    $idParam = $_GET['id'] ?? null;
+    if (!is_string($idParam) || !ctype_digit($idParam)) {
+        // Bad id -> bounce to dashboard
+        pf_redirect('/dashboard');
+    }
+
+    $clarificationId = (int)$idParam;
+
+    $clar = plainfully_find_clarification_for_user($clarificationId, $userId);
+    if ($clar === null) {
+        // Not found or not owned: friendly message, no info leakage
+        ob_start();
+        ?>
+        <section class="pf-card pf-card--narrow">
+            <h1 class="pf-page-title">Clarification not found</h1>
+            <p class="pf-page-subtitle">
+                We couldn’t find that clarification in your history.
+                It may have expired or been cancelled.
+            </p>
+
+            <div class="pf-actions pf-actions--split">
+                <a href="/dashboard" class="pf-button pf-button--ghost">
+                    Back to dashboard
+                </a>
+                <a href="/clarifications/new" class="pf-button pf-button--primary">
+                    Start a new clarification
+                </a>
+            </div>
+        </section>
+        <?php
+        $inner = ob_get_clean();
+        pf_render_shell('Clarification not found', $inner);
+        return;
+    }
+
+    // Decide if this is considered "draft" / cancellable vs completed
+    $status = $clar['status'] ?? 'completed';
+    $isCompleted = ($status === 'completed');
+    $isCancellable = in_array($status, ['draft', 'in_progress'], true);
+
+    // Render dedicated view template
+    $pageTitle = 'Your clarification result';
+
+    // Make $clar, $isCompleted, $isCancellable, $pageTitle available to the view
+    ob_start();
+    require dirname(__DIR__) . '/views/clarifications/view.php';
+    $inner = ob_get_clean();
+
+    pf_render_shell($pageTitle, $inner);
+}
+
+/**
+ * Handle POST /clarifications/cancel
+ * - Only allows cancelling DRAFT / IN_PROGRESS clarifications
+ * - Physically deletes clarifications + details + uploads
+ * - Completed clarifications are never deleted here
+ */
+function plainfully_handle_clarification_cancel(): void
+{
+    // CSRF check (only on POST; function is a no-op for GET)
+    pf_verify_csrf_or_abort();
+
+    $userId = plainfully_current_user_id();
+    if ($userId === null) {
+        pf_redirect('/login');
+    }
+
+    $idParam = $_POST['clarification_id'] ?? null;
+    if (!is_string($idParam) || !ctype_digit($idParam)) {
+        pf_redirect('/dashboard');
+    }
+
+    $clarificationId = (int)$idParam;
+
+    $pdo = plainfully_pdo();
+
+    // Load the clarification row first
+    $clar = plainfully_find_clarification_for_user($clarificationId, $userId);
+
+    if ($clar === null) {
+        // Nothing to cancel -> just go home
+        pf_redirect('/dashboard');
+    }
+
+    $status = $clar['status'] ?? 'completed';
+
+    // Completed clarifications: protect from deletion
+    if ($status === 'completed') {
+        // Optionally flash a message later; for now just redirect
+        pf_redirect('/clarifications/view?id=' . urlencode((string)$clarificationId));
+    }
+
+    // Only allow explicit draft/in_progress to be cancelled
+    if (!in_array($status, ['draft', 'in_progress'], true)) {
+        pf_redirect('/dashboard');
+    }
+
+    // Hard-delete draft consultation + related rows
+    try {
+        $pdo->beginTransaction();
+
+        // Delete uploads first (if used)
+        $stmt = $pdo->prepare('DELETE FROM clarification_uploads WHERE clarification_id = :id');
+        $stmt->execute([':id' => $clarificationId]);
+
+        // Delete details (encrypted prompt, etc.)
+        $stmt = $pdo->prepare('DELETE FROM clarification_details WHERE clarification_id = :id');
+        $stmt->execute([':id' => $clarificationId]);
+
+        // Delete main clarification row
+        $stmt = $pdo->prepare('DELETE FROM clarifications WHERE id = :id AND user_id = :user_id');
+        $stmt->execute([
+            ':id'      => $clarificationId,
+            ':user_id' => $userId,
+        ]);
+
+        $pdo->commit();
+    } catch (\Throwable $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        error_log('[Plainfully] Failed to cancel clarification: ' . $e->getMessage());
+        // Don’t leak details, just return user to dashboard
+    }
+
+    // After cancellation, the consultation is invisible to the user
+    pf_redirect('/dashboard');
+}

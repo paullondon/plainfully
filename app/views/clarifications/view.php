@@ -1,135 +1,101 @@
-<?php declare(strict_types=1);
+<?php
+/** @var array $clar */
+/** @var bool  $isCompleted */
+/** @var bool  $isCancellable */
+/** @var string $pageTitle */
 
-require_once __DIR__ . '/../../support/clarifications.php';
+$id          = (int)$clar['id'];
+$tone        = $clar['tone'] ?? 'Calm';
+$status      = $clar['status'] ?? 'completed';
+$resultText  = $clar['result_text'] ?? '';
+$createdAt   = $clar['created_at'] ?? null;
+$completedAt = $clar['completed_at'] ?? null;
 
-if (session_status() !== PHP_SESSION_ACTIVE) {
-    session_start();
-}
-
-$id = $_GET['id'] ?? null;
-$id = is_numeric($id) ? (int)$id : null;
-
-if ($id === null || $id <= 0) {
-    header('Location: /dashboard', true, 302);
-    exit;
-}
-
-$pdo    = plainfully_pdo();
-$userId = plainfully_current_user_id();
-
-if ($userId === null) {
-    header('Location: /auth/login', true, 302);
-    exit;
-}
-
-// Load clarification, enforcing ownership
-$stmt = $pdo->prepare("
-    SELECT id, user_id, status, source, tone, created_at
-    FROM clarifications
-    WHERE id = :id
-      AND user_id = :user_id
-    LIMIT 1
-");
-$stmt->bindValue(':id', $id, \PDO::PARAM_INT);
-$stmt->bindValue(':user_id', $userId, \PDO::PARAM_INT);
-$stmt->execute();
-$clar = $stmt->fetch();
-
-if (!$clar) {
-    // Not found or not owned by this user → push back to dashboard
-    header('Location: /dashboard', true, 302);
-    exit;
-}
-
-// Load first detail row
-$stmt = $pdo->prepare("
-    SELECT model_response_ciphertext
-    FROM clarification_details
-    WHERE clarification_id = :id
-    ORDER BY sequence_no ASC
-    LIMIT 1
-");
-$stmt->bindValue(':id', $id, \PDO::PARAM_INT);
-$stmt->execute();
-$detail = $stmt->fetch();
-
-$clarifiedText = '';
-
-if ($detail) {
-    $clarifiedText = plainfully_decrypt((string)$detail['model_response_ciphertext']);
-}
-
-// Determine if this can be "cancelled" (treated as abandoned)
-// e.g. only within 5 minutes of creation
-$allowCancel = false;
-try {
-    if (!empty($clar['created_at'])) {
-        $createdAt   = new DateTimeImmutable($clar['created_at'], new DateTimeZone('UTC'));
-        $fiveMinutes = new DateTimeImmutable('-5 minutes', new DateTimeZone('UTC'));
-        $allowCancel = $createdAt >= $fiveMinutes;
+// Format dates very simply; adjust to taste or use a helper later
+function pf_fmt_dt(?string $dt): string {
+    if (!$dt) {
+        return '';
     }
-} catch (Throwable $e) {
-    $allowCancel = false;
+    try {
+        $dtObj = new DateTimeImmutable($dt);
+        return $dtObj->format('j M Y, H:i');
+    } catch (Throwable $e) {
+        return $dt;
+    }
 }
-
-$csrfToken = plainfully_csrf_token();
 ?>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Your Clarification | Plainfully</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="stylesheet" href="/assets/css/app.css">
-</head>
-<body class="pf-page-body">
-<main class="pf-page-main">
-    <section class="pf-card pf-card--narrow">
-        <h1 class="pf-heading">Your clarification is ready</h1>
-
-        <p class="pf-meta">
-            Tone: <?= htmlspecialchars($clar['tone'] ?? '', ENT_QUOTES, 'UTF-8') ?>
-            &nbsp;•&nbsp;
-            Created: <?= htmlspecialchars($clar['created_at'] ?? '', ENT_QUOTES, 'UTF-8') ?>
+<section class="pf-card pf-card--narrow">
+    <header style="margin-bottom:1.1rem;">
+        <h1 class="pf-page-title">Your clarification</h1>
+        <p class="pf-page-subtitle">
+            This is Plainfully’s rephrased version of the message you asked about.
+            We never show the original text here for your privacy.
         </p>
+    </header>
 
-        <!-- Upsell banner -->
-        <div class="pf-upsell">
-            <strong>Plainfully Free</strong> keeps your clarifications for 28 days.
-            Want longer history and priority processing?
-            <a href="/plans">See plans</a>.
-        </div>
-
-        <div class="pf-field">
-            <h2 class="pf-label">Plainfully’s version</h2>
-            <div class="pf-box">
-                <pre><?= htmlspecialchars($clarifiedText, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></pre>
-            </div>
-        </div>
-
-        <div class="pf-actions pf-actions--split">
-            <a href="/dashboard" class="pf-button pf-button--ghost">
-                Back to your dashboard
-            </a>
-            <a href="/clarifications/new" class="pf-button pf-button--primary">
-                Start another clarification
-            </a>
-        </div>
-
-        <?php if ($allowCancel): ?>
-            <form method="post"
-                  action="/clarifications/cancel"
-                  class="pf-actions pf-actions--inline-danger">
-                <input type="hidden" name="_token"
-                       value="<?= htmlspecialchars($csrfToken, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>">
-                <input type="hidden" name="id"
-                       value="<?= htmlspecialchars((string)$clar['id'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>">
-                <button type="submit" class="pf-button pf-button--danger-ghost">
-                    Cancel and remove this clarification
-                </button>
-            </form>
+    <!-- Meta bar -->
+    <div class="pf-meta" style="
+        display:flex;
+        flex-wrap:wrap;
+        gap:0.75rem;
+        margin-bottom:1rem;
+        font-size:0.85rem;
+    ">
+        <span>Clarification #<?= htmlspecialchars((string)$id, ENT_QUOTES, 'UTF-8') ?></span>
+        <?php if ($tone): ?>
+            <span>• Tone: <?= htmlspecialchars($tone, ENT_QUOTES, 'UTF-8') ?></span>
         <?php endif; ?>
-    </section>
-</main>
-</body>
-</html>
+        <?php if ($createdAt): ?>
+            <span>• Started: <?= htmlspecialchars(pf_fmt_dt($createdAt), ENT_QUOTES, 'UTF-8') ?></span>
+        <?php endif; ?>
+        <?php if ($completedAt): ?>
+            <span>• Completed: <?= htmlspecialchars(pf_fmt_dt($completedAt), ENT_QUOTES, 'UTF-8') ?></span>
+        <?php endif; ?>
+        <span>• Status: <?= htmlspecialchars(ucfirst($status), ENT_QUOTES, 'UTF-8') ?></span>
+    </div>
+
+    <!-- Plan upsell -->
+    <div class="pf-upsell">
+        <strong>Plainfully Basic</strong> gives you a simple, secure way to clarify tricky messages.
+        In the future you’ll be able to upgrade for richer history, sharing tools and additional tones.
+        <br>
+        <span style="font-size:0.8rem;color:var(--pf-text-muted);">
+            For now, enjoy unlimited clarifications while we’re in early access.
+        </span>
+    </div>
+
+    <!-- Result text only (NEVER original input) -->
+    <h2 class="pf-heading" style="margin-top:1.25rem;margin-bottom:0.5rem;">
+        Rephrased message
+    </h2>
+
+    <div class="pf-box">
+        <?= nl2br(htmlspecialchars($resultText, ENT_QUOTES, 'UTF-8')) ?>
+    </div>
+
+    <!-- Actions -->
+    <div class="pf-actions pf-actions--split" style="margin-top:1.5rem;">
+        <a href="/dashboard" class="pf-button pf-button--ghost">
+            Back to dashboard
+        </a>
+
+        <a href="/clarifications/new" class="pf-button pf-button--primary">
+            Start another clarification
+        </a>
+    </div>
+
+    <?php if ($isCancellable): ?>
+        <form method="post"
+              action="/clarifications/cancel"
+              class="pf-actions pf-actions--inline-danger">
+            <?php pf_csrf_field(); ?>
+            <input type="hidden"
+                   name="clarification_id"
+                   value="<?= htmlspecialchars((string)$id, ENT_QUOTES, 'UTF-8') ?>">
+
+            <button type="submit" class="pf-button pf-button--danger-ghost">
+                Cancel and delete this draft
+            </button>
+        </form>
+    <?php endif; ?>
+</section>

@@ -52,12 +52,14 @@ switch (true) {
     case $path === '/clarifications/view' && $method === 'GET':
         require_login();
         require dirname(__DIR__) . '/app/views/clarifications/view.php';
+        plainfully_handle_clarification_view();
         break;
     
     // Cancel (abandon) a very recent clarification
     case $path === '/clarifications/cancel' && $method === 'POST':
         require_login();
         require dirname(__DIR__) . '/app/views/clarifications/cancel.php';
+        plainfully_handle_clarification_cancel();
         break;
 
 
