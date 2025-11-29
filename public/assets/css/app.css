@@ -1,9 +1,12 @@
-/* ============================
-   Plainfully – Design Tokens
-   ============================ */
+/* Plainfully – Core UI Layer (simplified SaaS styling)
+   Drop this near the bottom of app.css so it overrides older rules.
+*/
 
+/* ============================
+   Design Tokens
+   ============================ */
 :root {
-    /* Core surfaces */
+    /* Surfaces */
     --pf-bg: #171717;
     --pf-surface: #1f1f1f;
     --pf-surface-soft: #232323;
@@ -13,12 +16,6 @@
     --pf-text-main: #E8E8E8;
     --pf-text-muted: #b5b5b5;
     --pf-text-soft: #8c8c8c;
-
-    /* Logo chaos colours */
-    --pf-chaos-1: #C32148;
-    --pf-chaos-2: #8A122F;
-    --pf-chaos-3: #1AB385;
-    --pf-chaos-4: #0C6349;
 
     /* Accents */
     --pf-accent: #1AB385;
@@ -38,7 +35,7 @@
 }
 
 /* ============================
-   Base Layout + Typography
+   Base Layout
    ============================ */
 
 html,
@@ -50,16 +47,8 @@ body {
     font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
-/* Legacy shell (used by login view that has its own <body class="pf-shell">) */
-.pf-shell {
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    background: radial-gradient(circle at top, #202020 0, var(--pf-bg) 45%, #050505 100%);
-    color: var(--pf-text-main);
-}
-
-/* Logged-in shell (used via pf_render_shell) */
+/* Shells used by pf_render_shell / auth */
+.pf-shell,
 .pf-shell-loggedin {
     min-height: 100vh;
     display: flex;
@@ -68,13 +57,20 @@ body {
     color: var(--pf-text-main);
 }
 
-/* Main content wrapper for logged-in pages */
+/* Main content wrapper */
 .pf-main {
     max-width: 1100px;
     width: 100%;
     margin: 4rem auto 3rem;
     padding: 0 2rem;
     box-sizing: border-box;
+}
+
+@media (max-width: 800px) {
+    .pf-main {
+        margin-top: 2.5rem;
+        padding: 0 1.25rem;
+    }
 }
 
 /* Generic card / panel */
@@ -86,529 +82,181 @@ body {
     padding: 1.5rem;
 }
 
-/* ============================
-   Buttons & Links
-   ============================ */
-
-.pf-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: .5rem;
-    padding: .75rem 1.25rem;
-    border-radius: var(--pf-radius-md);
-    border: 1px solid transparent;
-    font-size: .95rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition:
-        background-color 150ms ease,
-        border-color 150ms ease,
-        box-shadow 150ms ease,
-        transform 120ms ease;
+.pf-card--narrow {
+    max-width: 720px;
+    margin: 0 auto;
 }
 
-.pf-btn--primary {
-    background: var(--pf-accent);
-    color: #07110e;
-    box-shadow: var(--pf-shadow-soft);
+/* Headings & meta */
+.pf-page-title,
+.pf-heading {
+    font-size: 1.6rem;
+    font-weight: 650;
+    margin: 0 0 0.4rem;
 }
 
-.pf-btn--primary:hover {
-    background: var(--pf-accent-strong);
-    transform: translateY(-1px);
-}
-
-.pf-btn--primary:active {
-    transform: translateY(0);
-    box-shadow: none;
-}
-
-.pf-btn--ghost {
-    background: transparent;
-    color: var(--pf-text-main);
-    border-color: var(--pf-border-subtle);
-}
-
-.pf-btn--ghost:hover {
-    border-color: var(--pf-chaos-3);
-    background: var(--pf-accent-soft);
-}
-
-/* Primary form-style button */
-.pf-button {
-    width: 100%;
-    background: var(--pf-accent);
-    color: #05150f;
-    border: none;
-    padding: .9rem 1.2rem;
-    border-radius: var(--pf-radius-md);
-    font-size: 1rem;
-    font-weight: 600;
-    margin-top: .5rem;
-    cursor: pointer;
-    transition: background 180ms ease, transform 100ms ease;
-}
-
-.pf-button:hover {
-    background: var(--pf-accent-strong);
-    transform: translateY(-1px);
-}
-
-.pf-button:active {
-    transform: translateY(0);
-}
-
-/* Links */
-.pf-link {
-    text-decoration: none;
-    color: var(--pf-accent);
-}
-
-.pf-link:hover {
-    color: var(--pf-accent-strong);
-}
-
-.pf-link--inline {
-    font-size: .85rem;
-}
-
-.pf-link--subtle {
-    font-size: .85rem;
-    color: var(--pf-text-muted);
-}
-
-.pf-link--subtle:hover {
-    color: var(--pf-accent);
-}
-
-/* ============================
-   Auth Page Layout (magic link)
-   ============================ */
-/* Debug panel styling */
-.pf-alert--debug {
-    background: #1E1F24;            /* dark grey background */
-    border: 1px dashed #F26945;     /* eventform/brand orange */
-    color: #F7F8FA;                 /* white-ish text */
-    padding: 0.75rem 1rem;
-    margin-bottom: 1rem;
-    border-radius: 8px;
+.pf-page-subtitle,
+.pf-meta {
     font-size: 0.9rem;
-}
-
-/* Debug links */
-.pf-alert--debug a {
-    color: #F26945;                 /* on-brand orange */
-    text-decoration: underline;
-}
-
-.pf-alert--debug a:hover {
-    color: #ff8f6c;                 /* lighter orange on hover */
-}
-
-
-.pf-page-center {
-    min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 2rem;
-}
-
-.pf-auth-card {
-    max-width: 480px;
-    width: 100%;
-    padding: 2.5rem;
-    border-radius: 20px;
-    background: var(--pf-surface);
-    border: 1px solid var(--pf-border-subtle);
-    box-shadow: var(--pf-shadow-subtle);
-}
-
-/* Header: logo + heading inline */
-.pf-auth-header {
-    display: flex;
-    align-items: center;
-    gap: 1.4rem;
-    margin-bottom: 1.25rem;
-}
-
-.pf-auth-heading {
-    display: flex;
-    flex-direction: column;
-}
-
-/* Logo */
-.pf-logo {
-    width: 80px;
-    height: 80px;
-    flex-shrink: 0;
-}
-
-.pf-logo-img {
-    width: 100%;
-    height: 100%;
-    display: block;
-    object-fit: contain;
-}
-
-/* Auth headings */
-.pf-auth-title {
-    font-size: 2rem;
-    font-weight: 700;
-    margin: 0 0 .4rem;
-}
-
-.pf-auth-subtitle {
-    margin: 0;
-    font-size: .95rem;
     color: var(--pf-text-muted);
+    margin: 0 0 1.25rem;
 }
 
-/* Auth form fields */
+/* ============================
+   Form Fields
+   ============================ */
+
 .pf-field {
-    margin-top: 1.75rem;
-    margin-bottom: 1.25rem;
+    margin-bottom: 1.35rem;
 }
 
 .pf-label {
     display: block;
-    margin-bottom: .4rem;
-    font-size: .9rem;
+    margin-bottom: 0.45rem;
+    font-size: 0.9rem;
     color: var(--pf-text-muted);
 }
 
-.pf-input {
+.pf-input,
+.pf-textarea,
+.pf-select {
     width: 100%;
-    padding: .75rem 1rem;
+    box-sizing: border-box;
+    padding: 0.7rem 0.9rem;
     border-radius: var(--pf-radius-md);
     border: 1px solid var(--pf-border-subtle);
     background: #111;
     color: var(--pf-text-main);
-    font-size: 1rem;
-    box-sizing: border-box;
+    font-size: 0.95rem;
 }
 
-.pf-input::placeholder {
+.pf-input::placeholder,
+.pf-textarea::placeholder {
     color: #555;
 }
 
-.pf-input:focus {
+.pf-input:focus,
+.pf-textarea:focus,
+.pf-select:focus {
     outline: none;
     border-color: var(--pf-accent);
     box-shadow: 0 0 0 2px var(--pf-accent-soft);
 }
 
-/* Auth note & messages */
-.pf-note {
-    margin-top: 1rem;
-    font-size: .85rem;
+.pf-textarea {
+    min-height: 220px;
+    resize: vertical;
+}
+
+.pf-help {
+    font-size: 0.8rem;
     color: var(--pf-text-muted);
+    margin-top: 0.35rem;
 }
 
-.pf-message-ok {
-    margin-top: .75rem;
-    font-size: .85rem;
-    color: var(--pf-accent);
+/* ============================
+   Buttons & Actions
+   ============================ */
+
+.pf-button {
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 0.95rem;
+    border-radius: var(--pf-radius-md);
+    padding: 0.75rem 1.25rem;
+    font-weight: 600;
+    transition: background 140ms ease-out, color 140ms ease-out,
+                border-color 140ms ease-out, box-shadow 140ms ease-out,
+                transform 80ms ease-out;
 }
 
-.pf-message-error {
-    margin-top: .75rem;
-    font-size: .85rem;
-    color: var(--pf-danger);
+/* Primary action */
+.pf-button--primary {
+    background: #18A57A;
+    color: #0B0C0E;
 }
 
-/* Stack auth header on very small screens */
-@media (max-width: 480px) {
-    .pf-auth-header {
-        flex-direction: column;
-        align-items: flex-start;
-    }
-
-    .pf-logo {
-        width: 72px;
-        height: 72px;
-    }
+.pf-button--primary:hover {
+    background: #1EC48F;
+    box-shadow: 0 8px 20px rgba(24, 165, 122, 0.35);
+    transform: translateY(-1px);
 }
 
-/* Fix overlapping buttons inside action rows */
+/* Secondary / ghost */
+.pf-button--ghost {
+    background: transparent;
+    border: 1px solid #272B33;
+    color: #F7F8FA;
+}
+
+.pf-button--ghost:hover {
+    border-color: #18A57A;
+    color: #18A57A;
+}
+
+/* Danger ghost */
+.pf-button--danger-ghost {
+    background: transparent;
+    border: 1px solid #8B2F2F;
+    color: #E28D8D;
+}
+
+.pf-button--danger-ghost:hover {
+    border-color: #E28D8D;
+    color: #FFB4A9;
+}
+
+/* Action rows (e.g. submit + back buttons) */
 .pf-actions {
     display: flex;
+    justify-content: center;
+    gap: 1rem;
+    margin-top: 1.5rem;
     flex-wrap: wrap;
-    gap: 0.75rem;
-    margin-top: 1.25rem;
 }
 
-/* Two-button layout: dashboard + primary */
 .pf-actions--split {
     justify-content: space-between;
 }
 
-/* Override the global full-width button style in action rows */
 .pf-actions .pf-button {
-    display: inline-flex;          /* nice centering */
-    align-items: center;
+    width: auto;
+    min-width: 180px;
+    padding: 0.75rem 1.25rem;
+    display: inline-flex;
     justify-content: center;
-    width: auto;                   /* stop stretching to 100% */
-    padding-inline: 1.25rem;
-    flex: 1 1 0;                   /* share space nicely */
-    min-width: 0;
+    align-items: center;
+    border-radius: 10px;
 }
 
-/* On small screens, let them stack nicely */
 @media (max-width: 600px) {
-    .pf-actions {
-        flex-direction: column;
-    }
-
     .pf-actions .pf-button {
         width: 100%;
-        flex: 1 0 auto;
     }
 }
 
 /* ============================
-   Plainfully – Dashboard
+   Boxes & Output
    ============================ */
 
-/* Dashboard wrapper inside .pf-main */
-.pf-dashboard {
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
-}
-
-/* Top header row: welcome + plan box */
-.pf-dashboard-header {
-    display: grid;
-    grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr);
-    gap: 1.25rem;              /* smaller gap between welcome + plan */
-    margin-bottom: 1.25rem;    /* smaller gap before main cards */
-    align-items: flex-start;
-}
-
-/* On anything below ~1200px wide, stack vertically:
-   Welcome first, then plan card. This kills the giant "fake gap". */
-@media (max-width: 1200px) {
-    .pf-dashboard-header {
-        grid-template-columns: 1fr;
-    }
-}
-
-/* Title + subtitle */
-.pf-dashboard-title {
-    margin: 0 0 .5rem;
-    font-size: 2rem;
-}
-
-.pf-dashboard-subtitle {
-    margin: 0;
-    font-size: .95rem;
-    color: var(--pf-text-muted);
-}
-
-/* Plan / upsell card (fixed layout bug) */
-.pf-dashboard-plan {
-    flex: 0 1 320px;             /* Preferred width 320, but allowed to shrink */
-    min-width: 260px;            /* Never collapse below */
-    max-width: 360px;            /* Prevent over-expansion */
-    background: var(--pf-surface);
-    border-radius: var(--pf-radius-lg);
-    border: 1px solid var(--pf-border-subtle);
-    padding: 1.25rem 1.5rem;
-    box-shadow: var(--pf-shadow-subtle);
-    box-sizing: border-box;
-}
-
-.pf-plan-label {
-    font-size: .8rem;
-    text-transform: uppercase;
-    letter-spacing: .08em;
-    color: var(--pf-text-soft);
-}
-
-.pf-plan-chip {
-    display: inline-flex;
-    align-items: center;
-    padding: .25rem .75rem;
-    border-radius: 999px;
-    margin-top: .35rem;
-    font-weight: 600;
-    font-size: .9rem;
-    border: 1px solid var(--pf-border-subtle);
-    background: var(--pf-surface-soft);
-}
-
-.pf-plan-chip--basic {
-    border-color: var(--pf-chaos-3);
-    color: var(--pf-chaos-3);
-}
-
-.pf-plan-chip--pro {
-    border-color: var(--pf-chaos-1);
-    color: var(--pf-chaos-1);
-}
-
-.pf-plan-chip--unlimited {
-    border-color: var(--pf-chaos-4);
-    color: var(--pf-chaos-4);
-}
-
-.pf-plan-tagline {
-    margin: .75rem 0 1rem;
-    font-size: .9rem;
-    color: var(--pf-text-muted);
-}
-
-.pf-plan-upgrade {
-    margin: 0;
-}
-
-.pf-plan-note {
-    margin: .75rem 0 0;
-    font-size: .85rem;
-    color: var(--pf-text-muted);
-}
-
-.pf-dashboard-main-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1.25rem;   /* not 2rem */
-}
-
-/* Dashboard cards */
-.pf-dashboard-card {
-    background: var(--pf-surface);
-    border-radius: var(--pf-radius-lg);
-    border: 1px solid var(--pf-border-subtle);
-    padding: 2rem;
-    box-shadow: var(--pf-shadow-subtle);
-    box-sizing: border-box;
-}
-
-/* Make primary card stand out */
-.pf-dashboard-card--primary {
-    border-left: 4px solid var(--pf-accent);
-}
-
-/* Secondary card */
-.pf-dashboard-card--secondary {
-    border-left: 4px solid var(--pf-chaos-4);
-}
-
-.pf-card-title {
-    margin: 0 0 .6rem;
-    font-size: 1.25rem;
-}
-
-.pf-card-text {
-    margin: 0 0 1.25rem;
-    font-size: .95rem;
-    color: var(--pf-text-muted);
-}
-
-.pf-card-text--muted {
-    font-size: .9rem;
-    color: var(--pf-text-soft);
-}
-
-.pf-dashboard-cta {
-    margin-top: .25rem;
-}
-
-/* Upsell banner inside primary card */
-.pf-upsell-banner {
-    margin-top: 1.5rem;
-    padding: .9rem 1rem;
-    border-radius: var(--pf-radius-md);
-    background: var(--pf-accent-soft);
-    border: 1px solid rgba(26, 179, 133, 0.35);
-}
-
-.pf-upsell-banner--soft {
-    background: rgba(195, 33, 72, 0.08);
-    border-color: rgba(195, 33, 72, 0.4);
-}
-
-.pf-upsell-text {
-    margin: 0 0 .35rem;
-    font-size: .9rem;
-    color: var(--pf-text-main);
-}
-
-/* Recent consultations list */
-.pf-list {
-    list-style: none;
-    padding: 0;
-    margin: 0 0 1rem;
-}
-
-.pf-list-item + .pf-list-item {
-    margin-top: .5rem;
-}
-
-.pf-list-link {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    padding: .5rem .6rem;
-    border-radius: var(--pf-radius-md);
-    text-decoration: none;
-    color: var(--pf-text-main);
-    background: transparent;
-    transition: background 120ms ease, transform 80ms ease;
-}
-
-.pf-list-link:hover {
-    background: var(--pf-surface-soft);
-    transform: translateY(-1px);
-}
-
-.pf-list-main {
-    display: flex;
-    flex-direction: column;
-    gap: .15rem;
-}
-
-.pf-list-title {
-    font-size: .95rem;
-}
-
-.pf-list-status {
-    font-size: .8rem;
-    color: var(--pf-text-muted);
-}
-
-.pf-list-meta {
-    font-size: .8rem;
-    color: var(--pf-text-soft);
-}
-
-/* Base box for output/preview sections */
 .pf-box {
-    background: #10131A;              /* matches your card backgrounds */
-    border: 1px solid #272B33;        /* subtle grey border */
-    border-radius: 10px;              /* same radius as other inputs */
+    background: #10131A;
+    border: 1px solid #272B33;
+    border-radius: 10px;
     padding: 16px 18px;
-    color: #F7F8FA;                   /* your white-ish text */
+    color: #F7F8FA;
     font-size: 0.95rem;
     line-height: 1.45;
-    overflow-x: auto;                 /* prevent overflow on long lines */
-    white-space: pre-wrap;            /* wrap user text nicely */
+    overflow-x: auto;
+    white-space: pre-wrap;
 }
 
-/* Mono version (for raw/original text) */
 .pf-box--mono {
-    font-family: ui-monospace, 
-                 SFMono-Regular, 
-                 Menlo, 
-                 Consolas, 
-                 "Liberation Mono", 
-                 monospace;
-    background: #0D0F14;             /* slightly darker to differentiate */
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    background: #0D0F14;
 }
 
-/* Make pre tags inside behave nicely */
 .pf-box pre {
     margin: 0;
     padding: 0;
@@ -617,27 +265,9 @@ body {
     white-space: pre-wrap;
 }
 
-.pf-actions {
-    display: flex;
-    gap: 0.75rem;
-    margin-top: 1.25rem;
-}
-
-.pf-actions--split {
-    justify-content: space-between;
-    flex-wrap: wrap;
-}
-
-.pf-button--ghost {
-    background: transparent;
-    border: 1px solid #272B33;
-    color: #F7F8FA;
-}
-
-.pf-button--ghost:hover {
-    border-color: #F26945;
-    color: #F26945;
-}
+/* ============================
+   Upsell + Debug Alerts
+   ============================ */
 
 .pf-upsell {
     margin: 0.75rem 0 1.25rem;
@@ -658,133 +288,69 @@ body {
     color: #ff8f6c;
 }
 
-.pf-actions {
-    display: flex;
-    gap: 0.75rem;
-    margin-top: 1.25rem;
-    flex-wrap: wrap;
-}
-
-.pf-actions--split {
-    justify-content: space-between;
-}
-
-.pf-actions--inline-danger {
-    margin-top: 0.75rem;
-    justify-content: flex-end;
-}
-
-.pf-button--ghost {
-    background: transparent;
-    border: 1px solid #272B33;
+/* Debug panel for magic-link */
+.pf-alert--debug {
+    background: #1E1F24;
+    border: 1px dashed #F26945;
     color: #F7F8FA;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+    border-radius: 8px;
+    font-size: 0.9rem;
 }
 
-.pf-button--ghost:hover {
-    border-color: #F26945;
+.pf-alert--debug a {
     color: #F26945;
+    text-decoration: underline;
 }
 
-.pf-button--danger-ghost {
-    background: transparent;
-    border: 1px solid #B3261E;
-    color: #FFB4A9;
+.pf-alert--debug a:hover {
+    color: #ff8f6c;
 }
-
-.pf-button--danger-ghost:hover {
-    border-color: #FFB4A9;
-    color: #FFB4A9;
-}
-
 
 /* ============================
-   Responsive Tweaks
+   Dashboard Basics
    ============================ */
 
-@media (max-width: 768px) {
-    .pf-dashboard-header {
-        flex-direction: column;
-    }
+.pf-dashboard {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
 
-    .pf-dashboard-main-grid {
+.pf-dashboard-header {
+    display: grid;
+    grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr);
+    gap: 1.25rem;
+    margin-bottom: 1.25rem;
+    align-items: flex-start;
+}
+
+@media (max-width: 1200px) {
+    .pf-dashboard-header {
         grid-template-columns: 1fr;
     }
 }
 
-@media (max-width: 800px) {
-    .pf-main {
-        margin-top: 2.5rem;
-        padding: 0 1.25rem;
-    }
+.pf-dashboard-title {
+    margin: 0 0 0.5rem;
+    font-size: 2rem;
 }
 
-
-/* Responsive behaviour */
-@media (max-width: 600px) {
-    .pf-box {
-        padding: 14px 16px;
-        font-size: 0.9rem;
-    }
-}
-/* Action container */
-.pf-actions {
-    display: flex;
-    justify-content: center;
-    gap: 1rem;
-    margin-top: 1.5rem;
-    flex-wrap: wrap;
+.pf-dashboard-subtitle {
+    margin: 0;
+    font-size: 0.95rem;
+    color: var(--pf-text-muted);
 }
 
-/* Make buttons fit content, not stretch the full page */
-.pf-actions .pf-button {
-    width: auto;
-    min-width: 180px;               /* consistent feel */
-    padding: 0.75rem 1.25rem;
-    display: inline-flex;
-    justify-content: center;
-    align-items: center;
-    border-radius: 10px;
-}
-
-/* PRIMARY BUTTON (generate clarification) */
-.pf-button--primary {
-    background: #18A57A;            /* your green/teal primary */
-    color: #0B0C0E;
-    font-weight: 600;
-    border: none;
-}
-
-.pf-button--primary:hover {
-    background: #1EC48F;            /* subtle lighter teal */
-}
-
-/* GHOST BUTTON (back to dashboard) */
-.pf-button--ghost {
-    background: transparent;
-    border: 1px solid #272B33;      /* subtle neutral border */
-    color: #F7F8FA;                 /* light grey text */
-}
-
-.pf-button--ghost:hover {
-    border-color: #18A57A;          /* match primary tone */
-    color: #18A57A;                 /* teal text on hover */
-}
-
-/* Danger ghost (if you use cancel buttons) */
-.pf-button--danger-ghost {
-    background: transparent;
-    border: 1px solid #8B2F2F;
-    color: #E28D8D;
-}
-
-.pf-button--danger-ghost:hover {
-    border-color: #E28D8D;
-    color: #FFB4A9;
-}
-
-/* Mobile tidy-up */
-@media (max-width: 600px) {
-    .pf-actions .pf-button {
-        width: 100%;
-    }
+.pf-dashboard-plan {
+    flex: 0 1 320px;
+    min-width: 260px;
+    max-width: 360px;
+    background: var(--pf-surface);
+    border-radius: var(--pf-radius-lg);
+    border: 1px solid var(--pf-border-subtle);
+    padding: 1.25rem 1.5rem;
+    box-shadow: var(--pf-shadow-subtle);
+    box-sizing: border-box;
 }
