@@ -119,15 +119,15 @@ function pf_fmt_dt(?string $dt): string {
                 </div>
             </div>
         </div>
-    </section>
+ <!--   </section>
 
     <section class="pf-card">
     <div class="pf-box pf-box--fullreport">
-
+-->
     <!-- 1. Key things to know -->
         <div class="pf-fullreport-group">
-        <h3 class="pf-fullreport-heading">Key things to know</h3>
-            <div class="pf-fullreport-section">
+        <h3 class="pf-card-title">Key things to know</h3>
+            <div class="pf-quickglance">
                 <?php if (!empty($keyPoints)): ?>
                     <ul class="pf-fullreport-list">
                         <?php foreach ($keyPoints as $point): ?>
@@ -144,7 +144,7 @@ function pf_fmt_dt(?string $dt): string {
 
         <!-- 2. Risks / cautions -->
         <div class="pf-fullreport-group">
-            <h3 class="pf-fullreport-heading">Risks / cautions</h3>
+            <h4 class="pf-card-title">Risks / cautions</h4>
 
             <div class="pf-fullreport-section">
                 <p class="pf-fullreport-body">
@@ -154,8 +154,8 @@ function pf_fmt_dt(?string $dt): string {
         </div>
 
         <!-- 3. What people typically do -->
-        <div class="pf-fullreport-group">
-            <h3 class="pf-fullreport-heading">What people typically do in this situation</h3>
+        <div class="pf-quickglance">
+            <h5 class="pf-fullreport-heading">What people typically do in this situation</h5>
 
             <div class="pf-fullreport-section">
                 <?php if (!empty($actionsList)): ?>
