@@ -367,7 +367,7 @@ function plainfully_load_clarification_result_for_user(int $clarificationId, int
 {
     $pdo = plainfully_pdo();
 
-    // 1) Load main clarification row (ownership check)
+    // 1) Load the main clarification row
     $stmt = $pdo->prepare(
         'SELECT id, user_id, tone, status, source, created_at, updated_at, expires_at
          FROM clarifications
@@ -384,7 +384,7 @@ function plainfully_load_clarification_result_for_user(int $clarificationId, int
         return null;
     }
 
-    // 2) Load the latest detail row for this clarification
+    // 2) Load latest detail row
     $stmt = $pdo->prepare(
         'SELECT
              clarification_ciphertext,
@@ -402,8 +402,11 @@ function plainfully_load_clarification_result_for_user(int $clarificationId, int
     $resultText = '';
 
     if ($detail !== false) {
-        // Prefer clarified text, then model response, then redacted summary
-        $cipher = $detail['clarification_ciphertext'] ?? null;
+
+        // Priority: clarification → model → summary
+        $cipher = $detail['clarification_ciphertext']
+                  ?? null;
+
         if (empty($cipher) && !empty($detail['model_response_ciphertext'])) {
             $cipher = $detail['model_response_ciphertext'];
         }
@@ -413,11 +416,10 @@ function plainfully_load_clarification_result_for_user(int $clarificationId, int
 
         if (!empty($cipher)) {
             try {
-                // We NEVER decrypt / show the original prompt here.
                 $resultText = plainfully_decrypt($cipher);
-            } catch (\Throwable $e) {
-                error_log('[Plainfully] Failed to decrypt clarification result: ' . $e->getMessage());
-                $resultText = '[Sorry, we could not decrypt this result. Please try regenerating it.]';
+            } catch (Throwable $e) {
+                error_log('[Plainfully] decrypt failed: ' . $e->getMessage());
+                $resultText = '[Unable to decrypt result text]';
             }
         }
     }
