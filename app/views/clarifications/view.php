@@ -66,6 +66,22 @@ function pf_fmt_dt(?string $dt): string {
     // Defensive defaults in case view is hit oddly
     $tldrText       = $tldrText       ?? ($clar['result_text'] ?? '');
     $fullReportText = $fullReportText ?? ($clar['result_text'] ?? '');
+    $riskLevel      = $riskLevel      ?? 'low';
+
+    // Map risk level → label, icon, CSS modifier
+    $riskLabel = 'Low risk';
+    $riskIcon  = '✓';
+    $riskClass = 'pf-risk-badge--low';
+
+    if ($riskLevel === 'medium') {
+        $riskLabel = 'Medium risk';
+        $riskIcon  = '!';
+        $riskClass = 'pf-risk-badge--medium';
+    } elseif ($riskLevel === 'high') {
+        $riskLabel = 'High risk';
+        $riskIcon  = '!!';
+        $riskClass = 'pf-risk-badge--high';
+    }
     ?>
 
     <section class="pf-card" style="margin-bottom: 1.75rem;">
@@ -76,7 +92,15 @@ function pf_fmt_dt(?string $dt): string {
 
         <h2 class="pf-card-title" style="margin-top: 1.5rem;">TL;DR summary</h2>
         <div class="pf-box">
-            <?= nl2br(htmlspecialchars($tldrText, ENT_QUOTES, 'UTF-8')) ?>
+            <div class="pf-tldr-layout">
+                <div class="pf-risk-badge <?= $riskClass ?>">
+                    <span class="pf-risk-badge__icon"><?= htmlspecialchars($riskIcon, ENT_QUOTES, 'UTF-8') ?></span>
+                    <span class="pf-risk-badge__label"><?= htmlspecialchars($riskLabel, ENT_QUOTES, 'UTF-8') ?></span>
+                </div>
+                <div class="pf-tldr-text">
+                    <?= nl2br(htmlspecialchars($tldrText, ENT_QUOTES, 'UTF-8')) ?>
+                </div>
+            </div>
         </div>
     </section>
 
@@ -87,11 +111,10 @@ function pf_fmt_dt(?string $dt): string {
             risks/cautions, what people typically do, and a short summary.
         </p>
 
-        <div class="pf-box pf-box--mono">
+        <div class="pf-box">
             <?= nl2br(htmlspecialchars($fullReportText, ENT_QUOTES, 'UTF-8')) ?>
         </div>
 
-        <!-- Subtle plan-based upsell -->
         <div class="pf-upsell" style="margin-top: 1.25rem;">
             On your current plan, Plainfully keeps clarifications for up to
             <strong>28 days</strong> and does not store your original text.

@@ -173,11 +173,10 @@ function plainfully_current_user_id(): ?int
  */
 function plainfully_stub_model_response(string $input): string
 {
-    // --- Very simple risk heuristics for now (MVP only) ---
     $lower = mb_strtolower($input);
 
+    // --- crude risk detection (MVP only) ---
     $riskLevel = 'low';
-    $riskIcon  = '🔵 Low risk';
 
     if (
         str_contains($lower, 'final notice')
@@ -189,7 +188,6 @@ function plainfully_stub_model_response(string $input): string
         || str_contains($lower, 'eviction')
     ) {
         $riskLevel = 'high';
-        $riskIcon  = '🔴 High risk';
     } elseif (
         str_contains($lower, 'reminder')
         || str_contains($lower, 'overdue')
@@ -197,21 +195,19 @@ function plainfully_stub_model_response(string $input): string
         || str_contains($lower, 'please respond')
     ) {
         $riskLevel = 'medium';
-        $riskIcon  = '🟠 Medium risk';
     }
 
-    // --- TL;DR block (fast, anxiety-friendly) ---
-    $tldr = "TL;DR\n"
-          . "{$riskIcon}\n"
-          . "This message has been summarised for you. "
-          . "Read the details below if you need the full breakdown.\n\n";
+    // --- TL;DR block: internal format ---
+    // First line encodes risk, next lines are the human summary.
+    $tldr  = "RISK: {$riskLevel}\n";
+    $tldr .= "This message has been summarised for you. "
+          .  "Read the details below if you need the full breakdown.\n\n";
 
-    // --- Full Report placeholder (structure only for now) ---
+    // --- Full report (still placeholder, but cleaner) ---
     $full  = "FULL REPORT\n";
-    $full .= "-------------------------------------\n";
     $full .= "Plain explanation:\n";
     $full .= "This is a placeholder plain-language explanation of the message you pasted. "
-          . "In the live version, Plainfully will explain the meaning in simple, calm terms.\n\n";
+           . "In the live version, Plainfully will explain the meaning in simple, calm terms.\n\n";
 
     $full .= "Key things to know:\n";
     $full .= "- Example key point 1 about the message.\n";
@@ -220,25 +216,24 @@ function plainfully_stub_model_response(string $input): string
 
     $full .= "Risks / cautions:\n";
     if ($riskLevel === 'high') {
-        $full .= "This looks like a serious or urgent message. "
-               . "Pay attention to deadlines, money amounts, and any warnings it contains.\n\n";
+        $full .= "This looks like a serious or urgent message. Pay close attention "
+               . "to deadlines, amounts and any warnings.\n\n";
     } elseif ($riskLevel === 'medium') {
-        $full .= "This message likely contains important information or a time-sensitive request "
-               . "that you should review carefully.\n\n";
+        $full .= "This message likely contains important information or a time-sensitive "
+               . "request that you should review carefully.\n\n";
     } else {
-        $full .= "No obvious major risks detected from the wording alone, but always check the original "
-               . "document if you are unsure.\n\n";
+        $full .= "No obvious major risks detected from the wording alone, but always check the "
+               . "original document if you are unsure.\n\n";
     }
 
     $full .= "What people typically do in this situation:\n";
-    $full .= "In similar situations, people often:\n";
     $full .= "- Re-read the message slowly to confirm what is being asked.\n";
     $full .= "- Check any dates, amounts, or deadlines mentioned.\n";
     $full .= "- Contact the sender for clarification if something is unclear.\n\n";
 
     $full .= "Short summary:\n";
-    $full .= "This is a placeholder summary of the message. In the live version, Plainfully will give "
-           . "a short recap of what the message is about and why it matters.\n";
+    $full .= "This is a placeholder summary of the message. In the live version, Plainfully will "
+           . "give a short recap of what the message is about and why it matters.\n";
 
     return $tldr . $full;
 }
@@ -257,20 +252,80 @@ function plainfully_split_result_sections(string $resultText): array
     $markerPos = mb_stripos($resultText, 'FULL REPORT');
 
     if ($markerPos === false) {
-        // Safe fallback: show same text in both sections
         $clean = trim($resultText);
+
         return [
-            'tldr' => $clean,
-            'full' => $clean,
+            'risk_level' => 'low',
+            'tldr'       => $clean,
+            'full'       => $clean,
         ];
     }
 
-    $tldr = trim(mb_substr($resultText, 0, $markerPos));
-    $full = trim(mb_substr($resultText, $markerPos));
+    $tldrBlock = trim(mb_substr($resultText, 0, $markerPos));
+    $fullBlock = trim(mb_substr($resultText, $markerPos));
+
+    // --- Parse TLDR block: first non-empty line "RISK: level" ---
+    $riskLevel     = 'low';
+    $summaryLines  = [];
+    $lines         = preg_split('/\R/', $tldrBlock);
+
+    foreach ($lines as $line) {
+        $trim = trim($line);
+        if ($trim === '') {
+            continue;
+        }
+
+        if (preg_match('/^RISK:\s*(low|medium|high)\s*$/i', $trim, $m)) {
+            $riskLevel = strtolower($m[1]);
+            continue;
+        }
+
+        $summaryLines[] = $line;
+    }
+
+    $tldrSummary = trim(implode("\n", $summaryLines));
+    if ($tldrSummary === '') {
+        $tldrSummary = $tldrBlock;
+    }
+
+    // --- Clean FULL REPORT heading from full block ---
+    $fullLines = preg_split('/\R/', $fullBlock);
+    $cleanLines = [];
+    $skippedHeader = false;
+
+    foreach ($fullLines as $line) {
+        $trim = trim($line);
+
+        if (!$skippedHeader) {
+            // Skip the first non-empty line if it is "FULL REPORT"
+            if ($trim === '') {
+                continue;
+            }
+            if (preg_match('/^FULL REPORT$/i', $trim)) {
+                $skippedHeader = true;
+                continue;
+            }
+        }
+
+        // Optionally skip a dashed line immediately after the header
+        if ($skippedHeader && $trim !== '' && preg_match('/^-{5,}$/', $trim)) {
+            // consume this one dashed line only
+            $skippedHeader = 'done';
+            continue;
+        }
+
+        $cleanLines[] = $line;
+    }
+
+    $fullClean = trim(implode("\n", $cleanLines));
+    if ($fullClean === '') {
+        $fullClean = $fullBlock;
+    }
 
     return [
-        'tldr' => $tldr,
-        'full' => $full,
+        'risk_level' => $riskLevel,
+        'tldr'       => $tldrSummary,
+        'full'       => $fullClean,
     ];
 }
 
@@ -570,16 +625,14 @@ function plainfully_handle_clarification_view(): void
         $resultText = '[Result text is currently empty – check encryption/decryption.]';
     }
 
-    // Keep original blob attached as well (for any future use)
     $clar['result_text'] = $resultText;
 
-    // --- NEW: split into TL;DR + Full Report for the template ---
     $sections       = plainfully_split_result_sections($resultText);
+    $riskLevel      = $sections['risk_level'];
     $tldrText       = $sections['tldr'];
     $fullReportText = $sections['full'];
 
     $status    = $clar['status']     ?? 'completed';
-    $tone      = $clar['tone']       ?? 'calm'; // tone currently unused
     $createdAt = $clar['created_at'] ?? null;
     $updatedAt = $clar['updated_at'] ?? null;
 
@@ -588,7 +641,6 @@ function plainfully_handle_clarification_view(): void
 
     $pageTitle = 'Your clarification result';
 
-    // Expose variables to the view template
     ob_start();
     require dirname(__DIR__) . '/views/clarifications/view.php';
     $inner = ob_get_clean();
