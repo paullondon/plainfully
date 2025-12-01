@@ -1212,3 +1212,92 @@ body {
         grid-template-columns: 1fr;
     }
 }
+/* Centre-column card – SaaS-y detail page */
+.pf-card--narrow {
+    max-width: 900px;
+    margin: 3rem auto;
+    padding: 1.75rem 2rem 2rem;
+}
+
+/* Sections inside the detail card */
+.pf-section {
+    margin-top: 1.75rem;
+    border-top: 1px solid var(--pf-border-subtle);
+    padding-top: 1.25rem;
+}
+
+/* First section shouldn't have a divider line */
+.pf-section:first-of-type {
+    border-top: none;
+    padding-top: 1.25rem;
+}
+
+/* Titles + text */
+.pf-card-title {
+    margin: 0 0 0.45rem;
+    font-size: 1.2rem;
+}
+
+.pf-page-subtitle {
+    margin: 0.25rem 0 0.9rem;
+    font-size: 0.95rem;
+    color: var(--pf-text-muted);
+}
+
+/* Boxes under titles */
+.pf-box {
+    margin-top: 0.5rem;
+}
+
+/* Body text in report sections */
+.pf-fullreport-body,
+.pf-fullreport-list {
+    font-size: 0.95rem;
+    line-height: 1.55;
+}
+
+/* Quick glance layout (risk + summary) */
+.pf-box--quickglance {
+    padding: 1.1rem 1.3rem;
+}
+
+.pf-quickglance {
+    display: grid;
+    grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.3fr);
+    gap: 1.1rem;
+    align-items: center;
+}
+
+.pf-quickglance-card {
+    background: var(--pf-surface-soft);
+    border-radius: var(--pf-radius-md);
+    padding: 0.9rem 1.05rem;
+}
+
+.pf-quickglance-text {
+    font-size: 0.95rem;
+    line-height: 1.55;
+}
+
+/* Risk badge sizing */
+.pf-risk-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.5rem 0.95rem;
+    border-radius: 999px;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+/* Mobile: stack risk + summary */
+@media (max-width: 640px) {
+    .pf-quickglance {
+        grid-template-columns: 1fr;
+    }
+
+    .pf-card--narrow {
+        margin: 2rem 1rem;
+        padding: 1.5rem 1.25rem 1.75rem;
+    }
+}

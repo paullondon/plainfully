@@ -53,7 +53,7 @@ $actionsList = $actionsList ?? [];
     <header style="margin-bottom:1.1rem;">
         <h1 class="pf-page-title">Your clarification</h1>
         <p class="pf-page-subtitle">
-            This is Plainfully’s rephrased version of the message you asked about.
+            Plainfully has rephrased your message into something easier to scan and act on.
             We never show the original text here for your privacy.
         </p>
     </header>
@@ -78,7 +78,7 @@ $actionsList = $actionsList ?? [];
     <!-- Plan upsell -->
     <div class="pf-upsell">
         <strong>Plainfully Basic</strong> gives you a simple, secure way to clarify tricky messages.
-        In the future you’ll be able to upgrade for richer history, sharing tools and additional tones.
+        In the future you’ll be able to upgrade for richer history and extra tools.
         <br>
         <span style="font-size:0.8rem;color:var(--pf-text-muted);">
             For now, enjoy unlimited clarifications while we’re in early access.
@@ -87,17 +87,7 @@ $actionsList = $actionsList ?? [];
 
     <!-- SECTION 1: Plainfully Simple Clarification -->
     <div class="pf-section">
-        <div class="pf-section-label">
-            <span class="pf-section-label-dot"></span>
-            <span>Overview</span>
-        </div>
-
         <h2 class="pf-card-title">Plainfully Simple Clarification</h2>
-        <p class="pf-card-text">
-            A quick view of how this message feels and a one-line summary. 
-            The risk level is our best guess based only on the wording.
-        </p>
-
         <div class="pf-box pf-box--quickglance">
             <div class="pf-quickglance">
                 <!-- Left: risk badge -->
@@ -124,11 +114,6 @@ $actionsList = $actionsList ?? [];
 
     <!-- SECTION 2: Key things to know -->
     <div class="pf-section">
-        <div class="pf-section-label">
-            <span class="pf-section-label-dot"></span>
-            <span>Details</span>
-        </div>
-
         <h2 class="pf-card-title">Key things to know</h2>
         <div class="pf-box">
             <?php if (!empty($keyPoints)): ?>
@@ -147,11 +132,6 @@ $actionsList = $actionsList ?? [];
 
     <!-- SECTION 3: Risks / cautions -->
     <div class="pf-section">
-        <div class="pf-section-label">
-            <span class="pf-section-label-dot"></span>
-            <span>Risk</span>
-        </div>
-
         <h2 class="pf-card-title">Risks / cautions</h2>
         <div class="pf-box">
             <p class="pf-fullreport-body">
@@ -162,11 +142,6 @@ $actionsList = $actionsList ?? [];
 
     <!-- SECTION 4: What people typically do -->
     <div class="pf-section">
-        <div class="pf-section-label">
-            <span class="pf-section-label-dot"></span>
-            <span>Next steps</span>
-        </div>
-
         <h2 class="pf-card-title">What people typically do in this situation</h2>
         <div class="pf-box">
             <?php if (!empty($actionsList)): ?>
