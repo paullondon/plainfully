@@ -1110,3 +1110,105 @@ body {
 .pf-fullreport-list li + li {
     margin-top: 0.25rem;
 }
+
+/* ============================
+   Plainfully – Clarification detail polish
+   ============================ */
+
+/* Narrow card centre column */
+.pf-card--narrow {
+    max-width: 900px;
+    margin: 3rem auto;
+    padding: 1.75rem 2rem 2rem;
+}
+
+/* Sections inside the card */
+.pf-section {
+    margin-top: 1.75rem;
+}
+
+.pf-section + .pf-section {
+    border-top: 1px solid var(--pf-border-subtle);
+    padding-top: 1.5rem;
+}
+
+/* Tiny section label above each H2 */
+.pf-section-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.75rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--pf-text-soft);
+    margin-bottom: 0.25rem;
+}
+
+.pf-section-label-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    background: var(--pf-accent);
+}
+
+/* Tighten titles + boxes a bit so it feels SaaS-y, not blog-y */
+.pf-card-title {
+    margin: 0 0 0.4rem;
+    font-size: 1.25rem;
+}
+
+.pf-card-text {
+    margin: 0 0 0.75rem;
+    font-size: 0.95rem;
+    color: var(--pf-text-muted);
+}
+
+/* Inside detail pages, boxes sit a little closer to their titles */
+.pf-box {
+    margin-top: 0.6rem;
+}
+
+/* Quick glance layout – ensure nice spacing in the card */
+.pf-box--quickglance {
+    padding: 1.25rem 1.5rem;
+}
+
+.pf-quickglance {
+    display: grid;
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.4fr);
+    gap: 1.25rem;
+    align-items: center;
+}
+
+.pf-quickglance-card {
+    background: var(--pf-surface-soft);
+    border-radius: var(--pf-radius-md);
+    padding: 1rem 1.25rem;
+}
+
+/* Risk badge sizing */
+.pf-risk-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.55rem 0.95rem;
+    border-radius: 999px;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.pf-risk-badge__icon {
+    font-size: 0.9rem;
+}
+
+.pf-quickglance-text {
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+
+/* Mobile: stack quick glance cards */
+@media (max-width: 640px) {
+    .pf-quickglance {
+        grid-template-columns: 1fr;
+    }
+}
