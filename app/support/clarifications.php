@@ -160,38 +160,80 @@ function plainfully_current_user_id(): ?int
 // ... existing functions above ...
 
 /**
- * Find a clarification for a given user.
- * Returns associative array or null if not found / not owned.
+ * Load a clarification + its latest decrypted result text for a given user.
+ *
+ * Returns:
+ *  [
+ *      'clar'        => <clarifications row>,
+ *      'result_text' => <string>  // decrypted clarified text (or empty string)
+ *  ]
+ * or null if not found / not owned by user.
  */
-function plainfully_find_clarification_for_user(int $id, int $userId): ?array
+function plainfully_load_clarification_result_for_user(int $clarificationId, int $userId): ?array
 {
     $pdo = plainfully_pdo();
 
-    $sql = <<<SQL
-SELECT
-    id,
-    user_id,
-    tone,
-    status,
-    result_text,
-    created_at,
-    completed_at,
-    expires_at
-FROM clarifications
-WHERE id = :id
-  AND user_id = :user_id
-LIMIT 1
-SQL;
-
-    $stmt = $pdo->prepare($sql);
+    // 1) Load main clarification row (ownership check)
+    $stmt = $pdo->prepare(
+        'SELECT id, user_id, tone, status, source, created_at, updated_at, expires_at
+         FROM clarifications
+         WHERE id = :id AND user_id = :user_id
+         LIMIT 1'
+    );
     $stmt->execute([
-        ':id'      => $id,
+        ':id'      => $clarificationId,
         ':user_id' => $userId,
     ]);
 
-    $row = $stmt->fetch();
-    return $row === false ? null : $row;
+    $clar = $stmt->fetch();
+    if ($clar === false) {
+        return null;
+    }
+
+    // 2) Load the latest detail row for this clarification
+    $stmt = $pdo->prepare(
+        'SELECT
+             clarification_ciphertext,
+             model_response_ciphertext,
+             redacted_summary_ciphertext
+         FROM clarification_details
+         WHERE clarification_id = :id
+         ORDER BY sequence_no DESC, id DESC
+         LIMIT 1'
+    );
+    $stmt->execute([':id' => $clarificationId]);
+
+    $detail = $stmt->fetch();
+
+    $resultText = '';
+
+    if ($detail !== false) {
+        // Prefer clarified text, then model response, then redacted summary
+        $cipher = $detail['clarification_ciphertext'] ?? null;
+        if (empty($cipher) && !empty($detail['model_response_ciphertext'])) {
+            $cipher = $detail['model_response_ciphertext'];
+        }
+        if (empty($cipher) && !empty($detail['redacted_summary_ciphertext'])) {
+            $cipher = $detail['redacted_summary_ciphertext'];
+        }
+
+        if (!empty($cipher)) {
+            try {
+                // We NEVER decrypt / show the original prompt here.
+                $resultText = plainfully_decrypt($cipher);
+            } catch (\Throwable $e) {
+                error_log('[Plainfully] Failed to decrypt clarification result: ' . $e->getMessage());
+                $resultText = '[Sorry, we could not decrypt this result. Please try regenerating it.]';
+            }
+        }
+    }
+
+    return [
+        'clar'        => $clar,
+        'result_text' => $resultText,
+    ];
 }
+
 
 /**
  * Handle GET /clarifications/view?id=...
@@ -208,15 +250,14 @@ function plainfully_handle_clarification_view(): void
 
     $idParam = $_GET['id'] ?? null;
     if (!is_string($idParam) || !ctype_digit($idParam)) {
-        // Bad id -> bounce to dashboard
         pf_redirect('/dashboard');
     }
 
     $clarificationId = (int)$idParam;
 
-    $clar = plainfully_find_clarification_for_user($clarificationId, $userId);
-    if ($clar === null) {
-        // Not found or not owned: friendly message, no info leakage
+    $data = plainfully_load_clarification_result_for_user($clarificationId, $userId);
+    if ($data === null) {
+        // Not found / not owned
         ob_start();
         ?>
         <section class="pf-card pf-card--narrow">
@@ -241,21 +282,25 @@ function plainfully_handle_clarification_view(): void
         return;
     }
 
-    // Decide if this is considered "draft" / cancellable vs completed
-    $status = $clar['status'] ?? 'completed';
-    $isCompleted = ($status === 'completed');
+    $clar       = $data['clar'];
+    $resultText = $data['result_text'] ?? '';
+
+    $status = $clar['status'] ?? 'open';
+    $isCompleted   = ($status === 'completed' || $status === 'open'); // treat 'open' as completed for now
     $isCancellable = in_array($status, ['draft', 'in_progress'], true);
 
-    // Render dedicated view template
     $pageTitle = 'Your clarification result';
 
-    // Make $clar, $isCompleted, $isCancellable, $pageTitle available to the view
     ob_start();
+    // Make variables available to the view
+    $createdAt = $clar['created_at'] ?? null;
+    $updatedAt = $clar['updated_at'] ?? null;
     require dirname(__DIR__) . '/views/clarifications/view.php';
     $inner = ob_get_clean();
 
     pf_render_shell($pageTitle, $inner);
 }
+
 
 /**
  * Handle POST /clarifications/cancel

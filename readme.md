@@ -33,6 +33,8 @@ A structured roadmap of everything required before opening the platform to your 
 - [ ] Ensure the user is able to return to dashboard
 
 ### A4 - Aggressive cleaning / screening 
+- [ ] Ensure on creation of consultation user gets directed to “answer page”.
+- [ ] ensure dashboard has recent clarifications viewable. limit table to paginate within to 4 lines. paginate is only on the table ensure the page stays static and the table is its own entity in the page.
 - [ ] create logic for cleansing input text 
 - [ ] apply screening to text ready for upload to AI stream
 - [ ] create fake push and get for AI, ensuring that we have it tied to debug settings
