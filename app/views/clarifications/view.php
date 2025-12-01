@@ -122,17 +122,12 @@ function pf_fmt_dt(?string $dt): string {
     </section>
 
     <section class="pf-card">
-        <h2 class="pf-card-title">Full report</h2>
-        <p class="pf-card-text">
-            This section breaks the message down into key things to know, risks/cautions,
-            and what people typically do in similar situations.
-        </p>
+    <div class="pf-box pf-box--fullreport">
 
-        <div class="pf-box pf-box--fullreport">
-            <!-- 1. Key things to know -->
+    <!-- 1. Key things to know -->
+        <div class="pf-fullreport-group">
+        <h3 class="pf-fullreport-heading">Key things to know</h3>
             <div class="pf-fullreport-section">
-                <h3 class="pf-fullreport-heading">Key things to know</h3>
-
                 <?php if (!empty($keyPoints)): ?>
                     <ul class="pf-fullreport-list">
                         <?php foreach ($keyPoints as $point): ?>
@@ -145,19 +140,24 @@ function pf_fmt_dt(?string $dt): string {
                     </p>
                 <?php endif; ?>
             </div>
+        </div>
 
-            <!-- 2. Risks / cautions -->
+        <!-- 2. Risks / cautions -->
+        <div class="pf-fullreport-group">
+            <h3 class="pf-fullreport-heading">Risks / cautions</h3>
+
             <div class="pf-fullreport-section">
-                <h3 class="pf-fullreport-heading">Risks / cautions</h3>
                 <p class="pf-fullreport-body">
                     <?= nl2br(htmlspecialchars($risksText, ENT_QUOTES, 'UTF-8')) ?>
                 </p>
             </div>
+        </div>
 
-            <!-- 3. What people typically do -->
+        <!-- 3. What people typically do -->
+        <div class="pf-fullreport-group">
+            <h3 class="pf-fullreport-heading">What people typically do in this situation</h3>
+
             <div class="pf-fullreport-section">
-                <h3 class="pf-fullreport-heading">What people typically do in this situation</h3>
-
                 <?php if (!empty($actionsList)): ?>
                     <ul class="pf-fullreport-list">
                         <?php foreach ($actionsList as $action): ?>
@@ -171,6 +171,7 @@ function pf_fmt_dt(?string $dt): string {
                 <?php endif; ?>
             </div>
         </div>
+    </div>
 
         <div class="pf-actions pf-actions--split" style="margin-top: 1.5rem;">
             <a href="/dashboard" class="pf-button pf-button--ghost">
