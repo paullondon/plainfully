@@ -811,6 +811,21 @@ body {
     max-width: 92%;
 }
 
+/* Quick glance two-column layout */
+.pf-quickglance-grid {
+    display: grid;
+    grid-template-columns: 1fr 2fr;   /* Risk box smaller, summary box wider */
+    gap: 1.25rem;
+    align-items: stretch;
+}
+
+/* Mobile: stack vertically */
+@media (max-width: 700px) {
+    .pf-quickglance-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
 /* Mobile: stack nicely */
 @media (max-width: 600px) {
     .pf-quickglance {
@@ -820,4 +835,54 @@ body {
     .pf-quickglance-card--risk {
         max-width: none;
     }
+}
+
+
+/* ============================
+   Quick glance layout override
+   ============================ */
+
+/* Two columns on desktop: [risk] [summary] */
+.pf-quickglance {
+    display: grid;
+    grid-template-columns: minmax(0, 230px) minmax(0, 1fr);
+    gap: 1.25rem;
+    align-items: stretch;
+}
+
+/* Stack on smaller screens */
+@media (max-width: 700px) {
+    .pf-quickglance {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Inner cards */
+.pf-quickglance-card {
+    border-radius: 10px;
+    padding: 1.1rem 1.2rem;
+    border: 1px solid var(--pf-border-subtle);
+    background: var(--pf-surface-soft);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    box-sizing: border-box;
+}
+
+/* Left card: centre badge nicely */
+.pf-quickglance-card--risk {
+    align-items: center;
+    text-align: center;
+}
+
+/* Right card: centre summary text in the box */
+.pf-quickglance-card--summary {
+    align-items: center;
+    text-align: center;
+}
+
+.pf-quickglance-text {
+    font-size: 0.95rem;
+    line-height: 1.5;
+    max-width: 95%;
 }
