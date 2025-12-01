@@ -156,9 +156,6 @@ function plainfully_current_user_id(): ?int
     return is_numeric($id) ? (int)$id : null;
 }
 
-<?php
-// ... existing functions above ...
-
 /**
  * Load a clarification + its latest decrypted result text for a given user.
  *
