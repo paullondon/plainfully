@@ -68,6 +68,11 @@ function pf_fmt_dt(?string $dt): string {
     $fullReportText = $fullReportText ?? ($clar['result_text'] ?? '');
     $riskLevel      = $riskLevel      ?? 'low';
 
+    // These arrays/texts DO NOT exist yet in A3 — provide safe defaults
+    $keyPoints  = $keyPoints  ?? [];
+    $risksText  = $risksText  ?? 'Plainfully will highlight any risks or cautions here.';
+    $actionsList = $actionsList ?? [];
+
     // Map risk level → label, icon, CSS modifier
     $riskLabel = 'Low risk';
     $riskIcon  = '✓';
