@@ -878,7 +878,7 @@ body {
 /* Right card: centre summary text in the box */
 .pf-quickglance-card--summary {
     align-items: center;
-    text-align: center;
+    text-align: left;
 }
 
 .pf-quickglance-text {
@@ -889,7 +889,7 @@ body {
 
 /* Tighten outer quick-glance box padding a bit */
 .pf-box {
-    padding: 12px 16px;
+    padding: 4px 16px;
 }
 
 /* Quick glance cards – less vertical padding */
