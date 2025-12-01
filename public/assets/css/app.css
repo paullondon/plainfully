@@ -889,7 +889,7 @@ body {
 
 /* Tighten outer quick-glance box padding a bit */
 .pf-box {
-    padding: 4px 16px;
+    padding: 4px 2px;
 }
 
 /* Quick glance cards – less vertical padding */
