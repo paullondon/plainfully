@@ -1,7 +1,7 @@
 <?php
-/** @var array $clar */
-/** @var bool  $isCompleted */
-/** @var bool  $isCancellable */
+/** @var array  $clar */
+/** @var bool   $isCompleted */
+/** @var bool   $isCancellable */
 /** @var string $pageTitle */
 
 $id          = (int)$clar['id'];
@@ -11,7 +11,7 @@ $resultText  = $clar['result_text'] ?? '';
 $createdAt   = $clar['created_at'] ?? null;
 $completedAt = $clar['completed_at'] ?? null;
 
-// Format dates very simply; adjust to taste or use a helper later
+// Simple formatter for created/completed timestamps
 function pf_fmt_dt(?string $dt): string {
     if (!$dt) {
         return '';
@@ -23,8 +23,37 @@ function pf_fmt_dt(?string $dt): string {
         return $dt;
     }
 }
+
+// ---------- View-safe defaults for A3 ----------
+
+// TL;DR + full report fall back to result_text for now
+$tldrText       = $tldrText       ?? ($clar['result_text'] ?? '');
+$fullReportText = $fullReportText ?? ($clar['result_text'] ?? '');
+
+// Risk level + derived label/icon/class
+$riskLevel  = $riskLevel ?? 'low';
+$riskLabel  = 'Low risk';
+$riskIcon   = '✓';
+$riskClass  = 'pf-risk-badge--low';
+
+if ($riskLevel === 'medium') {
+    $riskLabel = 'Medium risk';
+    $riskIcon  = '!';
+    $riskClass = 'pf-risk-badge--medium';
+} elseif ($riskLevel === 'high') {
+    $riskLabel = 'High risk';
+    $riskIcon  = '!!';
+    $riskClass = 'pf-risk-badge--high';
+}
+
+// Structured sub-parts – safe placeholders for now
+$keyPoints   = $keyPoints   ?? [];
+$risksText   = $risksText   ?? 'Plainfully will highlight any risks or cautions here.';
+$actionsList = $actionsList ?? [];
 ?>
+
 <section class="pf-card pf-card--narrow">
+    <!-- Top header + meta ---------------------------------------->
     <header style="margin-bottom:1.1rem;">
         <h1 class="pf-page-title">Your clarification</h1>
         <p class="pf-page-subtitle">
@@ -33,7 +62,6 @@ function pf_fmt_dt(?string $dt): string {
         </p>
     </header>
 
-    <!-- Meta bar -->
     <div class="pf-meta" style="
         display:flex;
         flex-wrap:wrap;
@@ -51,7 +79,7 @@ function pf_fmt_dt(?string $dt): string {
         <span>• Status: <?= htmlspecialchars(ucfirst($status), ENT_QUOTES, 'UTF-8') ?></span>
     </div>
 
-    <!-- Plan upsell -->
+    <!-- Plan upsell ----------------------------------------------->
     <div class="pf-upsell">
         <strong>Plainfully Basic</strong> gives you a simple, secure way to clarify tricky messages.
         In the future you’ll be able to upgrade for richer history, sharing tools and additional tones.
@@ -61,128 +89,104 @@ function pf_fmt_dt(?string $dt): string {
         </span>
     </div>
 
-    <!-- Result text only (NEVER original input) -->
-    <?php
-    // Defensive defaults in case view is hit oddly
-    $tldrText       = $tldrText       ?? ($clar['result_text'] ?? '');
-    $fullReportText = $fullReportText ?? ($clar['result_text'] ?? '');
-    $riskLevel      = $riskLevel      ?? 'low';
+    <!-- 1. Plainfully Simple Clarification ------------------------>
+    <h2 class="pf-card-title" style="margin-top: 1.25rem;">
+        Plainfully Simple Clarification
+    </h2>
+    <p class="pf-card-text" style="margin-top:0.25rem;margin-bottom:0.75rem;">
+        Here’s the quick Plainfully view first, then a more detailed breakdown below.
+        The risk level is our best guess based only on how the wording feels.
+    </p>
 
-    // These arrays/texts DO NOT exist yet in A3 — provide safe defaults
-    $keyPoints  = $keyPoints  ?? [];
-    $risksText  = $risksText  ?? 'Plainfully will highlight any risks or cautions here.';
-    $actionsList = $actionsList ?? [];
-
-    // Map risk level → label, icon, CSS modifier
-    $riskLabel = 'Low risk';
-    $riskIcon  = '✓';
-    $riskClass = 'pf-risk-badge--low';
-
-    if ($riskLevel === 'medium') {
-        $riskLabel = 'Medium risk';
-        $riskIcon  = '!';
-        $riskClass = 'pf-risk-badge--medium';
-    } elseif ($riskLevel === 'high') {
-        $riskLabel = 'High risk';
-        $riskIcon  = '!!';
-        $riskClass = 'pf-risk-badge--high';
-    }
-    ?>
-
-    <section class="pf-card" style="margin-bottom: 1.75rem;">
-        <h1 class="pf-page-title">Your clarification</h1>
-        <p class="pf-page-subtitle">
-            Here’s a quick summary first, followed by the full Plainfully report. 
-            Plainfully’s algorythms give a suggestion around how urgent or risky this feels from the wording alone.
-        </p>
-
-        <h2 class="pf-card-title" style="margin-top: 1.0rem;"> Plainfully Simple Clarification </h2>
-        <div class="pf-box pf-box--quickglance">
-            <div class="pf-quickglance">
-                <!-- Left: risk box -->
-                <div class="pf-quickglance-card pf-quickglance-card--risk">
-                    <div class="pf-risk-badge <?= $riskClass ?>">
-                        <span class="pf-risk-badge__icon">
-                            <?= htmlspecialchars($riskIcon, ENT_QUOTES, 'UTF-8') ?>
-                        </span>
-                        <span class="pf-risk-badge__label">
-                            <?= htmlspecialchars($riskLabel, ENT_QUOTES, 'UTF-8') ?>
-                        </span>
-                    </div>
+    <div class="pf-box pf-box--quickglance">
+        <div class="pf-quickglance">
+            <!-- Left: risk badge -->
+            <div class="pf-quickglance-card pf-quickglance-card--risk">
+                <div class="pf-risk-badge <?= $riskClass ?>">
+                    <span class="pf-risk-badge__icon">
+                        <?= htmlspecialchars($riskIcon, ENT_QUOTES, 'UTF-8') ?>
+                    </span>
+                    <span class="pf-risk-badge__label">
+                        <?= htmlspecialchars($riskLabel, ENT_QUOTES, 'UTF-8') ?>
+                    </span>
                 </div>
+            </div>
 
-                <!-- Right: summary box -->
-                <div class="pf-quickglance-card pf-quickglance-card--summary">
-                    <div class="pf-quickglance-text">
-                        <?= nl2br(htmlspecialchars($tldrText, ENT_QUOTES, 'UTF-8')) ?>
-                    </div>
+            <!-- Right: short summary -->
+            <div class="pf-quickglance-card pf-quickglance-card--summary">
+                <div class="pf-quickglance-text">
+                    <?= nl2br(htmlspecialchars($tldrText, ENT_QUOTES, 'UTF-8')) ?>
                 </div>
             </div>
         </div>
+    </div>
 
-        <!-- 2. Key things to know -->
-        <section class="pf-card" style="margin-top: 1.25rem;">
-            <h2 class="pf-card-title">Key things to know</h2>
-            <div class="pf-box">
-                <?php if (!empty($keyPoints)): ?>
-                    <ul class="pf-fullreport-list">
-                        <?php foreach ($keyPoints as $point): ?>
-                            <li><?= htmlspecialchars($point, ENT_QUOTES, 'UTF-8') ?></li>
-                        <?php endforeach; ?>
-                    </ul>
-                <?php else: ?>
-                    <p class="pf-fullreport-body">
-                        Plainfully will highlight the main points from your message here.
-                    </p>
-                <?php endif; ?>
-            </div>
-        </section>
+    <!-- 2. Key things to know ------------------------------------->
+    <h2 class="pf-card-title" style="margin-top: 1.75rem;">
+        Key things to know
+    </h2>
+    <div class="pf-box">
+        <?php if (!empty($keyPoints)): ?>
+            <ul class="pf-fullreport-list">
+                <?php foreach ($keyPoints as $point): ?>
+                    <li><?= htmlspecialchars($point, ENT_QUOTES, 'UTF-8') ?></li>
+                <?php endforeach; ?>
+            </ul>
+        <?php else: ?>
+            <p class="pf-fullreport-body">
+                Plainfully will highlight the main points from your message here.
+            </p>
+        <?php endif; ?>
+    </div>
 
-        <!-- 3. Risks / cautions -->
-        <section class="pf-card" style="margin-top: 1.25rem;">
-            <h2 class="pf-card-title">Risks / cautions</h2>
-            <div class="pf-box">
-                <p class="pf-fullreport-body">
-                    <?= nl2br(htmlspecialchars($risksText, ENT_QUOTES, 'UTF-8')) ?>
-                </p>
-            </div>
-        </section>
+    <!-- 3. Risks / cautions --------------------------------------->
+    <h2 class="pf-card-title" style="margin-top: 1.75rem;">
+        Risks / cautions
+    </h2>
+    <div class="pf-box">
+        <p class="pf-fullreport-body">
+            <?= nl2br(htmlspecialchars($risksText, ENT_QUOTES, 'UTF-8')) ?>
+        </p>
+    </div>
 
-        <!-- 4. What people typically do -->
-        <section class="pf-card" style="margin-top: 1.25rem;">
-            <h2 class="pf-card-title">What people typically do in this situation</h2>
-            <div class="pf-box">
-                <?php if (!empty($actionsList)): ?>
-                    <ul class="pf-fullreport-list">
-                        <?php foreach ($actionsList as $action): ?>
-                            <li><?= htmlspecialchars($action, ENT_QUOTES, 'UTF-8') ?></li>
-                        <?php endforeach; ?>
-                    </ul>
-                <?php else: ?>
-                    <p class="pf-fullreport-body">
-                        Plainfully will suggest a few common next steps people take in similar situations.
-                    </p>
-                <?php endif; ?>
-            </div>
+    <!-- 4. What people typically do ------------------------------->
+    <h2 class="pf-card-title" style="margin-top: 1.75rem;">
+        What people typically do in this situation
+    </h2>
+    <div class="pf-box">
+        <?php if (!empty($actionsList)): ?>
+            <ul class="pf-fullreport-list">
+                <?php foreach ($actionsList as $action): ?>
+                    <li><?= htmlspecialchars($action, ENT_QUOTES, 'UTF-8') ?></li>
+                <?php endforeach; ?>
+            </ul>
+        <?php else: ?>
+            <p class="pf-fullreport-body">
+                Plainfully will suggest a few common next steps people take in similar situations.
+            </p>
+        <?php endif; ?>
+    </div>
 
-            <div class="pf-actions pf-actions--split" style="margin-top: 1.5rem;">
-                <a href="/dashboard" class="pf-button pf-button--ghost">
-                    Back to dashboard
-                </a>
-                <a href="/clarifications/new" class="pf-button pf-button--primary">
-                    Start another clarification
-                </a>
-            </div>
-        </section>
+    <!-- Primary actions ------------------------------------------->
+    <div class="pf-actions pf-actions--split" style="margin-top: 1.5rem;">
+        <a href="/dashboard" class="pf-button pf-button--ghost">
+            Back to dashboard
+        </a>
+        <a href="/clarifications/new" class="pf-button pf-button--primary">
+            Start another clarification
+        </a>
+    </div>
 
+    <!-- Cancel draft (only for draft / in-progress) --------------->
     <?php if ($isCancellable): ?>
         <form method="post"
-            action="/clarifications/cancel"
-            class="pf-actions pf-actions--inline-danger">
+              action="/clarifications/cancel"
+              class="pf-actions pf-actions--inline-danger"
+              style="margin-top: 0.75rem;">
             <?php pf_csrf_field(); ?>
             <input type="hidden"
-                name="clarification_id"
-                value="<?= htmlspecialchars((string)$id, ENT_QUOTES, 'UTF-8') ?>">
+                   name="clarification_id"
+                   value="<?= htmlspecialchars((string)$id, ENT_QUOTES, 'UTF-8') ?>">
 
             <button type="submit" class="pf-button pf-button--danger-ghost">
                 Cancel and delete this draft
