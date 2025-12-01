@@ -96,7 +96,7 @@ function pf_fmt_dt(?string $dt): string {
             Plainfully’s algorythms give a suggestion around how urgent or risky this feels from the wording alone.
         </p>
 
-        <h2 class="pf-card-title" style="margin-top: 1.0rem;">Quick glance</h2>
+        <h2 class="pf-card-title" style="margin-top: 1.0rem;"> Plainfully Simple Clarification </h2>
         <div class="pf-box pf-box--quickglance">
             <div class="pf-quickglance">
                 <!-- Left: risk box -->
@@ -119,69 +119,66 @@ function pf_fmt_dt(?string $dt): string {
                 </div>
             </div>
         </div>
- <!--   </section>
+        <section class="pf-card" style="margin-top: 1.0rem;">
+            <div class="pf-box pf-box--fullreport">
 
-    <section class="pf-card">
-    <div class="pf-box pf-box--fullreport">
--->
-    <!-- 1. Key things to know -->
-        <div class="pf-fullreport-group">
-        <h3 class="pf-card-title">Key things to know</h3>
-            <div class="pf-quickglance">
-                <?php if (!empty($keyPoints)): ?>
-                    <ul class="pf-fullreport-list">
-                        <?php foreach ($keyPoints as $point): ?>
-                            <li><?= htmlspecialchars($point, ENT_QUOTES, 'UTF-8') ?></li>
-                        <?php endforeach; ?>
-                    </ul>
-                <?php else: ?>
-                    <p class="pf-fullreport-body">
-                        Plainfully will highlight the main points from your message here.
-                    </p>
-                <?php endif; ?>
+                <!-- 1. Key things to know -->
+                <div class="pf-fullreport-group">
+                    <h3 class="pf-fullreport-heading">Key things to know</h3>
+                    <div class="pf-fullreport-section">
+                        <?php if (!empty($keyPoints)): ?>
+                            <ul class="pf-fullreport-list">
+                                <?php foreach ($keyPoints as $point): ?>
+                                    <li><?= htmlspecialchars($point, ENT_QUOTES, 'UTF-8') ?></li>
+                                <?php endforeach; ?>
+                            </ul>
+                        <?php else: ?>
+                            <p class="pf-fullreport-body">
+                                Plainfully will highlight the main points from your message here.
+                            </p>
+                        <?php endif; ?>
+                    </div>
+                </div>
+
+                <!-- 2. Risks / cautions -->
+                <div class="pf-fullreport-group">
+                    <h3 class="pf-fullreport-heading">Risks / cautions</h3>
+                    <div class="pf-fullreport-section">
+                        <p class="pf-fullreport-body">
+                            <?= nl2br(htmlspecialchars($risksText, ENT_QUOTES, 'UTF-8')) ?>
+                        </p>
+                    </div>
+                </div>
+
+                <!-- 3. What people typically do -->
+                <div class="pf-fullreport-group">
+                    <h3 class="pf-fullreport-heading">What people typically do in this situation</h3>
+                    <div class="pf-fullreport-section">
+                        <?php if (!empty($actionsList)): ?>
+                            <ul class="pf-fullreport-list">
+                                <?php foreach ($actionsList as $action): ?>
+                                    <li><?= htmlspecialchars($action, ENT_QUOTES, 'UTF-8') ?></li>
+                                <?php endforeach; ?>
+                            </ul>
+                        <?php else: ?>
+                            <p class="pf-fullreport-body">
+                                Plainfully will suggest a few common next steps people take in similar situations.
+                            </p>
+                        <?php endif; ?>
+                    </div>
+                </div>
+
             </div>
-        </div>
 
-        <!-- 2. Risks / cautions -->
-        <div class="pf-fullreport-group">
-            <h4 class="pf-card-title">Risks / cautions</h4>
-
-            <div class="pf-fullreport-section">
-                <p class="pf-fullreport-body">
-                    <?= nl2br(htmlspecialchars($risksText, ENT_QUOTES, 'UTF-8')) ?>
-                </p>
+            <div class="pf-actions pf-actions--split" style="margin-top: 1.5rem;">
+                <a href="/dashboard" class="pf-button pf-button--ghost">
+                    Back to dashboard
+                </a>
+                <a href="/clarifications/new" class="pf-button pf-button--primary">
+                    Start another clarification
+                </a>
             </div>
-        </div>
-
-        <!-- 3. What people typically do -->
-        <div class="pf-quickglance">
-            <h5 class="pf-fullreport-heading">What people typically do in this situation</h5>
-
-            <div class="pf-fullreport-section">
-                <?php if (!empty($actionsList)): ?>
-                    <ul class="pf-fullreport-list">
-                        <?php foreach ($actionsList as $action): ?>
-                            <li><?= htmlspecialchars($action, ENT_QUOTES, 'UTF-8') ?></li>
-                        <?php endforeach; ?>
-                    </ul>
-                <?php else: ?>
-                    <p class="pf-fullreport-body">
-                        Plainfully will suggest a few common next steps people take in similar situations.
-                    </p>
-                <?php endif; ?>
-            </div>
-        </div>
-    </div>
-
-        <div class="pf-actions pf-actions--split" style="margin-top: 1.5rem;">
-            <a href="/dashboard" class="pf-button pf-button--ghost">
-                Back to dashboard
-            </a>
-            <a href="/clarifications/new" class="pf-button pf-button--primary">
-                Start another clarification
-            </a>
-        </div>
-    </section>
+        </section>
 
     <?php if ($isCancellable): ?>
         <form method="post"
