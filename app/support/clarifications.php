@@ -161,59 +161,118 @@ function plainfully_current_user_id(): ?int
 
 
 /**
- * Testing stub generation
- * 
- */
-/**
- * Very simple stub generator for now.
- * Later this becomes the real AI call.
+ * Temporary stub "AI" for Plainfully results.
+ *
+ * This generates:
+ * - A TL;DR section with a simple risk level
+ * - A Full Report section with placeholder structure
+ *
+ * Later, the real AI output MUST keep the same
+ * "TL;DR ... FULL REPORT" structure so we can
+ * reliably split it for display.
  */
 function plainfully_stub_model_response(string $input): string
 {
-    // Very primitive risk detection for now
-    $lower = strtolower($input);
+    // --- Very simple risk heuristics for now (MVP only) ---
+    $lower = mb_strtolower($input);
 
-    if (str_contains($lower, 'final notice') ||
-        str_contains($lower, 'legal') ||
-        str_contains($lower, 'debt') ||
-        str_contains($lower, 'termination') ||
-        str_contains($lower, 'overdue')) {
-        $risk = 'high';
-        $riskIcon = '🔴 High risk';
-    } elseif (str_contains($lower, 'action required') ||
-              str_contains($lower, 'reminder') ||
-              str_contains($lower, 'please respond')) {
-        $risk = 'medium';
-        $riskIcon = '🟠 Medium risk';
-    } else {
-        $risk = 'low';
-        $riskIcon = '🔵 Low risk';
+    $riskLevel = 'low';
+    $riskIcon  = '🔵 Low risk';
+
+    if (
+        str_contains($lower, 'final notice')
+        || str_contains($lower, 'final warning')
+        || str_contains($lower, 'court')
+        || str_contains($lower, 'bailiff')
+        || str_contains($lower, 'termination')
+        || str_contains($lower, 'disconnected')
+        || str_contains($lower, 'eviction')
+    ) {
+        $riskLevel = 'high';
+        $riskIcon  = '🔴 High risk';
+    } elseif (
+        str_contains($lower, 'reminder')
+        || str_contains($lower, 'overdue')
+        || str_contains($lower, 'action required')
+        || str_contains($lower, 'please respond')
+    ) {
+        $riskLevel = 'medium';
+        $riskIcon  = '🟠 Medium risk';
     }
 
-    // TLDR block
-    $tldr = "TL;DR — {$riskIcon}\n"
-          . "This message is summarised for you. "
-          . "See details below for key points and context.\n\n";
+    // --- TL;DR block (fast, anxiety-friendly) ---
+    $tldr = "TL;DR\n"
+          . "{$riskIcon}\n"
+          . "This message has been summarised for you. "
+          . "Read the details below if you need the full breakdown.\n\n";
 
-    // Full Report
-    $full = "FULL REPORT\n"
-          . "-------------------------------------\n"
-          . "Plain explanation:\n"
-          . "This is a placeholder explanation of the message.\n\n"
-          . "Key things to know:\n"
-          . "- This is example bullet point 1\n"
-          . "- This is example bullet point 2\n"
-          . "- This is example bullet point 3\n\n"
-          . "Risks / cautions:\n"
-          . "This is a placeholder risk assessment based on the message content.\n\n"
-          . "What people typically do:\n"
-          . "This section explains general behaviour in similar situations.\n\n"
-          . "Short summary:\n"
-          . "This is your short summary of the message.";
+    // --- Full Report placeholder (structure only for now) ---
+    $full  = "FULL REPORT\n";
+    $full .= "-------------------------------------\n";
+    $full .= "Plain explanation:\n";
+    $full .= "This is a placeholder plain-language explanation of the message you pasted. "
+          . "In the live version, Plainfully will explain the meaning in simple, calm terms.\n\n";
+
+    $full .= "Key things to know:\n";
+    $full .= "- Example key point 1 about the message.\n";
+    $full .= "- Example key point 2 about obligations, money, or dates.\n";
+    $full .= "- Example key point 3 about what is being requested.\n\n";
+
+    $full .= "Risks / cautions:\n";
+    if ($riskLevel === 'high') {
+        $full .= "This looks like a serious or urgent message. "
+               . "Pay attention to deadlines, money amounts, and any warnings it contains.\n\n";
+    } elseif ($riskLevel === 'medium') {
+        $full .= "This message likely contains important information or a time-sensitive request "
+               . "that you should review carefully.\n\n";
+    } else {
+        $full .= "No obvious major risks detected from the wording alone, but always check the original "
+               . "document if you are unsure.\n\n";
+    }
+
+    $full .= "What people typically do in this situation:\n";
+    $full .= "In similar situations, people often:\n";
+    $full .= "- Re-read the message slowly to confirm what is being asked.\n";
+    $full .= "- Check any dates, amounts, or deadlines mentioned.\n";
+    $full .= "- Contact the sender for clarification if something is unclear.\n\n";
+
+    $full .= "Short summary:\n";
+    $full .= "This is a placeholder summary of the message. In the live version, Plainfully will give "
+           . "a short recap of what the message is about and why it matters.\n";
 
     return $tldr . $full;
 }
 
+/**
+ * Split a Plainfully result blob into:
+ * - 'tldr'       => TL;DR section
+ * - 'full'       => full report section
+ *
+ * It expects the text to contain the marker "FULL REPORT".
+ * If the marker is missing, the whole text is treated as TL;DR
+ * and the full report is left identical (safe fallback).
+ */
+function plainfully_split_result_sections(string $resultText): array
+{
+    $markerPos = mb_stripos($resultText, 'FULL REPORT');
+
+    if ($markerPos === false) {
+        // Safe fallback: show same text in both sections
+        $clean = trim($resultText);
+        return [
+            'tldr' => $clean,
+            'full' => $clean,
+        ];
+    }
+
+    $tldr = trim(mb_substr($resultText, 0, $markerPos));
+    $full = trim(mb_substr($resultText, $markerPos));
+
+    return [
+        'tldr' => $tldr,
+        'full' => $full,
+    ];
+}
 
 /**
  * Handle POST /clarifications/new
@@ -507,20 +566,24 @@ function plainfully_handle_clarification_view(): void
     $clar       = $data['clar'];
     $resultText = (string)($data['result_text'] ?? '');
 
-    // Failsafe: if decrypt somehow returns empty, at least show *something*
     if ($resultText === '') {
         $resultText = '[Result text is currently empty – check encryption/decryption.]';
     }
 
-    // ALSO expose via $clar["result_text"] in case the view still expects that
+    // Keep original blob attached as well (for any future use)
     $clar['result_text'] = $resultText;
 
-    $status    = $clar['status']     ?? 'open';
-    $tone      = $clar['tone']       ?? 'notapplicable';
+    // --- NEW: split into TL;DR + Full Report for the template ---
+    $sections       = plainfully_split_result_sections($resultText);
+    $tldrText       = $sections['tldr'];
+    $fullReportText = $sections['full'];
+
+    $status    = $clar['status']     ?? 'completed';
+    $tone      = $clar['tone']       ?? 'calm'; // tone currently unused
     $createdAt = $clar['created_at'] ?? null;
     $updatedAt = $clar['updated_at'] ?? null;
 
-    $isCompleted   = ($status === 'completed' || $status === 'open');
+    $isCompleted   = ($status === 'completed');
     $isCancellable = in_array($status, ['draft', 'in_progress'], true);
 
     $pageTitle = 'Your clarification result';
@@ -532,6 +595,7 @@ function plainfully_handle_clarification_view(): void
 
     pf_render_shell($pageTitle, $inner);
 }
+
 
 
 

@@ -62,48 +62,65 @@ function pf_fmt_dt(?string $dt): string {
     </div>
 
     <!-- Result text only (NEVER original input) -->
-    <h2 class="pf-heading" style="margin-top:1.25rem;margin-bottom:0.5rem;">
-        Rephrased message
-    </h2>
+    <?php
+    // Defensive defaults in case view is hit oddly
+    $tldrText       = $tldrText       ?? ($clar['result_text'] ?? '');
+    $fullReportText = $fullReportText ?? ($clar['result_text'] ?? '');
+    ?>
 
-    <?php if (!empty($clar['result_text'])): ?>
-        <section class="pf-card" style="margin-bottom: 2rem;">
-            <h2 class="pf-card-title">TL;DR Summary</h2>
-            <div class="pf-box">
-                <?= nl2br(htmlspecialchars($clar['result_text'], ENT_QUOTES, 'UTF-8')) ?>
-            </div>
-        </section>
-    <?php endif; ?>
+    <section class="pf-card" style="margin-bottom: 1.75rem;">
+        <h1 class="pf-page-title">Your clarification</h1>
+        <p class="pf-page-subtitle">
+            Here’s a quick summary first, followed by the full Plainfully report.
+        </p>
+
+        <h2 class="pf-card-title" style="margin-top: 1.5rem;">TL;DR summary</h2>
+        <div class="pf-box">
+            <?= nl2br(htmlspecialchars($tldrText, ENT_QUOTES, 'UTF-8')) ?>
+        </div>
+    </section>
 
     <section class="pf-card">
-        <h2 class="pf-card-title">Full Report</h2>
+        <h2 class="pf-card-title">Full report</h2>
+        <p class="pf-card-text">
+            This section breaks the message down into plain explanation, key things to know,
+            risks/cautions, what people typically do, and a short summary.
+        </p>
+
         <div class="pf-box pf-box--mono">
-            <?= nl2br(htmlspecialchars($clar['result_text'], ENT_QUOTES, 'UTF-8')) ?>
+            <?= nl2br(htmlspecialchars($fullReportText, ENT_QUOTES, 'UTF-8')) ?>
         </div>
-        <!-- Actions -->
-        <div class="pf-actions pf-actions--split" style="margin-top:1.5rem;">
+
+        <!-- Subtle plan-based upsell -->
+        <div class="pf-upsell" style="margin-top: 1.25rem;">
+            On your current plan, Plainfully keeps clarifications for up to
+            <strong>28 days</strong> and does not store your original text.
+            In future paid plans, you’ll be able to keep reports for longer
+            and export them securely.
+        </div>
+
+        <div class="pf-actions pf-actions--split" style="margin-top: 1.5rem;">
             <a href="/dashboard" class="pf-button pf-button--ghost">
                 Back to dashboard
             </a>
-
             <a href="/clarifications/new" class="pf-button pf-button--primary">
                 Start another clarification
             </a>
         </div>
     </section>
 
-        <?php if ($isCancellable): ?>
-            <form method="post"
-                action="/clarifications/cancel"
-                class="pf-actions pf-actions--inline-danger">
-                <?php pf_csrf_field(); ?>
-                <input type="hidden"
-                    name="clarification_id"
-                    value="<?= htmlspecialchars((string)$id, ENT_QUOTES, 'UTF-8') ?>">
+    <?php if ($isCancellable): ?>
+        <form method="post"
+            action="/clarifications/cancel"
+            class="pf-actions pf-actions--inline-danger">
+            <?php pf_csrf_field(); ?>
+            <input type="hidden"
+                name="clarification_id"
+                value="<?= htmlspecialchars((string)$id, ENT_QUOTES, 'UTF-8') ?>">
 
-                <button type="submit" class="pf-button pf-button--danger-ghost">
-                    Cancel and delete this draft
-                </button>
-            </form>
-        <?php endif; ?>
+            <button type="submit" class="pf-button pf-button--danger-ghost">
+                Cancel and delete this draft
+            </button>
+        </form>
+    <?php endif; ?>
 </section>
