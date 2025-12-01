@@ -120,54 +120,49 @@ function pf_fmt_dt(?string $dt): string {
             </div>
         </div>
 
-        <div class="pf-box pf-box--fullreport">
+        <!-- 2. Key things to know -->
+        <section class="pf-card" style="margin-top: 1.25rem;">
+            <h2 class="pf-card-title">Key things to know</h2>
+            <div class="pf-box">
+                <?php if (!empty($keyPoints)): ?>
+                    <ul class="pf-fullreport-list">
+                        <?php foreach ($keyPoints as $point): ?>
+                            <li><?= htmlspecialchars($point, ENT_QUOTES, 'UTF-8') ?></li>
+                        <?php endforeach; ?>
+                    </ul>
+                <?php else: ?>
+                    <p class="pf-fullreport-body">
+                        Plainfully will highlight the main points from your message here.
+                    </p>
+                <?php endif; ?>
+            </div>
+        </section>
 
-                <!-- 1. Key things to know -->
-                <div class="pf-fullreport-group">
-                    <h3 class="pf-fullreport-heading">Key things to know</h3>
-                    <div class="pf-fullreport-section">
-                        <?php if (!empty($keyPoints)): ?>
-                            <ul class="pf-fullreport-list">
-                                <?php foreach ($keyPoints as $point): ?>
-                                    <li><?= htmlspecialchars($point, ENT_QUOTES, 'UTF-8') ?></li>
-                                <?php endforeach; ?>
-                            </ul>
-                        <?php else: ?>
-                            <p class="pf-fullreport-body">
-                                Plainfully will highlight the main points from your message here.
-                            </p>
-                        <?php endif; ?>
-                    </div>
-                </div>
+        <!-- 3. Risks / cautions -->
+        <section class="pf-card" style="margin-top: 1.25rem;">
+            <h2 class="pf-card-title">Risks / cautions</h2>
+            <div class="pf-box">
+                <p class="pf-fullreport-body">
+                    <?= nl2br(htmlspecialchars($risksText, ENT_QUOTES, 'UTF-8')) ?>
+                </p>
+            </div>
+        </section>
 
-                <!-- 2. Risks / cautions -->
-                <div class="pf-fullreport-group">
-                    <h3 class="pf-fullreport-heading">Risks / cautions</h3>
-                    <div class="pf-fullreport-section">
-                        <p class="pf-fullreport-body">
-                            <?= nl2br(htmlspecialchars($risksText, ENT_QUOTES, 'UTF-8')) ?>
-                        </p>
-                    </div>
-                </div>
-
-                <!-- 3. What people typically do -->
-                <div class="pf-fullreport-group">
-                    <h3 class="pf-fullreport-heading">What people typically do in this situation</h3>
-                    <div class="pf-fullreport-section">
-                        <?php if (!empty($actionsList)): ?>
-                            <ul class="pf-fullreport-list">
-                                <?php foreach ($actionsList as $action): ?>
-                                    <li><?= htmlspecialchars($action, ENT_QUOTES, 'UTF-8') ?></li>
-                                <?php endforeach; ?>
-                            </ul>
-                        <?php else: ?>
-                            <p class="pf-fullreport-body">
-                                Plainfully will suggest a few common next steps people take in similar situations.
-                            </p>
-                        <?php endif; ?>
-                    </div>
-                </div>
-
+        <!-- 4. What people typically do -->
+        <section class="pf-card" style="margin-top: 1.25rem;">
+            <h2 class="pf-card-title">What people typically do in this situation</h2>
+            <div class="pf-box">
+                <?php if (!empty($actionsList)): ?>
+                    <ul class="pf-fullreport-list">
+                        <?php foreach ($actionsList as $action): ?>
+                            <li><?= htmlspecialchars($action, ENT_QUOTES, 'UTF-8') ?></li>
+                        <?php endforeach; ?>
+                    </ul>
+                <?php else: ?>
+                    <p class="pf-fullreport-body">
+                        Plainfully will suggest a few common next steps people take in similar situations.
+                    </p>
+                <?php endif; ?>
             </div>
 
             <div class="pf-actions pf-actions--split" style="margin-top: 1.5rem;">
@@ -178,7 +173,7 @@ function pf_fmt_dt(?string $dt): string {
                     Start another clarification
                 </a>
             </div>
-    </section>
+        </section>
 
     <?php if ($isCancellable): ?>
         <form method="post"
