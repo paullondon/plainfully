@@ -695,3 +695,9 @@ body {
     font-size: .8rem;
     color: var(--pf-text-soft);
 }
+
+.pf-divider {
+    height: 1px;
+    background: var(--pf-border-subtle);
+    margin: 2rem 0;
+}
