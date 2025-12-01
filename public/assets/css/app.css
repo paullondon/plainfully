@@ -701,3 +701,59 @@ body {
     background: var(--pf-border-subtle);
     margin: 2rem 0;
 }
+
+/* TLDR layout */
+.pf-tldr-layout {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-start;
+    flex-wrap: wrap;
+}
+
+.pf-tldr-text {
+    flex: 1 1 0;
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+
+/* Risk badge using brand-ish colours */
+.pf-risk-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.35rem 0.75rem;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    border: 1px solid transparent;
+    white-space: nowrap;
+}
+
+.pf-risk-badge__icon {
+    font-size: 0.9rem;
+}
+
+.pf-risk-badge--low {
+    border-color: var(--pf-accent);
+    background: rgba(26, 179, 133, 0.14);
+    color: var(--pf-accent);
+}
+
+.pf-risk-badge--medium {
+    border-color: #f2a93f;
+    background: rgba(242, 169, 63, 0.16);
+    color: #f7d18a;
+}
+
+.pf-risk-badge--high {
+    border-color: var(--pf-danger);
+    background: rgba(195, 33, 72, 0.18);
+    color: #ffb3c4;
+}
+
+/* Mobile: stack badge above text nicely */
+@media (max-width: 600px) {
+    .pf-tldr-layout {
+        flex-direction: column;
+    }
+}
