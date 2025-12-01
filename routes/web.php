@@ -38,9 +38,8 @@ switch (true) {
         pf_redirect('/dashboard');
         break;
 
-
     // -------------------------------------------------
-    // Clarifications – list (logged-in only)
+    // Clarifications – new
     // -------------------------------------------------
 
     case $path === '/clarifications/new' && $method === 'GET':
@@ -54,16 +53,19 @@ switch (true) {
         plainfully_handle_clarification_new_post_v2();
         break;
 
+    // -------------------------------------------------
+    // Clarifications – view + cancel
+    // -------------------------------------------------
+
     case $path === '/clarifications/view' && $method === 'GET':
         require_login();
-        require dirname(__DIR__) . '/app/views/clarifications/view.php';
+        require dirname(__DIR__) . '/app/support/clarifications.php';
         plainfully_handle_clarification_view();
         break;
-    
-    // Cancel (abandon) a very recent clarification
+
     case $path === '/clarifications/cancel' && $method === 'POST':
         require_login();
-        require dirname(__DIR__) . '/app/views/clarifications/cancel.php';
+        require dirname(__DIR__) . '/app/support/clarifications.php';
         plainfully_handle_clarification_cancel();
         break;
 
