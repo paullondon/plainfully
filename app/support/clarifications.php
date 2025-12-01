@@ -156,6 +156,203 @@ function plainfully_current_user_id(): ?int
     return is_numeric($id) ? (int)$id : null;
 }
 
+
+
+
+
+/**
+ * Testing stub generation
+ * 
+ */
+/**
+ * Very simple stub generator for now.
+ * Later this becomes the real AI call.
+ */
+function plainfully_stub_model_response(string $tone, string $text): string
+{
+    $toneLabel = match ($tone) {
+        'calm'         => 'Calm',
+        'firm'         => 'Firm',
+        'professional' => 'Professional',
+        default        => 'Calm',
+    };
+
+    return "Tone: {$toneLabel}\n\n"
+        . "This is a placeholder clarification. In the live version Plainfully will rewrite "
+        . "your message here in that style.";
+}
+
+/**
+ * Handle POST /clarifications/new
+ * - Validates input
+ * - Encrypts prompt + stub result
+ * - Inserts into clarifications + clarification_details
+ * - Redirects to /clarifications/view?id=...
+ */
+function plainfully_handle_clarification_new_post_v2(): void
+{
+    // CSRF protection
+    pf_verify_csrf_or_abort();
+
+    $userId = plainfully_current_user_id();
+    if ($userId === null) {
+        pf_redirect('/login');
+    }
+
+    // Read + normalise inputs
+    $tone = $_POST['tone'] ?? 'calm';
+    $tone = is_string($tone) ? strtolower(trim($tone)) : 'calm';
+
+    $allowedTones = ['calm', 'firm', 'professional'];
+    if (!in_array($tone, $allowedTones, true)) {
+        $tone = 'calm';
+    }
+
+    $text = $_POST['text'] ?? '';
+    if (!is_string($text)) {
+        $text = '';
+    }
+    $text = trim($text);
+
+    $errors = [];
+
+    if ($text === '') {
+        $errors[] = 'Please paste the message you want Plainfully to clarify.';
+    } elseif (mb_strlen($text) > 8000) {
+        $errors[] = 'That message is a bit long. Please trim it down and try again.';
+    }
+
+    if (!empty($errors)) {
+        // Reuse your existing form renderer (from A2)
+        render_plainfully_clarification_form(
+            $errors,
+            ['text' => $text, 'tone' => $tone]
+        );
+        return;
+    }
+
+    // Encrypt sensitive fields
+    try {
+        $promptCipher = plainfully_encrypt($text);
+
+        $stubText     = plainfully_stub_model_response($tone, $text);
+        $clarCipher   = plainfully_encrypt($stubText);
+
+        // Model response / redacted summary left empty for now
+        $modelCipher     = null;
+        $summaryCipher   = null;
+    } catch (\Throwable $e) {
+        error_log('[Plainfully] Failed to encrypt clarification fields: ' . $e->getMessage());
+
+        render_plainfully_clarification_form(
+            ['Something went wrong securing your text. Please try again.'],
+            ['text' => $text, 'tone' => $tone]
+        );
+        return;
+    }
+
+    $pdo = plainfully_pdo();
+
+    $now       = new DateTimeImmutable('now', new DateTimeZone('UTC'));
+    $createdAt = $now->format('Y-m-d H:i:s');
+    $updatedAt = $createdAt;
+    $expiresAt = $now->modify('+28 days')->format('Y-m-d H:i:s');
+
+    try {
+        $pdo->beginTransaction();
+
+        // Insert into clarifications (meta only)
+        $stmt = $pdo->prepare(
+            'INSERT INTO clarifications
+                 (user_id, email_hash, source, status, tone, created_at, updated_at, expires_at)
+             VALUES
+                 (:user_id, :email_hash, :source, :status, :tone, :created_at, :updated_at, :expires_at)'
+        );
+
+        $stmt->execute([
+            ':user_id'    => $userId,
+            ':email_hash' => null,        // optional for now
+            ':source'     => 'web',
+            ':status'     => 'open',      // treat "open" as completed enough to show
+            ':tone'       => $tone,
+            ':created_at' => $createdAt,
+            ':updated_at' => $updatedAt,
+            ':expires_at' => $expiresAt,
+        ]);
+
+        $clarificationId = (int)$pdo->lastInsertId();
+
+        // Insert first detail row (prompt + clarified stub)
+        $stmt = $pdo->prepare(
+            'INSERT INTO clarification_details
+                 (clarification_id,
+                  role,
+                  sequence_no,
+                  prompt_ciphertext,
+                  clarification_ciphertext,
+                  model_response_ciphertext,
+                  redacted_summary_ciphertext,
+                  created_at,
+                  updated_at,
+                  expires_at)
+             VALUES
+                 (:clarification_id,
+                  :role,
+                  :sequence_no,
+                  :prompt_ciphertext,
+                  :clarification_ciphertext,
+                  :model_response_ciphertext,
+                  :redacted_summary_ciphertext,
+                  :created_at,
+                  :updated_at,
+                  :expires_at)'
+        );
+
+        $stmt->execute([
+            ':clarification_id'            => $clarificationId,
+            ':role'                        => 'assistant',   // or 'system' if you prefer
+            ':sequence_no'                 => 1,
+            ':prompt_ciphertext'           => $promptCipher,
+            ':clarification_ciphertext'    => $clarCipher,
+            ':model_response_ciphertext'   => $modelCipher,
+            ':redacted_summary_ciphertext' => $summaryCipher,
+            ':created_at'                  => $createdAt,
+            ':updated_at'                  => $updatedAt,
+            ':expires_at'                  => $expiresAt,
+        ]);
+
+        $pdo->commit();
+    } catch (\Throwable $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        error_log('[Plainfully] Failed to save clarification: ' . $e->getMessage());
+
+        render_plainfully_clarification_form(
+            ['Something went wrong saving your clarification. Please try again.'],
+            ['text' => $text, 'tone' => $tone]
+        );
+        return;
+    }
+
+    // All good – show the result page
+    pf_redirect('/clarifications/view?id=' . urlencode((string)$clarificationId));
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 /**
  * Load a clarification + its latest decrypted result text for a given user.
  *

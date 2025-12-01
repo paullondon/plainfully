@@ -44,9 +44,14 @@ switch (true) {
     // -------------------------------------------------
 
     case $path === '/clarifications/new' && $method === 'GET':
-    case $path === '/clarifications/new' && $method === 'POST':
         require_login();
         require dirname(__DIR__) . '/app/views/clarifications/new.php';
+        break;
+
+    case $path === '/clarifications/new' && $method === 'POST':
+        require_login();
+        require APP_ROOT . '/app/support/clarifications.php';
+        plainfully_handle_clarification_new_post_v2();
         break;
 
     case $path === '/clarifications/view' && $method === 'GET':
