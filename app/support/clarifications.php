@@ -384,10 +384,11 @@ function plainfully_load_clarification_result_for_user(int $clarificationId, int
         return null;
     }
 
-    // 2) Load latest detail row
+    // 2) Load latest detail row (with length for debug)
     $stmt = $pdo->prepare(
         'SELECT
              clarification_ciphertext,
+             LENGTH(clarification_ciphertext) AS clar_len,
              model_response_ciphertext,
              redacted_summary_ciphertext
          FROM clarification_details
@@ -402,26 +403,37 @@ function plainfully_load_clarification_result_for_user(int $clarificationId, int
     $resultText = '';
 
     if ($detail !== false) {
-
-        // Priority: clarification → model → summary
-        $cipher = $detail['clarification_ciphertext']
-                  ?? null;
+        $cipher    = $detail['clarification_ciphertext'] ?? null;
+        $clarLen   = (int)($detail['clar_len'] ?? 0);
 
         if (empty($cipher) && !empty($detail['model_response_ciphertext'])) {
-            $cipher = $detail['model_response_ciphertext'];
+            $cipher  = $detail['model_response_ciphertext'];
+            $clarLen = strlen((string)$cipher);
         }
         if (empty($cipher) && !empty($detail['redacted_summary_ciphertext'])) {
-            $cipher = $detail['redacted_summary_ciphertext'];
+            $cipher  = $detail['redacted_summary_ciphertext'];
+            $clarLen = strlen((string)$cipher);
         }
 
         if (!empty($cipher)) {
             try {
-                $resultText = plainfully_decrypt($cipher);
+                $decoded = plainfully_decrypt($cipher);
+
+                // If decrypt returns false or empty, treat that as a failure
+                if ($decoded === false || $decoded === '' || $decoded === null) {
+                    $resultText = "[DEBUG] decrypt returned empty/false (cipher length {$clarLen})";
+                } else {
+                    $resultText = (string)$decoded;
+                }
             } catch (Throwable $e) {
                 error_log('[Plainfully] decrypt failed: ' . $e->getMessage());
-                $resultText = '[Unable to decrypt result text]';
+                $resultText = "[DEBUG] decrypt threw an exception (cipher length {$clarLen})";
             }
+        } else {
+            $resultText = "[DEBUG] no ciphertext found for this clarification.";
         }
+    } else {
+        $resultText = "[DEBUG] no detail row found for this clarification.";
     }
 
     return [
@@ -429,6 +441,7 @@ function plainfully_load_clarification_result_for_user(int $clarificationId, int
         'result_text' => $resultText,
     ];
 }
+
 
 
 /**
