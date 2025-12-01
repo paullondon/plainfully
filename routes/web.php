@@ -50,7 +50,7 @@ switch (true) {
 
     case $path === '/clarifications/new' && $method === 'POST':
         require_login();
-        require APP_ROOT . '/app/support/clarifications.php';
+        require dirname(__DIR__) . '/app/support/clarifications.php';
         plainfully_handle_clarification_new_post_v2();
         break;
 
