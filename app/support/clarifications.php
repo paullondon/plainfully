@@ -431,7 +431,79 @@ function plainfully_load_clarification_result_for_user(int $clarificationId, int
     ];
 }
 
+/**
+ * Handle GET /clarifications/view?id=...
+ * - Ensures the clarification belongs to the current user
+ * - Loads + decrypts the result text
+ * - Renders the result page (never shows original prompt)
+ */
+function plainfully_handle_clarification_view(): void
+{
+    $userId = plainfully_current_user_id();
+    if ($userId === null) {
+        pf_redirect('/login');
+    }
 
+    $idParam = $_GET['id'] ?? null;
+    if (!is_string($idParam) || !ctype_digit($idParam)) {
+        pf_redirect('/dashboard');
+    }
+
+    $clarificationId = (int)$idParam;
+
+    // Load clarification meta + decrypted result
+    $data = plainfully_load_clarification_result_for_user($clarificationId, $userId);
+    if ($data === null) {
+        // Not found / not owned
+        ob_start();
+        ?>
+        <section class="pf-card pf-card--narrow">
+            <h1 class="pf-page-title">Clarification not found</h1>
+            <p class="pf-page-subtitle">
+                We couldn’t find that clarification in your history.
+                It may have expired or been cancelled.
+            </p>
+
+            <div class="pf-actions pf-actions--split">
+                <a href="/dashboard" class="pf-button pf-button--ghost">
+                    Back to dashboard
+                </a>
+                <a href="/clarifications/new" class="pf-button pf-button--primary">
+                    Start a new clarification
+                </a>
+            </div>
+        </section>
+        <?php
+        $inner = ob_get_clean();
+        pf_render_shell('Clarification not found', $inner);
+        return;
+    }
+
+    $clar       = $data['clar'];
+    $resultText = (string)($data['result_text'] ?? '');
+
+    // Failsafe: if decrypt somehow returns empty, at least show *something*
+    if ($resultText === '') {
+        $resultText = '[Result text is currently empty – check encryption/decryption.]';
+    }
+
+    $status    = $clar['status']     ?? 'open';
+    $tone      = $clar['tone']       ?? 'calm';
+    $createdAt = $clar['created_at'] ?? null;
+    $updatedAt = $clar['updated_at'] ?? null;
+
+    $isCompleted   = ($status === 'completed' || $status === 'open');
+    $isCancellable = in_array($status, ['draft', 'in_progress'], true);
+
+    $pageTitle = 'Your clarification result';
+
+    // Expose variables to the view template
+    ob_start();
+    require dirname(__DIR__) . '/views/clarifications/view.php';
+    $inner = ob_get_clean();
+
+    pf_render_shell($pageTitle, $inner);
+}
 
 
 /**
