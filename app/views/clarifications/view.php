@@ -119,8 +119,8 @@ function pf_fmt_dt(?string $dt): string {
                 </div>
             </div>
         </div>
-        <section class="pf-card" style="margin-top: 1.0rem;">
-            <div class="pf-box pf-box--fullreport">
+
+        <div class="pf-box pf-box--fullreport">
 
                 <!-- 1. Key things to know -->
                 <div class="pf-fullreport-group">
@@ -178,7 +178,7 @@ function pf_fmt_dt(?string $dt): string {
                     Start another clarification
                 </a>
             </div>
-        </section>
+    </section>
 
     <?php if ($isCancellable): ?>
         <form method="post"
