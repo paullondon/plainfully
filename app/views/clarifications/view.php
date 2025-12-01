@@ -91,7 +91,7 @@ function pf_fmt_dt(?string $dt): string {
             Plainfully’s algorythms give a suggestion around how urgent or risky this feels from the wording alone.
         </p>
 
-        <h2 class="pf-card-title" style="margin-top: 1.5rem;">Quick glance</h2>
+        <h2 class="pf-card-title" style="margin-top: 1.0rem;">Quick glance</h2>
         <div class="pf-box pf-box--quickglance">
             <div class="pf-quickglance">
                 <!-- Left: risk box -->
@@ -116,23 +116,55 @@ function pf_fmt_dt(?string $dt): string {
         </div>
     </section>
 
-
     <section class="pf-card">
         <h2 class="pf-card-title">Full report</h2>
         <p class="pf-card-text">
-            This section breaks the message down into plain explanation, key things to know,
-            risks/cautions, what people typically do, and a short summary.
+            This section breaks the message down into key things to know, risks/cautions,
+            and what people typically do in similar situations.
         </p>
 
-        <div class="pf-box">
-            <?= nl2br(htmlspecialchars($fullReportText, ENT_QUOTES, 'UTF-8')) ?>
-        </div>
+        <div class="pf-box pf-box--fullreport">
+            <!-- 1. Key things to know -->
+            <div class="pf-fullreport-section">
+                <h3 class="pf-fullreport-heading">Key things to know</h3>
 
-        <div class="pf-upsell" style="margin-top: 1.25rem;">
-            On your current plan, Plainfully keeps clarifications for up to
-            <strong>28 days</strong> and does not store your original text.
-            In future paid plans, you’ll be able to keep reports for longer
-            and export them securely.
+                <?php if (!empty($keyPoints)): ?>
+                    <ul class="pf-fullreport-list">
+                        <?php foreach ($keyPoints as $point): ?>
+                            <li><?= htmlspecialchars($point, ENT_QUOTES, 'UTF-8') ?></li>
+                        <?php endforeach; ?>
+                    </ul>
+                <?php else: ?>
+                    <p class="pf-fullreport-body">
+                        Plainfully will highlight the main points from your message here.
+                    </p>
+                <?php endif; ?>
+            </div>
+
+            <!-- 2. Risks / cautions -->
+            <div class="pf-fullreport-section">
+                <h3 class="pf-fullreport-heading">Risks / cautions</h3>
+                <p class="pf-fullreport-body">
+                    <?= nl2br(htmlspecialchars($risksText, ENT_QUOTES, 'UTF-8')) ?>
+                </p>
+            </div>
+
+            <!-- 3. What people typically do -->
+            <div class="pf-fullreport-section">
+                <h3 class="pf-fullreport-heading">What people typically do in this situation</h3>
+
+                <?php if (!empty($actionsList)): ?>
+                    <ul class="pf-fullreport-list">
+                        <?php foreach ($actionsList as $action): ?>
+                            <li><?= htmlspecialchars($action, ENT_QUOTES, 'UTF-8') ?></li>
+                        <?php endforeach; ?>
+                    </ul>
+                <?php else: ?>
+                    <p class="pf-fullreport-body">
+                        Plainfully will suggest a few common next steps people take in similar situations.
+                    </p>
+                <?php endif; ?>
+            </div>
         </div>
 
         <div class="pf-actions pf-actions--split" style="margin-top: 1.5rem;">
