@@ -757,3 +757,60 @@ body {
         flex-direction: column;
     }
 }
+
+/* Quick glance – two cards inside the main box */
+.pf-quickglance {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.pf-quickglance-card {
+    flex: 1 1 0;
+    min-width: 220px;
+    border-radius: 10px;
+    padding: 0.85rem 1rem;
+    border: 1px solid var(--pf-border-subtle);
+    background: var(--pf-surface-soft);
+    box-sizing: border-box;
+}
+
+/* Left card – risk */
+.pf-quickglance-card--risk {
+    max-width: 260px;
+}
+
+/* Right card – summary */
+.pf-quickglance-card--summary {
+    flex-grow: 2;
+}
+
+.pf-quickglance-caption {
+    margin: 0.5rem 0 0;
+    font-size: 0.8rem;
+    color: var(--pf-text-soft);
+}
+
+.pf-quickglance-label {
+    margin: 0 0 0.35rem;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--pf-text-soft);
+}
+
+.pf-quickglance-text {
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+
+/* Mobile: stack nicely */
+@media (max-width: 600px) {
+    .pf-quickglance {
+        flex-direction: column;
+    }
+
+    .pf-quickglance-card--risk {
+        max-width: none;
+    }
+}

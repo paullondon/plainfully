@@ -90,19 +90,35 @@ function pf_fmt_dt(?string $dt): string {
             Here’s a quick summary first, followed by the full Plainfully report.
         </p>
 
-        <h2 class="pf-card-title" style="margin-top: 1.5rem;">TL;DR summary</h2>
+        <h2 class="pf-card-title" style="margin-top: 1.5rem;">Quick glance</h2>
         <div class="pf-box">
-            <div class="pf-tldr-layout">
-                <div class="pf-risk-badge <?= $riskClass ?>">
-                    <span class="pf-risk-badge__icon"><?= htmlspecialchars($riskIcon, ENT_QUOTES, 'UTF-8') ?></span>
-                    <span class="pf-risk-badge__label"><?= htmlspecialchars($riskLabel, ENT_QUOTES, 'UTF-8') ?></span>
+            <div class="pf-quickglance">
+                <!-- Left: risk box -->
+                <div class="pf-quickglance-card pf-quickglance-card--risk">
+                    <div class="pf-risk-badge <?= $riskClass ?>">
+                        <span class="pf-risk-badge__icon">
+                            <?= htmlspecialchars($riskIcon, ENT_QUOTES, 'UTF-8') ?>
+                        </span>
+                        <span class="pf-risk-badge__label">
+                            <?= htmlspecialchars($riskLabel, ENT_QUOTES, 'UTF-8') ?>
+                        </span>
+                    </div>
+                    <p class="pf-quickglance-caption">
+                        Plainfully’s best guess about how urgent or risky this feels from the wording alone.
+                    </p>
                 </div>
-                <div class="pf-tldr-text">
-                    <?= nl2br(htmlspecialchars($tldrText, ENT_QUOTES, 'UTF-8')) ?>
+
+                <!-- Right: summary box -->
+                <div class="pf-quickglance-card pf-quickglance-card--summary">
+                    <p class="pf-quickglance-label">Plain explanation (one-line)</p>
+                    <div class="pf-quickglance-text">
+                        <?= nl2br(htmlspecialchars($tldrText, ENT_QUOTES, 'UTF-8')) ?>
+                    </div>
                 </div>
             </div>
         </div>
     </section>
+
 
     <section class="pf-card">
         <h2 class="pf-card-title">Full report</h2>
