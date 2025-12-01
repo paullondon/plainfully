@@ -354,14 +354,10 @@ function plainfully_handle_clarification_new_post_v2(): void
 
 
 /**
- * Load a clarification + its latest decrypted result text for a given user.
- *
- * Returns:
- *  [
- *      'clar'        => <clarifications row>,
- *      'result_text' => <string>  // decrypted clarified text (or empty string)
- *  ]
- * or null if not found / not owned by user.
+ * Handle GET /clarifications/view?id=...
+ * - Ensures the clarification belongs to the current user
+ * - Renders a styled result page
+ * - NEVER shows original input text (only result_text + meta)
  */
 function plainfully_load_clarification_result_for_user(int $clarificationId, int $userId): ?array
 {
@@ -435,93 +431,6 @@ function plainfully_load_clarification_result_for_user(int $clarificationId, int
     ];
 }
 
-
-
-
-/**
- * Handle GET /clarifications/view?id=...
- * - Ensures the clarification belongs to the current user
- * - Renders a styled result page
- * - NEVER shows original input text (only result_text + meta)
- */
-function plainfully_load_clarification_result_for_user(int $clarificationId, int $userId): ?array
-{
-    $pdo = plainfully_pdo();
-
-    // 1) Load the main clarification row
-    $stmt = $pdo->prepare(
-        'SELECT id, user_id, tone, status, source, created_at, updated_at, expires_at
-         FROM clarifications
-         WHERE id = :id AND user_id = :user_id
-         LIMIT 1'
-    );
-    $stmt->execute([
-        ':id'      => $clarificationId,
-        ':user_id' => $userId,
-    ]);
-
-    $clar = $stmt->fetch();
-    if ($clar === false) {
-        return null;
-    }
-
-    // 2) Load latest detail row (with length for debug)
-    $stmt = $pdo->prepare(
-        'SELECT
-             clarification_ciphertext,
-             LENGTH(clarification_ciphertext) AS clar_len,
-             model_response_ciphertext,
-             redacted_summary_ciphertext
-         FROM clarification_details
-         WHERE clarification_id = :id
-         ORDER BY sequence_no DESC, id DESC
-         LIMIT 1'
-    );
-    $stmt->execute([':id' => $clarificationId]);
-
-    $detail = $stmt->fetch();
-
-    $resultText = '';
-
-    if ($detail !== false) {
-        $cipher    = $detail['clarification_ciphertext'] ?? null;
-        $clarLen   = (int)($detail['clar_len'] ?? 0);
-
-        if (empty($cipher) && !empty($detail['model_response_ciphertext'])) {
-            $cipher  = $detail['model_response_ciphertext'];
-            $clarLen = strlen((string)$cipher);
-        }
-        if (empty($cipher) && !empty($detail['redacted_summary_ciphertext'])) {
-            $cipher  = $detail['redacted_summary_ciphertext'];
-            $clarLen = strlen((string)$cipher);
-        }
-
-        if (!empty($cipher)) {
-            try {
-                $decoded = plainfully_decrypt($cipher);
-
-                // If decrypt returns false or empty, treat that as a failure
-                if ($decoded === false || $decoded === '' || $decoded === null) {
-                    $resultText = "[DEBUG] decrypt returned empty/false (cipher length {$clarLen})";
-                } else {
-                    $resultText = (string)$decoded;
-                }
-            } catch (Throwable $e) {
-                error_log('[Plainfully] decrypt failed: ' . $e->getMessage());
-                $resultText = "[DEBUG] decrypt threw an exception (cipher length {$clarLen})";
-            }
-        } else {
-            $resultText = "[DEBUG] no ciphertext found for this clarification.";
-        }
-    } else {
-        $resultText = "[DEBUG] no detail row found for this clarification.";
-    }
-
-    return [
-        'clar'        => $clar,
-        'result_text' => $resultText,
-    ];
-}
 
 
 
