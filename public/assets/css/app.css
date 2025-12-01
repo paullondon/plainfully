@@ -1002,39 +1002,12 @@ body {
     gap: 1rem;
 }
 
-/* Each logical section (keys, risks, actions) */
-.pf-fullreport-section {
-    background: #10131A;
-    border-radius: 10px;
-    border: 1px solid #272B33;
-    padding: 0.9rem 1.1rem;
-}
-
-/* Section headings inside full report */
-.pf-fullreport-heading {
-    margin: 0 0 0.5rem;
-    font-size: 0.95rem;
-    font-weight: 600;
-}
-
 /* Body text + bullets */
 .pf-fullreport-body {
     margin: 0;
     font-size: 0.9rem;
     line-height: 1.5;
     color: var(--pf-text-main);
-}
-
-.pf-fullreport-list {
-    margin: 0.1rem 0 0;
-    padding-left: 1.1rem;
-    font-size: 0.9rem;
-    line-height: 1.5;
-    color: var(--pf-text-main);
-}
-
-.pf-fullreport-list li + li {
-    margin-top: 0.25rem;
 }
 
 /* ============================
