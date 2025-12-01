@@ -87,7 +87,8 @@ function pf_fmt_dt(?string $dt): string {
     <section class="pf-card" style="margin-bottom: 1.75rem;">
         <h1 class="pf-page-title">Your clarification</h1>
         <p class="pf-page-subtitle">
-            Here’s a quick summary first, followed by the full Plainfully report.
+            Here’s a quick summary first, followed by the full Plainfully report. 
+            Plainfully’s algorythms give a suggestion around how urgent or risky this feels from the wording alone.
         </p>
 
         <h2 class="pf-card-title" style="margin-top: 1.5rem;">Quick glance</h2>
@@ -103,14 +104,10 @@ function pf_fmt_dt(?string $dt): string {
                             <?= htmlspecialchars($riskLabel, ENT_QUOTES, 'UTF-8') ?>
                         </span>
                     </div>
-                    <p class="pf-quickglance-caption">
-                        Plainfully’s best guess about how urgent or risky this feels from the wording alone.
-                    </p>
                 </div>
 
                 <!-- Right: summary box -->
                 <div class="pf-quickglance-card pf-quickglance-card--summary">
-                    <p class="pf-quickglance-label">Plain explanation (one-line)</p>
                     <div class="pf-quickglance-text">
                         <?= nl2br(htmlspecialchars($tldrText, ENT_QUOTES, 'UTF-8')) ?>
                     </div>

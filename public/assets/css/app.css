@@ -761,6 +761,11 @@ body {
 /* Quick glance – two cards inside the main box */
 .pf-quickglance {
     display: flex;
+    flex-direction: column;
+    justify-content: center;   /* vertical centring */
+    align-items: center;       /* horizontal centring */
+    text-align: center;        /* centre captions and summary text */
+    padding: 1.25rem 1rem;
     gap: 1rem;
     flex-wrap: wrap;
 }
@@ -780,6 +785,10 @@ body {
     max-width: 260px;
 }
 
+.pf-quickglance-card--risk .pf-risk-badge {
+    margin-bottom: 0.75rem;
+}
+
 /* Right card – summary */
 .pf-quickglance-card--summary {
     flex-grow: 2;
@@ -792,16 +801,14 @@ body {
 }
 
 .pf-quickglance-label {
-    margin: 0 0 0.35rem;
-    font-size: 0.85rem;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--pf-text-soft);
+    display: none;
 }
 
 .pf-quickglance-text {
-    font-size: 0.95rem;
-    line-height: 1.5;
+    font-size: 1rem;
+    line-height: 1.55;
+    color: var(--pf-text-main);
+    max-width: 92%;
 }
 
 /* Mobile: stack nicely */
