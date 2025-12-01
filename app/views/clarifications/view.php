@@ -92,7 +92,7 @@ function pf_fmt_dt(?string $dt): string {
         </p>
 
         <h2 class="pf-card-title" style="margin-top: 1.5rem;">Quick glance</h2>
-        <div class="pf-box">
+        <div class="pf-box pf-box--quickglance">
             <div class="pf-quickglance">
                 <!-- Left: risk box -->
                 <div class="pf-quickglance-card pf-quickglance-card--risk">

@@ -878,7 +878,7 @@ body {
 /* Right card: centre summary text in the box */
 .pf-quickglance-card--summary {
     align-items: center;
-    text-align: left;
+    text-align: center;
 }
 
 .pf-quickglance-text {
@@ -889,7 +889,7 @@ body {
 
 /* Tighten outer quick-glance box padding a bit */
 .pf-box {
-    padding: 4px 2px;
+    padding: 4px 6px;
 }
 
 /* Quick glance cards – less vertical padding */
@@ -923,4 +923,71 @@ body {
 
 .pf-risk-badge__icon {
     font-size: 0.85rem;
+}
+
+/* ============================
+   Quick glance – final layout
+   ============================ */
+
+/* Use tighter padding only for this box */
+.pf-box--quickglance {
+    padding: 8px 14px;              /* trims top/bottom gap */
+}
+
+/* Two columns on desktop: [risk] [summary] */
+.pf-box--quickglance .pf-quickglance {
+    display: grid;
+    grid-template-columns: minmax(0, 230px) minmax(0, 1fr);
+    gap: 1.1rem;
+    align-items: stretch;
+}
+
+/* Stack cards on smaller screens */
+@media (max-width: 700px) {
+    .pf-box--quickglance .pf-quickglance {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Inner cards – reduced vertical padding */
+.pf-box--quickglance .pf-quickglance-card {
+    border-radius: 10px;
+    padding: 0.7rem 1rem;
+    border: 1px solid var(--pf-border-subtle);
+    background: var(--pf-surface-soft);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    box-sizing: border-box;
+}
+
+/* Left card: centre contents */
+.pf-box--quickglance .pf-quickglance-card--risk {
+    align-items: center;
+    text-align: center;
+}
+
+/* Right card: normal left-aligned text, no "indent" */
+.pf-box--quickglance .pf-quickglance-card--summary {
+    align-items: flex-start;
+    text-align: left;
+}
+
+/* Summary text – no extra inset */
+.pf-box--quickglance .pf-quickglance-text {
+    margin: 0;
+    padding: 0;
+    max-width: 100%;
+    font-size: 0.95rem;
+    line-height: 1.5;
+}
+
+/* Bigger, chunkier risk badge */
+.pf-box--quickglance .pf-risk-badge {
+    padding: 0.35rem 0.9rem;
+    font-size: 0.9rem;
+}
+
+.pf-box--quickglance .pf-risk-badge__icon {
+    font-size: 1rem;
 }
