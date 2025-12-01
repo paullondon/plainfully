@@ -487,6 +487,9 @@ function plainfully_handle_clarification_view(): void
         $resultText = '[Result text is currently empty – check encryption/decryption.]';
     }
 
+    // ALSO expose via $clar["result_text"] in case the view still expects that
+    $clar['result_text'] = $resultText;
+
     $status    = $clar['status']     ?? 'open';
     $tone      = $clar['tone']       ?? 'calm';
     $createdAt = $clar['created_at'] ?? null;
@@ -504,6 +507,7 @@ function plainfully_handle_clarification_view(): void
 
     pf_render_shell($pageTitle, $inner);
 }
+
 
 
 /**
