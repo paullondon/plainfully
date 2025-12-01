@@ -168,19 +168,52 @@ function plainfully_current_user_id(): ?int
  * Very simple stub generator for now.
  * Later this becomes the real AI call.
  */
-function plainfully_stub_model_response(string $tone, string $text): string
+function plainfully_stub_model_response(string $input): string
 {
-    $toneLabel = match ($tone) {
-        'calm'         => 'Calm',
-        'firm'         => 'Firm',
-        'professional' => 'Professional',
-        default        => 'Calm',
-    };
+    // Very primitive risk detection for now
+    $lower = strtolower($input);
 
-    return "Tone: {$toneLabel}\n\n"
-        . "This is a placeholder clarification. In the live version Plainfully will rewrite "
-        . "your message here in that style.";
+    if (str_contains($lower, 'final notice') ||
+        str_contains($lower, 'legal') ||
+        str_contains($lower, 'debt') ||
+        str_contains($lower, 'termination') ||
+        str_contains($lower, 'overdue')) {
+        $risk = 'high';
+        $riskIcon = '🔴 High risk';
+    } elseif (str_contains($lower, 'action required') ||
+              str_contains($lower, 'reminder') ||
+              str_contains($lower, 'please respond')) {
+        $risk = 'medium';
+        $riskIcon = '🟠 Medium risk';
+    } else {
+        $risk = 'low';
+        $riskIcon = '🔵 Low risk';
+    }
+
+    // TLDR block
+    $tldr = "TL;DR — {$riskIcon}\n"
+          . "This message is summarised for you. "
+          . "See details below for key points and context.\n\n";
+
+    // Full Report
+    $full = "FULL REPORT\n"
+          . "-------------------------------------\n"
+          . "Plain explanation:\n"
+          . "This is a placeholder explanation of the message.\n\n"
+          . "Key things to know:\n"
+          . "- This is example bullet point 1\n"
+          . "- This is example bullet point 2\n"
+          . "- This is example bullet point 3\n\n"
+          . "Risks / cautions:\n"
+          . "This is a placeholder risk assessment based on the message content.\n\n"
+          . "What people typically do:\n"
+          . "This section explains general behaviour in similar situations.\n\n"
+          . "Short summary:\n"
+          . "This is your short summary of the message.";
+
+    return $tldr . $full;
 }
+
 
 /**
  * Handle POST /clarifications/new
@@ -199,14 +232,6 @@ function plainfully_handle_clarification_new_post_v2(): void
         pf_redirect('/login');
     }
 
-    // Read + normalise inputs
-    $tone = $_POST['tone'] ?? 'calm';
-    $tone = is_string($tone) ? strtolower(trim($tone)) : 'calm';
-
-    $allowedTones = ['calm', 'firm', 'professional'];
-    if (!in_array($tone, $allowedTones, true)) {
-        $tone = 'calm';
-    }
 
     $text = $_POST['text'] ?? '';
     if (!is_string($text)) {
@@ -226,7 +251,7 @@ function plainfully_handle_clarification_new_post_v2(): void
         // Reuse your existing form renderer (from A2)
         render_plainfully_clarification_form(
             $errors,
-            ['text' => $text, 'tone' => $tone]
+            ['text' => $text]
         );
         return;
     }
@@ -235,7 +260,7 @@ function plainfully_handle_clarification_new_post_v2(): void
     try {
         $promptCipher = plainfully_encrypt($text);
 
-        $stubText     = plainfully_stub_model_response($tone, $text);
+        $stubText     = plainfully_stub_model_response($text);
         $clarCipher   = plainfully_encrypt($stubText);
 
         // Model response / redacted summary left empty for now
@@ -246,7 +271,7 @@ function plainfully_handle_clarification_new_post_v2(): void
 
         render_plainfully_clarification_form(
             ['Something went wrong securing your text. Please try again.'],
-            ['text' => $text, 'tone' => $tone]
+            ['text' => $text]
         );
         return;
     }
@@ -274,7 +299,7 @@ function plainfully_handle_clarification_new_post_v2(): void
             ':email_hash' => null,        // optional for now
             ':source'     => 'web',
             ':status'     => 'open',      // treat "open" as completed enough to show
-            ':tone'       => $tone,
+            ':tone'       => 'notrequired',
             ':created_at' => $createdAt,
             ':updated_at' => $updatedAt,
             ':expires_at' => $expiresAt,
@@ -330,7 +355,7 @@ function plainfully_handle_clarification_new_post_v2(): void
 
         render_plainfully_clarification_form(
             ['Something went wrong saving your clarification. Please try again.'],
-            ['text' => $text, 'tone' => $tone]
+            ['text' => $text]
         );
         return;
     }
@@ -491,7 +516,7 @@ function plainfully_handle_clarification_view(): void
     $clar['result_text'] = $resultText;
 
     $status    = $clar['status']     ?? 'open';
-    $tone      = $clar['tone']       ?? 'calm';
+    $tone      = $clar['tone']       ?? 'notapplicable';
     $createdAt = $clar['created_at'] ?? null;
     $updatedAt = $clar['updated_at'] ?? null;
 

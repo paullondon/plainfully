@@ -48,20 +48,6 @@ $old    = $old ?? [];
                 <p class="pf-help">Max 12,000 characters.</p>
             </div>
 
-            <div class="pf-field">
-                <label class="pf-label">Tone</label>
-                <select name="tone" class="pf-input pf-input--select">
-                    <?php
-                    $tones = ['calm' => 'Calm', 'firm' => 'Firm', 'professional' => 'Professional'];
-                    foreach ($tones as $k => $label):
-                        $selected = (($old['tone'] ?? '') === $k) ? 'selected' : '';
-                        ?>
-                        <option value="<?= $k ?>" <?= $selected ?>><?= $label ?></option>
-                    <?php endforeach; ?>
-                </select>
-                <p class="pf-help">This is the style Plainfully will use.</p>
-            </div>
-
             <button type="submit"
                     class="pf-button pf-button--primary pf-button--full">
                 Generate clarification
