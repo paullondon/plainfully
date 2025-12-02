@@ -27,6 +27,7 @@ function pf_fmt_dt(?string $dt): string {
 
 $tldrText       = $tldrText       ?? ($clar['result_text'] ?? '');
 $fullReportText = $fullReportText ?? ($clar['result_text'] ?? '');
+$isPaidUser = $isPaidUser ?? false; // TODO: wire this to your real plan logic
 
 $riskLevel  = $riskLevel ?? 'low';
 $riskLabel  = 'Low risk';
@@ -160,10 +161,37 @@ $actionsList = $actionsList ?? [];
 
     <!-- Primary actions -->
     <div class="pf-section" style="border-top:none;padding-top:1.25rem;">
+        <div class="pf-allcaughtup">
+            <p>You’re all caught up.</p>
+        </div>
+
         <div class="pf-actions pf-actions--split">
             <a href="/dashboard" class="pf-button pf-button--ghost">
                 Back to dashboard
             </a>
+
+            <?php if ($isPaidUser): ?>
+                <!-- Paid users: real email action -->
+                <form method="post"
+                    action="/clarifications/email"
+                    style="margin:0; display:inline;">
+                    <?php pf_csrf_field(); ?>
+                    <input type="hidden"
+                        name="clarification_id"
+                        value="<?= htmlspecialchars((string)$id, ENT_QUOTES, 'UTF-8') ?>">
+                    <button type="submit" class="pf-button pf-button--secondary">
+                        Email me this report
+                    </button>
+                </form>
+            <?php else: ?>
+                <!-- Free users: greyed-out Pro teaser -->
+                <button type="button"
+                        class="pf-button pf-button--secondary pf-button--disabled"
+                        disabled>
+                    Email me this report (Pro)
+                </button>
+            <?php endif; ?>
+
             <a href="/clarifications/new" class="pf-button pf-button--primary">
                 Start another clarification
             </a>
@@ -171,13 +199,13 @@ $actionsList = $actionsList ?? [];
 
         <?php if ($isCancellable): ?>
             <form method="post"
-                  action="/clarifications/cancel"
-                  class="pf-actions pf-actions--inline-danger"
-                  style="margin-top:0.75rem;">
+                action="/clarifications/cancel"
+                class="pf-actions pf-actions--inline-danger"
+                style="margin-top:0.75rem;">
                 <?php pf_csrf_field(); ?>
                 <input type="hidden"
-                       name="clarification_id"
-                       value="<?= htmlspecialchars((string)$id, ENT_QUOTES, 'UTF-8') ?>">
+                    name="clarification_id"
+                    value="<?= htmlspecialchars((string)$id, ENT_QUOTES, 'UTF-8') ?>">
 
                 <button type="submit" class="pf-button pf-button--danger-ghost">
                     Cancel and delete this draft

@@ -1301,3 +1301,23 @@ body {
         padding: 1.5rem 1.25rem 1.75rem;
     }
 }
+/* Secondary / Pro-teaser button */
+.pf-button--secondary {
+    background: #2b2b2b;
+    color: var(--pf-text-main);
+    border: 1px solid var(--pf-border-subtle);
+    font-weight: 500;
+}
+
+.pf-button--secondary:hover {
+    background: #333333;
+    border-color: var(--pf-accent);
+}
+
+/* Disabled state (free users) */
+.pf-button--disabled,
+.pf-button[disabled] {
+    opacity: 0.45;
+    cursor: not-allowed;
+    border-style: dashed;
+}
