@@ -1321,3 +1321,146 @@ body {
     cursor: not-allowed;
     border-style: dashed;
 }
+/* ==== Clarification report – SaaS-style sections ==== */
+
+.pf-result-section {
+    margin-top: 1.25rem;
+    padding: 1.25rem 1.5rem;
+    border-radius: var(--pf-radius-lg);
+    border: 1px solid var(--pf-border-subtle);
+    background: var(--pf-surface);
+    box-shadow: var(--pf-shadow-subtle);
+    border-left: 4px solid transparent;  /* coloured per section */
+}
+
+/* Primary "Plainfully Simple Clarification" card */
+.pf-result-section--primary {
+    border-left-color: var(--pf-accent);
+}
+
+/* Other sections – softer accent */
+.pf-result-section--secondary {
+    border-left-color: var(--pf-chaos-4);
+}
+
+/* Risk card left border by level */
+.pf-result-section--risk-low {
+    border-left-color: var(--pf-accent);
+}
+
+.pf-result-section--risk-medium {
+    border-left-color: #E3A018;  /* amber-ish */
+}
+
+.pf-result-section--risk-high {
+    border-left-color: var(--pf-danger);
+}
+
+.pf-result-heading {
+    margin: 0 0 0.75rem;
+    font-size: 1.05rem;
+    font-weight: 600;
+}
+
+.pf-result-body {
+    margin: 0;
+    font-size: 0.95rem;
+}
+
+/* Quick glance layout re-use */
+.pf-quickglance {
+    display: grid;
+    grid-template-columns: minmax(0, 220px) minmax(0, 1fr);
+    gap: 1.25rem;
+    align-items: center;
+}
+
+.pf-quickglance-card {
+    border-radius: var(--pf-radius-md);
+}
+
+.pf-quickglance-card--risk {
+    display: flex;
+    justify-content: center;
+}
+
+.pf-quickglance-card--summary {
+    padding: 0.9rem 1rem;
+    background: var(--pf-surface-soft);
+    border-radius: var(--pf-radius-md);
+}
+
+/* Risk badge size tweak */
+.pf-risk-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.45rem 0.9rem;
+    border-radius: 999px;
+    border: 1px solid rgba(0,0,0,0.3);
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.pf-risk-badge__icon {
+    font-size: 0.95rem;
+}
+
+/* Risk colours */
+.pf-risk-badge--low {
+    background: rgba(24, 165, 122, 0.12);
+    border-color: rgba(24, 165, 122, 0.55);
+    color: var(--pf-accent);
+}
+
+.pf-risk-badge--medium {
+    background: rgba(227, 160, 24, 0.12);
+    border-color: rgba(227, 160, 24, 0.6);
+    color: #E3A018;
+}
+
+.pf-risk-badge--high {
+    background: rgba(195, 33, 72, 0.12);
+    border-color: rgba(195, 33, 72, 0.7);
+    color: var(--pf-danger);
+}
+
+/* Short line explaining why the risk level was chosen */
+.pf-risk-explainer {
+    margin: 0.85rem 0 0;
+    font-size: 0.85rem;
+    color: var(--pf-text-muted);
+}
+
+/* Full-report lists inside sections */
+.pf-fullreport-list {
+    margin: 0;
+    padding-left: 1.3rem;
+    font-size: 0.95rem;
+}
+
+.pf-fullreport-list li + li {
+    margin-top: 0.3rem;
+}
+
+/* "You're all caught up" footer */
+.pf-report-footer {
+    margin-top: 1.75rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--pf-border-subtle);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.pf-report-footer-text {
+    font-size: 0.9rem;
+    color: var(--pf-text-muted);
+}
+
+.pf-button--ghost-disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
