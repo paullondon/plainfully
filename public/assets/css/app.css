@@ -1464,3 +1464,245 @@ body {
     opacity: 0.45;
     cursor: not-allowed;
 }
+/* ============================
+   Clarification report layout
+   ============================ */
+
+/* Plan + usage band at top of report */
+.pf-plan-band {
+    margin-bottom: 1.5rem;
+    padding: 0.9rem 1.1rem;
+    border-radius: var(--pf-radius-md);
+    background: var(--pf-surface-soft);
+    border: 1px solid var(--pf-border-subtle);
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.pf-plan-band__main {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.pf-plan-band__usage {
+    font-size: 0.9rem;
+    color: var(--pf-text-main);
+}
+
+.pf-plan-band__meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    font-size: 0.8rem;
+    color: var(--pf-text-muted);
+}
+
+.pf-plan-band__hint {
+    color: var(--pf-text-muted);
+}
+
+.pf-plan-band__warning {
+    color: var(--pf-danger);
+    font-weight: 500;
+}
+
+.pf-plan-band__upgrade {
+    margin-left: auto;
+}
+
+/* Existing chip style, plus colour variants */
+.pf-plan-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.2rem 0.75rem;
+    border-radius: 999px;
+    border: 1px solid var(--pf-border-subtle);
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+/* Keep these loosely aligned with your chaos colours */
+.pf-plan-chip--basic {
+    border-color: var(--pf-chaos-3);
+    color: var(--pf-chaos-3);
+}
+
+.pf-plan-chip--pro {
+    border-color: var(--pf-chaos-1);
+    color: var(--pf-chaos-1);
+}
+
+.pf-plan-chip--unlimited {
+    border-color: var(--pf-chaos-4);
+    color: var(--pf-chaos-4);
+}
+
+/* Header + meta under plan band */
+.pf-report-header {
+    margin-bottom: 1.5rem;
+}
+
+.pf-report-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    font-size: 0.8rem;
+    color: var(--pf-text-soft);
+}
+
+/* Core report cards – reuse dashboard feel */
+.pf-report-card {
+    margin-top: 1.25rem;
+    padding: 1.4rem 1.5rem;
+    border-radius: var(--pf-radius-lg);
+    background: var(--pf-surface);
+    border: 1px solid var(--pf-border-subtle);
+    box-shadow: var(--pf-shadow-subtle);
+    position: relative;
+}
+
+/* Side accents – top red, middle amber, bottom green */
+.pf-report-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    border-left-width: 4px;
+    border-left-style: solid;
+    border-left-color: transparent;
+    pointer-events: none;
+}
+
+/* Key → red */
+.pf-report-card--key::before {
+    border-left-color: var(--pf-chaos-1);
+}
+
+/* Risks → amber-ish (blend of red + accent) */
+.pf-report-card--risks::before {
+    border-left-color: #F29E4C;
+}
+
+/* Actions → green / clarity */
+.pf-report-card--actions::before {
+    border-left-color: var(--pf-chaos-3);
+}
+
+.pf-report-card__title {
+    margin: 0 0 0.35rem;
+    font-size: 1.15rem;
+}
+
+.pf-report-card__subtitle {
+    margin: 0 0 0.9rem;
+    font-size: 0.9rem;
+    color: var(--pf-text-muted);
+}
+
+/* Lists inside report cards */
+.pf-report-list {
+    margin: 0;
+    padding-left: 1.1rem;
+    font-size: 0.95rem;
+}
+
+.pf-report-list li + li {
+    margin-top: 0.35rem;
+}
+
+/* Risk row inside the risk card */
+.pf-report-risk {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: center;
+    margin-bottom: 0.9rem;
+}
+
+.pf-report-risk__explain {
+    margin: 0;
+    font-size: 0.9rem;
+    color: var(--pf-text-main);
+}
+
+/* Make risk badges look more like a “pill” */
+.pf-risk-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 999px;
+    font-size: 0.85rem;
+    border: 1px solid transparent;
+}
+
+/* Use pseudo-element dot instead of text icon */
+.pf-risk-badge__icon::before {
+    content: "";
+    display: inline-block;
+    width: 0.55rem;
+    height: 0.55rem;
+    border-radius: 999px;
+    background: currentColor;
+}
+
+/* Low / medium / high – colour mapping */
+.pf-risk-badge--low {
+    background: rgba(26, 179, 133, 0.12);
+    border-color: rgba(26, 179, 133, 0.4);
+    color: var(--pf-chaos-3);
+}
+
+.pf-risk-badge--medium {
+    background: rgba(242, 158, 76, 0.12);
+    border-color: rgba(242, 158, 76, 0.5);
+    color: #F29E4C;
+}
+
+.pf-risk-badge--high {
+    background: rgba(195, 33, 72, 0.14);
+    border-color: rgba(195, 33, 72, 0.6);
+    color: var(--pf-chaos-1);
+}
+
+/* Footer – “you’re all caught up” + buttons */
+.pf-report-footer {
+    margin-top: 1.75rem;
+}
+
+.pf-report-footer__text {
+    margin: 0 0 0.75rem;
+    font-size: 0.9rem;
+    color: var(--pf-text-soft);
+}
+
+.pf-report-footer__actions {
+    justify-content: flex-end;
+    gap: 0.75rem;
+}
+
+/* Disabled Pro-only button */
+.pf-button--disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+/* Mobile tweaks */
+@media (max-width: 640px) {
+    .pf-plan-band {
+        padding: 0.8rem 0.9rem;
+    }
+
+    .pf-report-card {
+        padding: 1.1rem 1.1rem;
+    }
+
+    .pf-report-footer__actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+}
