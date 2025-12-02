@@ -55,12 +55,13 @@ function pf_fmt_dt(?string $dt): string {
     }
     ?>
 
-    /** Plainfully Simple Clarification (quick glance) */
+    
+    <!-- Plainfully Simple Clarification (quick glance) -->
     <section class="pf-result-section pf-result-section--primary <?= $riskSectionClass ?>">
         <h2 class="pf-result-heading">Plainfully Simple Clarification</h2>
 
         <div class="pf-quickglance">
-            /** Left: risk */
+            <!-- Left: risk -->
             <div class="pf-quickglance-card pf-quickglance-card--risk">
                 <div class="pf-risk-badge <?= $riskClass ?>">
                     <span class="pf-risk-badge__icon">
@@ -72,7 +73,7 @@ function pf_fmt_dt(?string $dt): string {
                 </div>
             </div>
 
-            /** Right: TL;DR text */
+            <!-- Right: TL;DR text -->
             <div class="pf-quickglance-card pf-quickglance-card--summary">
                 <p class="pf-result-body">
                     <?= nl2br(htmlspecialchars($tldrText, ENT_QUOTES, 'UTF-8')) ?>
@@ -85,7 +86,7 @@ function pf_fmt_dt(?string $dt): string {
         </p>
     </section>
 
-    /** Key things to know */
+    <!-- Key things to know -->
     <section class="pf-result-section pf-result-section--secondary">
         <h2 class="pf-result-heading">Key things to know</h2>
         <?php if (!empty($keyPoints)): ?>
@@ -101,7 +102,7 @@ function pf_fmt_dt(?string $dt): string {
         <?php endif; ?>
     </section>
 
-    /** Risks / cautions */
+    <!-- Risks / cautions -->
     <section class="pf-result-section pf-result-section--secondary">
         <h2 class="pf-result-heading">Risks / cautions</h2>
         <p class="pf-result-body">
@@ -109,7 +110,7 @@ function pf_fmt_dt(?string $dt): string {
         </p>
     </section>
 
-    /** What people typically do */
+    <!-- What people typically do -->
     <section class="pf-result-section pf-result-section--secondary">
         <h2 class="pf-result-heading">What people typically do in this situation</h2>
         <?php if (!empty($actionsList)): ?>
@@ -124,13 +125,13 @@ function pf_fmt_dt(?string $dt): string {
             </p>
         <?php endif; ?>
 
-        /** Report footer: you're all caught up + actions */
+        <!-- Report footer: you're all caught up + actions -->
         <div class="pf-report-footer">
             <div class="pf-report-footer-text">
                 You’re all caught up on this message.
             </div>
             <div class="pf-actions pf-actions--split" style="margin-top:0;">
-                /** Non-paying: export button is disabled/greyed out for now */
+                <!-- Non-paying: export button is disabled/greyed out for now -->
                 <button type="button"
                         class="pf-button pf-button--ghost pf-button--ghost-disabled"
                         disabled>
@@ -147,7 +148,7 @@ function pf_fmt_dt(?string $dt): string {
         </div>
     </section>
 
-    /** Primary actions */
+    <!-- Primary actions -->
     <div class="pf-section" style="border-top:none;padding-top:1.25rem;">
         <div class="pf-allcaughtup">
             <p>You’re all caught up.</p>
@@ -159,7 +160,7 @@ function pf_fmt_dt(?string $dt): string {
             </a>
 
             <?php if ($isPaidUser): ?>
-                /** Paid users: real email action */
+                <!-- Paid users: real email action -->
                 <form method="post"
                     action="/clarifications/email"
                     style="margin:0; display:inline;">
@@ -172,7 +173,7 @@ function pf_fmt_dt(?string $dt): string {
                     </button>
                 </form>
             <?php else: ?>
-                /** Free users: greyed-out Pro teaser */
+                <!-- Free users: greyed-out Pro teaser -->
                 <button type="button"
                         class="pf-button pf-button--secondary pf-button--disabled"
                         disabled>
