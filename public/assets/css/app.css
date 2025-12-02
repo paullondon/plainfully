@@ -1,39 +1,41 @@
-/* Plainfully – SaaS UI Layer (tokens + auth + dashboard + clarifications)
-   Drop this near the bottom of app.css so it overrides older rules.
-*/
+
+/* =====================================
+   Plainfully – Light Theme SaaS Layer
+   (tokens + auth + dashboard + reports)
+   Drop this near the bottom of app.css
+   ===================================== */
 
 /* ============================
-   Design Tokens
+   Design Tokens (Light Mode)
    ============================ */
 :root {
     /* Surfaces */
-    --pf-bg: #0C0F12;
-    --pf-surface: #151A1F;
-    --pf-surface-soft: #1D242B;
-    --pf-border-subtle: #262C33;
+    --pf-bg: #F7F9FA;                 /* page background */
+    --pf-surface: #FFFFFF;            /* main cards */
+    --pf-surface-soft: #F1F3F5;       /* subtle panels / hovers */
+    --pf-border-subtle: #D6D9DD;      /* soft dividers */
 
     /* Text */
-    --pf-text-main: #E9ECEF;
-    --pf-text-muted: #A8B1B8;
-    --pf-text-soft: #6F7A83;
+    --pf-text-main: #1C1F21;          /* primary */
+    --pf-text-muted: #636B74;         /* secondary */
+    --pf-text-soft: #8E96A0;          /* labels/meta */
 
-    /* Brand “chaos” colours mapped into new palette */
-    --pf-chaos-1: #D05A6B;   /* red / risk */
-    --pf-chaos-2: #A67F5B;   /* warm deep */
-    --pf-chaos-3: #5ABFA8;   /* primary accent */
-    --pf-chaos-4: #2C6F63;   /* deep accent */
+    /* Brand chaos colours (remapped) */
+    --pf-chaos-1: #D05A6B;            /* red/pink – risk/high */
+    --pf-chaos-2: #CE9F77;            /* warm sand */
+    --pf-chaos-3: #5ABFA8;            /* teal accent */
+    --pf-chaos-4: #2C6F63;            /* deep teal */
 
     /* Accents */
-    --pf-accent: #5ABFA8;
-    --pf-accent-strong: #2C6F63;
-    --pf-accent-hover: #7FD1BA;
+    --pf-accent: #5ABFA8;             /* primary accent */
+    --pf-accent-strong: #2C6F63;      /* pressed/strong */
     --pf-accent-soft: rgba(90, 191, 168, 0.16);
 
     /* Warm reassurance accent */
     --pf-warm: #CE9F77;
     --pf-warm-deep: #A67F5B;
 
-    /* Feedback / danger */
+    /* Feedback */
     --pf-danger: #D05A6B;
     --pf-danger-soft: rgba(208, 90, 107, 0.16);
 
@@ -41,8 +43,8 @@
     --pf-radius-lg: 18px;
     --pf-radius-md: 10px;
     --pf-radius-sm: 6px;
-    --pf-shadow-soft: 0 18px 45px rgba(0, 0, 0, 0.45);
-    --pf-shadow-subtle: 0 10px 24px rgba(0, 0, 0, 0.35);
+    --pf-shadow-soft: 0 22px 55px rgba(15, 23, 42, 0.12);
+    --pf-shadow-subtle: 0 12px 30px rgba(15, 23, 42, 0.08);
 }
 
 /* ============================
@@ -64,12 +66,7 @@ body {
     min-height: 100vh;
     display: flex;
     flex-direction: column;
-    background: radial-gradient(
-        circle at top,
-        #151A1F 0,
-        var(--pf-bg) 45%,
-        #05080C 100%
-    );
+    background: radial-gradient(circle at top, #FFFFFF 0, var(--pf-bg) 45%, #E4E7EB 100%);
     color: var(--pf-text-main);
 }
 
@@ -96,26 +93,35 @@ body {
     box-shadow: var(--pf-shadow-subtle);
     border: 1px solid var(--pf-border-subtle);
     padding: 1.5rem;
+    box-sizing: border-box;
 }
 
 .pf-card--narrow {
-    max-width: 720px;
-    margin: 0 auto;
+    max-width: 900px;
+    margin: 3rem auto;
+    padding: 1.75rem 2rem 2rem;
 }
 
 /* Headings & meta text */
 .pf-page-title,
 .pf-heading {
-    font-size: 1.6rem;
+    font-size: 1.7rem;
     font-weight: 650;
-    margin: 0 0 0.4rem;
+    margin: 0 0 0.35rem;
 }
 
 .pf-page-subtitle,
 .pf-meta {
     font-size: 0.9rem;
     color: var(--pf-text-muted);
-    margin: 0 0 1.25rem;
+    margin: 0 0 1.1rem;
+}
+
+/* Divider */
+.pf-divider {
+    height: 1px;
+    margin: 2rem 0;
+    background: var(--pf-border-subtle);
 }
 
 /* ============================
@@ -138,17 +144,18 @@ body {
 .pf-select {
     width: 100%;
     box-sizing: border-box;
-    padding: 0.7rem 0.9rem;
+    padding: 0.75rem 0.95rem;
     border-radius: var(--pf-radius-md);
     border: 1px solid var(--pf-border-subtle);
-    background: var(--pf-surface-soft);
+    background: #FFFFFF;
     color: var(--pf-text-main);
     font-size: 0.95rem;
+    transition: border-color 140ms ease-out, box-shadow 140ms ease-out, background-color 140ms ease-out;
 }
 
 .pf-input::placeholder,
 .pf-textarea::placeholder {
-    color: #505864;
+    color: #A0A8B0;
 }
 
 .pf-input:focus,
@@ -157,6 +164,7 @@ body {
     outline: none;
     border-color: var(--pf-accent);
     box-shadow: 0 0 0 2px var(--pf-accent-soft);
+    background-color: #FFFFFF;
 }
 
 .pf-textarea {
@@ -166,7 +174,7 @@ body {
 
 .pf-help {
     font-size: 0.8rem;
-    color: var(--pf-text-muted);
+    color: var(--pf-text-soft);
     margin-top: 0.35rem;
 }
 
@@ -174,7 +182,7 @@ body {
    Buttons & Actions
    ============================ */
 
-/* Form / action buttons */
+/* Core buttons */
 .pf-button {
     border: none;
     cursor: pointer;
@@ -191,13 +199,19 @@ body {
 /* Primary action */
 .pf-button--primary {
     background: var(--pf-accent);
-    color: #0C0F12;
+    color: #0F1514;
+    box-shadow: var(--pf-shadow-soft);
 }
 
 .pf-button--primary:hover {
-    background: var(--pf-accent-hover);
-    box-shadow: 0 8px 20px rgba(90, 191, 168, 0.35);
+    background: var(--pf-accent-strong);
+    color: #FFFFFF;
     transform: translateY(-1px);
+}
+
+.pf-button--primary:active {
+    transform: translateY(0);
+   	box-shadow: none;
 }
 
 /* Secondary / ghost */
@@ -209,19 +223,42 @@ body {
 
 .pf-button--ghost:hover {
     border-color: var(--pf-accent);
-    color: var(--pf-accent-hover);
+    color: var(--pf-accent-strong);
+    background: rgba(90, 191, 168, 0.04);
 }
 
 /* Danger ghost */
 .pf-button--danger-ghost {
     background: transparent;
-    border: 1px solid var(--pf-danger);
-    color: #F2C2CB;
+    border: 1px solid rgba(208, 90, 107, 0.6);
+    color: #A33445;
 }
 
 .pf-button--danger-ghost:hover {
-    border-color: #F2C2CB;
-    color: #FCE2E6;
+    border-color: var(--pf-danger);
+    color: var(--pf-danger);
+    background: var(--pf-danger-soft);
+}
+
+/* Secondary / Pro-teaser button */
+.pf-button--secondary {
+    background: var(--pf-surface-soft);
+    color: var(--pf-text-main);
+    border: 1px solid var(--pf-border-subtle);
+    font-weight: 500;
+}
+
+.pf-button--secondary:hover {
+    background: #E5E9EE;
+    border-color: var(--pf-accent);
+}
+
+/* Disabled state (free users) */
+.pf-button--disabled,
+.pf-button[disabled] {
+    opacity: 0.45;
+    cursor: not-allowed;
+    border-style: dashed;
 }
 
 /* Small generic buttons (dashboard CTAs etc.) */
@@ -245,12 +282,13 @@ body {
 
 .pf-btn--primary {
     background: var(--pf-accent);
-    color: #0C0F12;
+    color: #0F1514;
     box-shadow: var(--pf-shadow-soft);
 }
 
 .pf-btn--primary:hover {
     background: var(--pf-accent-strong);
+    color: #FFFFFF;
     transform: translateY(-1px);
 }
 
@@ -270,7 +308,7 @@ body {
     background: var(--pf-accent-soft);
 }
 
-/* Action rows (e.g. submit + back buttons) */
+/* Action rows */
 .pf-actions {
     display: flex;
     justify-content: center;
@@ -307,11 +345,11 @@ body {
 /* Links */
 .pf-link {
     text-decoration: none;
-    color: var(--pf-accent);
+    color: var(--pf-accent-strong);
 }
 
 .pf-link:hover {
-    color: var(--pf-accent-hover);
+    color: var(--pf-accent);
 }
 
 .pf-link--inline {
@@ -324,7 +362,7 @@ body {
 }
 
 .pf-link--subtle:hover {
-    color: var(--pf-accent);
+    color: var(--pf-accent-strong);
 }
 
 /* ============================
@@ -341,11 +379,12 @@ body {
     line-height: 1.45;
     overflow-x: auto;
     white-space: pre-wrap;
+    margin-top: 0.6rem;
 }
 
 .pf-box--mono {
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
-    background: #12171D;
+    background: #EBEFF3;
 }
 
 .pf-box pre {
@@ -364,26 +403,26 @@ body {
     margin: 0.75rem 0 1.25rem;
     padding: 0.75rem 1rem;
     border-radius: 10px;
-    background: var(--pf-surface-soft);
-    border: 1px solid var(--pf-border-subtle);
+    background: rgba(206, 159, 119, 0.06);
+    border: 1px solid rgba(206, 159, 119, 0.55);
     font-size: 0.9rem;
     color: var(--pf-text-main);
 }
 
 .pf-upsell a {
-    color: var(--pf-warm);
+    color: var(--pf-warm-deep);
     text-decoration: underline;
 }
 
 .pf-upsell a:hover {
-    color: #E3B58F;
+    color: var(--pf-chaos-2);
 }
 
 /* Debug panel for magic-link */
 .pf-alert--debug {
-    background: #1A2027;
-    border: 1px dashed var(--pf-warm-deep);
-    color: var(--pf-text-main);
+    background: #FFF5F7;
+    border: 1px dashed var(--pf-danger);
+    color: #8A2E3F;
     padding: 0.75rem 1rem;
     margin-bottom: 1rem;
     border-radius: 8px;
@@ -391,12 +430,12 @@ body {
 }
 
 .pf-alert--debug a {
-    color: var(--pf-warm);
+    color: var(--pf-danger);
     text-decoration: underline;
 }
 
 .pf-alert--debug a:hover {
-    color: #E3B58F;
+    color: #B43F53;
 }
 
 /* ============================
@@ -467,7 +506,7 @@ body {
 .pf-message-ok {
     margin-top: .75rem;
     font-size: .85rem;
-    color: var(--pf-accent);
+    color: var(--pf-accent-strong);
 }
 
 .pf-message-error {
@@ -547,23 +586,26 @@ body {
 .pf-plan-chip {
     display: inline-flex;
     align-items: center;
-    padding: .25rem .75rem;
+    padding: .2rem .75rem;
     border-radius: 999px;
     margin-top: .35rem;
     font-weight: 600;
-    font-size: .9rem;
+    font-size: .8rem;
     border: 1px solid var(--pf-border-subtle);
     background: var(--pf-surface-soft);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
 }
 
+/* Plan chip variants (basic/pro/unlimited) */
 .pf-plan-chip--basic {
     border-color: var(--pf-chaos-3);
     color: var(--pf-chaos-3);
 }
 
 .pf-plan-chip--pro {
-    border-color: var(--pf-chaos-1);
-    color: var(--pf-chaos-1);
+    border-color: var(--pf-chaos-2);
+    color: var(--pf-chaos-2);
 }
 
 .pf-plan-chip--unlimited {
@@ -584,7 +626,7 @@ body {
 .pf-plan-note {
     margin: .75rem 0 0;
     font-size: .85rem;
-    color: var(--pf-text-muted);
+    color: var(--pf-text-soft);
 }
 
 /* Main dashboard cards grid */
@@ -624,7 +666,7 @@ body {
 }
 
 .pf-card-text {
-    margin: 0 0 1.25rem;
+    margin: 0 0 1.1rem;
     font-size: .95rem;
     color: var(--pf-text-muted);
 }
@@ -644,12 +686,12 @@ body {
     padding: .9rem 1rem;
     border-radius: var(--pf-radius-md);
     background: var(--pf-accent-soft);
-    border: 1px solid rgba(90, 191, 168, 0.35);
+    border: 1px solid rgba(90, 191, 168, 0.4);
 }
 
 .pf-upsell-banner--soft {
     background: rgba(208, 90, 107, 0.08);
-    border-color: rgba(208, 90, 107, 0.4);
+    border-color: rgba(208, 90, 107, 0.45);
 }
 
 .pf-upsell-text {
@@ -706,13 +748,10 @@ body {
     color: var(--pf-text-soft);
 }
 
-.pf-divider {
-    height: 1px;
-    background: var(--pf-border-subtle);
-    margin: 2rem 0;
-}
+/* ============================
+   Risk badges & TLDR
+   ============================ */
 
-/* TLDR layout */
 .pf-tldr-layout {
     display: flex;
     gap: 1rem;
@@ -726,550 +765,63 @@ body {
     line-height: 1.5;
 }
 
-/* Risk badge using brand-ish colours */
+/* Risk badge pill */
 .pf-risk-badge {
     display: inline-flex;
     align-items: center;
-    gap: 0.4rem;
-    padding: 0.35rem 0.75rem;
+    gap: 0.45rem;
+    padding: 0.35rem 0.9rem;
     border-radius: 999px;
-    font-size: 0.8rem;
+    font-size: 0.85rem;
     font-weight: 600;
     border: 1px solid transparent;
-    white-space: nowrap;
 }
 
-.pf-risk-badge__icon {
-    font-size: 0.9rem;
+/* Dot icon via pseudo-element */
+.pf-risk-badge__icon::before {
+    content: "";
+    display: inline-block;
+    width: 0.55rem;
+    height: 0.55rem;
+    border-radius: 999px;
+    background: currentColor;
 }
 
+/* Low / medium / high – colour mapping */
 .pf-risk-badge--low {
-    border-color: var(--pf-accent);
-    background: rgba(90, 191, 168, 0.14);
-    color: var(--pf-accent);
+    background: rgba(90, 191, 168, 0.12);
+    border-color: rgba(90, 191, 168, 0.5);
+    color: var(--pf-chaos-3);
 }
 
 .pf-risk-badge--medium {
-    border-color: var(--pf-warm);
-    background: rgba(206, 159, 119, 0.16);
-    color: var(--pf-warm);
+    background: rgba(242, 158, 76, 0.12);
+    border-color: rgba(242, 158, 76, 0.5);
+    color: #F29E4C;
 }
 
 .pf-risk-badge--high {
-    border-color: var(--pf-danger);
-    background: var(--pf-danger-soft);
-    color: #F2C2CB;
+    background: rgba(208, 90, 107, 0.14);
+    border-color: rgba(208, 90, 107, 0.65);
+    color: var(--pf-chaos-1);
 }
 
-/* Mobile: stack badge above text nicely */
+.pf-risk-explainer {
+    margin: 0.85rem 0 0;
+    font-size: 0.85rem;
+    color: var(--pf-text-muted);
+}
+
 @media (max-width: 600px) {
     .pf-tldr-layout {
         flex-direction: column;
     }
 }
 
-/* Quick glance – two cards inside the main box */
-.pf-quickglance {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    text-align: center;
-    padding: 1.25rem 1rem;
-    gap: 1rem;
-    flex-wrap: wrap;
-}
-
-.pf-quickglance-card {
-    flex: 1 1 0;
-    min-width: 220px;
-    border-radius: 10px;
-    padding: 0.85rem 1rem;
-    border: 1px solid var(--pf-border-subtle);
-    background: var(--pf-surface-soft);
-    box-sizing: border-box;
-}
-
-/* Left card – risk */
-.pf-quickglance-card--risk {
-    max-width: 260px;
-}
-
-.pf-quickglance-card--risk .pf-risk-badge {
-    margin-bottom: 0.75rem;
-}
-
-/* Right card – summary */
-.pf-quickglance-card--summary {
-    flex-grow: 2;
-}
-
-.pf-quickglance-caption {
-    margin: 0.5rem 0 0;
-    font-size: 0.8rem;
-    color: var(--pf-text-soft);
-}
-
-.pf-quickglance-label {
-    display: none;
-}
-
-.pf-quickglance-text {
-    font-size: 1rem;
-    line-height: 1.55;
-    color: var(--pf-text-main);
-    max-width: 92%;
-}
-
-/* Quick glance two-column layout */
-.pf-quickglance-grid {
-    display: grid;
-    grid-template-columns: 1fr 2fr;
-    gap: 1.25rem;
-    align-items: stretch;
-}
-
-/* Mobile: stack vertically */
-@media (max-width: 700px) {
-    .pf-quickglance-grid {
-        grid-template-columns: 1fr;
-    }
-}
-
-/* Mobile: stack nicely */
-@media (max-width: 600px) {
-    .pf-quickglance {
-        flex-direction: column;
-    }
-
-    .pf-quickglance-card--risk {
-        max-width: none;
-    }
-}
-
-
 /* ============================
-   Quick glance layout override
+   Quick glance layout
    ============================ */
 
-/* Two columns on desktop: [risk] [summary] */
-.pf-quickglance {
-    display: grid;
-    grid-template-columns: minmax(0, 230px) minmax(0, 1fr);
-    gap: 1.25rem;
-    align-items: stretch;
-}
-
-/* Stack on smaller screens */
-@media (max-width: 700px) {
-    .pf-quickglance {
-        grid-template-columns: 1fr;
-    }
-}
-
-/* Inner cards */
-.pf-quickglance-card {
-    border-radius: 10px;
-    padding: 1.1rem 1.2rem;
-    border: 1px solid var(--pf-border-subtle);
-    background: var(--pf-surface-soft);
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    box-sizing: border-box;
-}
-
-/* Left card: centre badge nicely */
-.pf-quickglance-card--risk {
-    align-items: center;
-    text-align: center;
-}
-
-/* Right card: centre summary text in the box */
-.pf-quickglance-card--summary {
-    align-items: center;
-    text-align: center;
-}
-
-.pf-quickglance-text {
-    font-size: 0.95rem;
-    line-height: 1.5;
-    max-width: 95%;
-}
-
-/* Tighten outer quick-glance box padding a bit */
-.pf-box {
-    margin-top: 0.6rem;
-}
-
-/* Quick glance cards – less vertical padding */
-.pf-quickglance-card {
-    padding: 0.9rem 1rem;
-}
-
-/* LEFT CARD: keep centred */
-.pf-quickglance-card--risk {
-    align-items: center;
-    text-align: center;
-}
-
-/* RIGHT CARD: left-align text, no odd indent */
-.pf-quickglance-card--summary {
-    align-items: flex-start;
-    text-align: left;
-}
-
-.pf-quickglance-text {
-    font-size: 0.95rem;
-    line-height: 1.5;
-    max-width: 100%;
-}
-
-/* Make the risk badge a bit more compact */
-.pf-risk-badge {
-    padding: 0.25rem 0.6rem;
-    font-size: 0.78rem;
-}
-
-.pf-risk-badge__icon {
-    font-size: 0.85rem;
-}
-
-/* ============================
-   Quick glance – final layout
-   ============================ */
-
-/* Use tighter padding only for this box */
-.pf-box--quickglance {
-    padding: 1.1rem 1.3rem;
-}
-
-/* Two columns on desktop: [risk] [summary] */
-.pf-box--quickglance .pf-quickglance {
-    display: grid;
-    grid-template-columns: minmax(0, 230px) minmax(0, 1fr);
-    gap: 1.1rem;
-    align-items: stretch;
-}
-
-/* Stack cards on smaller screens */
-@media (max-width: 700px) {
-    .pf-box--quickglance .pf-quickglance {
-        grid-template-columns: 1fr;
-    }
-}
-
-/* Inner cards – reduced vertical padding */
-.pf-box--quickglance .pf-quickglance-card {
-    border-radius: 10px;
-    padding: 0.7rem 1rem;
-    border: 1px solid var(--pf-border-subtle);
-    background: var(--pf-surface-soft);
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    box-sizing: border-box;
-}
-
-/* Left card: centre contents */
-.pf-box--quickglance .pf-quickglance-card--risk {
-    align-items: center;
-    text-align: center;
-}
-
-/* Right card: normal left-aligned text, no "indent" */
-.pf-box--quickglance .pf-quickglance-card--summary {
-    align-items: flex-start;
-    text-align: left;
-}
-
-/* Summary text – no extra inset */
-.pf-box--quickglance .pf-quickglance-text {
-    margin: 0;
-    padding: 0;
-    max-width: 100%;
-    font-size: 0.95rem;
-    line-height: 1.5;
-}
-
-/* Bigger, chunkier risk badge */
-.pf-box--quickglance .pf-risk-badge {
-    padding: 0.35rem 0.9rem;
-    font-size: 0.9rem;
-}
-
-.pf-box--quickglance .pf-risk-badge__icon {
-    font-size: 1rem;
-}
-
-/* ============================
-   Full report layout
-   ============================ */
-
-.pf-box--fullreport {
-    padding: 12px 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-}
-
-/* Body text + bullets */
-.pf-fullreport-body {
-    margin: 0;
-    font-size: 0.9rem;
-    line-height: 1.5;
-    color: var(--pf-text-main);
-}
-
-/* ============================
-   Full report – tidy layout
-   ============================ */
-
-.pf-box--fullreport {
-    padding: 10px 14px;
-    display: flex;
-    flex-direction: column;
-    gap: 0.9rem;
-}
-
-/* Each sub-section card */
-.pf-fullreport-section {
-    background: var(--pf-surface-soft);
-    border-radius: 10px;
-    border: 1px solid var(--pf-border-subtle);
-    padding: 0.75rem 1rem;
-    box-sizing: border-box;
-}
-
-/* Heading inside each sub-box */
-.pf-fullreport-heading {
-    margin: 0 0 0.35rem;
-    font-size: 0.92rem;
-    font-weight: 600;
-}
-
-/* Paragraph body */
-.pf-fullreport-body {
-    margin: 0;
-    font-size: 0.9rem;
-    line-height: 1.5;
-    color: var(--pf-text-main);
-}
-
-/* Bullet lists (key points / actions) */
-.pf-fullreport-list {
-    margin: 0.1rem 0 0;
-    padding-left: 1.1rem;
-    font-size: 0.9rem;
-    line-height: 1.5;
-    color: var(--pf-text-main);
-}
-
-.pf-fullreport-list li + li {
-    margin-top: 0.25rem;
-}
-
-/* ============================
-   Full report – grouped layout
-   ============================ */
-
-.pf-box--fullreport {
-    padding: 10px 14px;
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-}
-
-/* Wrapper: title + inner card */
-.pf-fullreport-group {
-    display: flex;
-    flex-direction: column;
-    gap: 0.4rem;
-}
-
-/* Titles above each card */
-.pf-fullreport-heading {
-    margin: 0;
-    font-size: 0.92rem;
-    font-weight: 600;
-}
-
-/* The actual inner card with content */
-.pf-fullreport-section {
-    background: var(--pf-surface-soft);
-    border-radius: 10px;
-    border: 1px solid var(--pf-border-subtle);
-    padding: 0.75rem 1rem;
-    box-sizing: border-box;
-}
-
-/* Body text + lists inside the card */
-.pf-fullreport-body {
-    margin: 0;
-    font-size: 0.9rem;
-    line-height: 1.5;
-    color: var(--pf-text-main);
-}
-
-.pf-fullreport-list {
-    margin: 0.1rem 0 0;
-    padding-left: 1.1rem;
-    font-size: 0.9rem;
-    line-height: 1.5;
-    color: var(--pf-text-main);
-}
-
-.pf-fullreport-list li + li {
-    margin-top: 0.25rem;
-}
-
-/* ============================
-   Plainfully – Clarification detail polish
-   ============================ */
-
-/* Narrow card centre column */
-.pf-card--narrow {
-    max-width: 900px;
-    margin: 3rem auto;
-    padding: 1.75rem 2rem 2rem;
-}
-
-/* Sections inside the card */
-.pf-section {
-    margin-top: 1.75rem;
-}
-
-.pf-section + .pf-section {
-    border-top: 1px solid var(--pf-border-subtle);
-    padding-top: 1.5rem;
-}
-
-/* Tiny section label above each H2 */
-.pf-section-label {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    font-size: 0.75rem;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: var(--pf-text-soft);
-    margin-bottom: 0.25rem;
-}
-
-.pf-section-label-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 999px;
-    background: var(--pf-accent);
-}
-
-/* Tighten titles + boxes a bit so it feels SaaS-y, not blog-y */
-.pf-card-title {
-    margin: 0 0 0.4rem;
-    font-size: 1.25rem;
-}
-
-.pf-card-text {
-    margin: 0 0 0.75rem;
-    font-size: 0.95rem;
-    color: var(--pf-text-muted);
-}
-
-/* Inside detail pages, boxes sit a little closer to their titles */
-.pf-box {
-    margin-top: 0.5rem;
-}
-
-/* Quick glance layout – ensure nice spacing in the card */
-.pf-box--quickglance {
-    padding: 1.25rem 1.5rem;
-}
-
-.pf-quickglance {
-    display: grid;
-    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.4fr);
-    gap: 1.25rem;
-    align-items: center;
-}
-
-.pf-quickglance-card {
-    background: var(--pf-surface-soft);
-    border-radius: var(--pf-radius-md);
-    padding: 1rem 1.25rem;
-}
-
-/* Risk badge sizing */
-.pf-risk-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.45rem;
-    padding: 0.5rem 0.95rem;
-    border-radius: 999px;
-    font-size: 0.9rem;
-    font-weight: 600;
-}
-
-.pf-risk-badge__icon {
-    font-size: 0.9rem;
-}
-
-.pf-quickglance-text {
-    font-size: 0.95rem;
-    line-height: 1.5;
-}
-
-/* Mobile: stack quick glance cards */
-@media (max-width: 640px) {
-    .pf-quickglance {
-        grid-template-columns: 1fr;
-    }
-}
-
-/* Centre-column card – SaaS-y detail page */
-.pf-card--narrow {
-    max-width: 900px;
-    margin: 3rem auto;
-    padding: 1.75rem 2rem 2rem;
-}
-
-/* Sections inside the detail card */
-.pf-section {
-    margin-top: 1.75rem;
-    border-top: 1px solid var(--pf-border-subtle);
-    padding-top: 1.25rem;
-}
-
-/* First section shouldn't have a divider line */
-.pf-section:first-of-type {
-    border-top: none;
-    padding-top: 1.25rem;
-}
-
-/* Titles + text */
-.pf-card-title {
-    margin: 0 0 0.45rem;
-    font-size: 1.2rem;
-}
-
-.pf-page-subtitle {
-    margin: 0.25rem 0 0.9rem;
-    font-size: 0.95rem;
-    color: var(--pf-text-muted);
-}
-
-/* Boxes under titles */
-.pf-box {
-    margin-top: 0.5rem;
-}
-
-/* Body text in report sections */
-.pf-fullreport-body,
-.pf-fullreport-list {
-    font-size: 0.95rem;
-    line-height: 1.55;
-}
-
-/* Quick glance layout (risk + summary) */
 .pf-box--quickglance {
     padding: 1.1rem 1.3rem;
 }
@@ -1282,116 +834,11 @@ body {
 }
 
 .pf-quickglance-card {
-    background: var(--pf-surface-soft);
+    background: var(--pf-surface);
     border-radius: var(--pf-radius-md);
     padding: 0.9rem 1.05rem;
-}
-
-.pf-quickglance-text {
-    font-size: 0.95rem;
-    line-height: 1.55;
-}
-
-/* Risk badge sizing */
-.pf-risk-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.45rem;
-    padding: 0.5rem 0.95rem;
-    border-radius: 999px;
-    font-size: 0.9rem;
-    font-weight: 600;
-}
-
-/* Mobile: stack risk + summary */
-@media (max-width: 640px) {
-    .pf-quickglance {
-        grid-template-columns: 1fr;
-    }
-
-    .pf-card--narrow {
-        margin: 2rem 1rem;
-        padding: 1.5rem 1.25rem 1.75rem;
-    }
-}
-
-/* Secondary / Pro-teaser button */
-.pf-button--secondary {
-    background: var(--pf-surface-soft);
-    color: var(--pf-text-main);
     border: 1px solid var(--pf-border-subtle);
-    font-weight: 500;
-}
-
-.pf-button--secondary:hover {
-    background: #1F262E;
-    border-color: var(--pf-accent);
-}
-
-/* Disabled state (free users) */
-.pf-button--disabled,
-.pf-button[disabled] {
-    opacity: 0.45;
-    cursor: not-allowed;
-    border-style: dashed;
-}
-
-/* ==== Clarification report – SaaS-style sections ==== */
-
-.pf-result-section {
-    margin-top: 1.25rem;
-    padding: 1.25rem 1.5rem;
-    border-radius: var(--pf-radius-lg);
-    border: 1px solid var(--pf-border-subtle);
-    background: var(--pf-surface);
-    box-shadow: var(--pf-shadow-subtle);
-    border-left: 4px solid transparent;
-}
-
-/* Primary "Plainfully Simple Clarification" card */
-.pf-result-section--primary {
-    border-left-color: var(--pf-accent);
-}
-
-/* Other sections – softer accent */
-.pf-result-section--secondary {
-    border-left-color: var(--pf-chaos-4);
-}
-
-/* Risk card left border by level */
-.pf-result-section--risk-low {
-    border-left-color: var(--pf-accent);
-}
-
-.pf-result-section--risk-medium {
-    border-left-color: var(--pf-warm);
-}
-
-.pf-result-section--risk-high {
-    border-left-color: var(--pf-danger);
-}
-
-.pf-result-heading {
-    margin: 0 0 0.75rem;
-    font-size: 1.05rem;
-    font-weight: 600;
-}
-
-.pf-result-body {
-    margin: 0;
-    font-size: 0.95rem;
-}
-
-/* Quick glance layout re-use */
-.pf-quickglance {
-    display: grid;
-    grid-template-columns: minmax(0, 220px) minmax(0, 1fr);
-    gap: 1.25rem;
-    align-items: center;
-}
-
-.pf-quickglance-card {
-    border-radius: var(--pf-radius-md);
+    box-shadow: 0 10px 22px rgba(15, 23, 42, 0.06);
 }
 
 .pf-quickglance-card--risk {
@@ -1401,83 +848,22 @@ body {
 
 .pf-quickglance-card--summary {
     padding: 0.9rem 1rem;
-    background: var(--pf-surface-soft);
-    border-radius: var(--pf-radius-md);
 }
 
-/* Risk badge size tweak */
-.pf-risk-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.45rem;
-    padding: 0.45rem 0.9rem;
-    border-radius: 999px;
-    border: 1px solid rgba(0,0,0,0.3);
-    font-size: 0.9rem;
-    font-weight: 600;
-}
-
-.pf-risk-badge__icon {
+.pf-quickglance-text {
     font-size: 0.95rem;
+    line-height: 1.55;
 }
 
-/* Risk colours */
-.pf-risk-badge--low {
-    background: rgba(90, 191, 168, 0.12);
-    border-color: rgba(90, 191, 168, 0.55);
-    color: var(--pf-chaos-3);
-}
+@media (max-width: 640px) {
+    .pf-quickglance {
+        grid-template-columns: 1fr;
+    }
 
-.pf-risk-badge--medium {
-    background: rgba(206, 159, 119, 0.12);
-    border-color: rgba(206, 159, 119, 0.6);
-    color: var(--pf-warm);
-}
-
-.pf-risk-badge--high {
-    background: rgba(208, 90, 107, 0.12);
-    border-color: rgba(208, 90, 107, 0.7);
-    color: var(--pf-danger);
-}
-
-/* Short line explaining why the risk level was chosen */
-.pf-risk-explainer {
-    margin: 0.85rem 0 0;
-    font-size: 0.85rem;
-    color: var(--pf-text-muted);
-}
-
-/* Full-report lists inside sections */
-.pf-fullreport-list {
-    margin: 0;
-    padding-left: 1.3rem;
-    font-size: 0.95rem;
-}
-
-.pf-fullreport-list li + li {
-    margin-top: 0.3rem;
-}
-
-/* "You're all caught up" footer */
-.pf-report-footer {
-    margin-top: 1.75rem;
-    padding-top: 1.25rem;
-    border-top: 1px solid var(--pf-border-subtle);
-    display: flex;
-    flex-wrap: wrap;
-    gap: 1rem;
-    align-items: center;
-    justify-content: space-between;
-}
-
-.pf-report-footer-text {
-    font-size: 0.9rem;
-    color: var(--pf-text-muted);
-}
-
-.pf-button--ghost-disabled {
-    opacity: 0.45;
-    cursor: not-allowed;
+    .pf-card--narrow {
+        margin: 2rem 1rem;
+        padding: 1.5rem 1.25rem 1.75rem;
+    }
 }
 
 /* ============================
@@ -1528,35 +914,6 @@ body {
     margin-left: auto;
 }
 
-/* Existing chip style, plus colour variants */
-.pf-plan-chip {
-    display: inline-flex;
-    align-items: center;
-    padding: 0.2rem 0.75rem;
-    border-radius: 999px;
-    border: 1px solid var(--pf-border-subtle);
-    font-size: 0.8rem;
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-}
-
-/* Keep these loosely aligned with your chaos colours */
-.pf-plan-chip--basic {
-    border-color: var(--pf-chaos-3);
-    color: var(--pf-chaos-3);
-}
-
-.pf-plan-chip--pro {
-    border-color: var(--pf-chaos-1);
-    color: var(--pf-chaos-1);
-}
-
-.pf-plan-chip--unlimited {
-    border-color: var(--pf-chaos-4);
-    color: var(--pf-chaos-4);
-}
-
 /* Header + meta under plan band */
 .pf-report-header {
     margin-bottom: 1.5rem;
@@ -1579,6 +936,7 @@ body {
     border: 1px solid var(--pf-border-subtle);
     box-shadow: var(--pf-shadow-subtle);
     position: relative;
+    box-sizing: border-box;
 }
 
 /* Side accents – top red, middle amber, bottom green */
@@ -1593,17 +951,14 @@ body {
     pointer-events: none;
 }
 
-/* Key → red */
 .pf-report-card--key::before {
     border-left-color: var(--pf-chaos-1);
 }
 
-/* Risks → amber-ish */
 .pf-report-card--risks::before {
-    border-left-color: var(--pf-warm);
+    border-left-color: #F29E4C;
 }
 
-/* Actions → green / clarity */
 .pf-report-card--actions::before {
     border-left-color: var(--pf-chaos-3);
 }
@@ -1645,46 +1000,6 @@ body {
     color: var(--pf-text-main);
 }
 
-/* Make risk badges look more like a “pill” */
-.pf-risk-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.45rem;
-    padding: 0.25rem 0.75rem;
-    border-radius: 999px;
-    font-size: 0.85rem;
-    border: 1px solid transparent;
-}
-
-/* Use pseudo-element dot instead of text icon */
-.pf-risk-badge__icon::before {
-    content: "";
-    display: inline-block;
-    width: 0.55rem;
-    height: 0.55rem;
-    border-radius: 999px;
-    background: currentColor;
-}
-
-/* Low / medium / high – colour mapping */
-.pf-risk-badge--low {
-    background: rgba(90, 191, 168, 0.12);
-    border-color: rgba(90, 191, 168, 0.4);
-    color: var(--pf-chaos-3);
-}
-
-.pf-risk-badge--medium {
-    background: rgba(206, 159, 119, 0.12);
-    border-color: rgba(206, 159, 119, 0.5);
-    color: var(--pf-warm);
-}
-
-.pf-risk-badge--high {
-    background: rgba(208, 90, 107, 0.14);
-    border-color: rgba(208, 90, 107, 0.6);
-    color: var(--pf-chaos-1);
-}
-
 /* Footer – “you’re all caught up” + buttons */
 .pf-report-footer {
     margin-top: 1.75rem;
@@ -1702,7 +1017,7 @@ body {
 }
 
 /* Disabled Pro-only button */
-.pf-button--disabled {
+.pf-button--ghost-disabled {
     opacity: 0.45;
     cursor: not-allowed;
 }

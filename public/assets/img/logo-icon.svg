@@ -1,49 +1,52 @@
+
 <svg width="256" height="256" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <!-- Centre fade – match page background with soft fade out -->
+    <!-- Centre fade to match light background -->
     <radialGradient id="core" cx="50%" cy="50%" r="50%">
-      <stop offset="40%" stop-color="#0C0F12"/>
-      <stop offset="85%" stop-color="#0C0F12" stop-opacity="0"/>
+      <stop offset="40%" stop-color="#F7F9FA"/>
+      <stop offset="85%" stop-color="#F7F9FA" stop-opacity="0"/>
     </radialGradient>
 
-    <!-- Calm teal / sage -->
-    <radialGradient id="g1" cx="50%" cy="50%" r="100%">
+    <!-- Teal accent -->
+    <radialGradient id="g-teal-soft" cx="50%" cy="50%" r="100%">
       <stop offset="0%" stop-color="#5ABFA8"/>
       <stop offset="100%" stop-color="#5ABFA8" stop-opacity="0"/>
     </radialGradient>
 
-    <radialGradient id="g3" cx="50%" cy="50%" r="100%">
+    <!-- Deep teal -->
+    <radialGradient id="g-teal-deep" cx="50%" cy="50%" r="100%">
       <stop offset="0%" stop-color="#2C6F63"/>
       <stop offset="100%" stop-color="#2C6F63" stop-opacity="0"/>
     </radialGradient>
 
-    <!-- Warm reassurance / sand tones -->
-    <radialGradient id="g2" cx="50%" cy="50%" r="100%">
+    <!-- Warm sand -->
+    <radialGradient id="g-warm" cx="50%" cy="50%" r="100%">
       <stop offset="0%" stop-color="#CE9F77"/>
       <stop offset="100%" stop-color="#CE9F77" stop-opacity="0"/>
     </radialGradient>
 
-    <radialGradient id="g4" cx="50%" cy="50%" r="100%">
+    <!-- Warm deep -->
+    <radialGradient id="g-warm-deep" cx="50%" cy="50%" r="100%">
       <stop offset="0%" stop-color="#A67F5B"/>
       <stop offset="100%" stop-color="#A67F5B" stop-opacity="0"/>
     </radialGradient>
   </defs>
 
-  <!-- Outer chaos rings: 2 teal, 2 warm -->
-  <circle cx="128" cy="76"  r="64" fill="url(#g1)" stroke="#5ABFA8" stroke-width="10"/>
-  <circle cx="180" cy="128" r="64" fill="url(#g2)" stroke="#CE9F77" stroke-width="10"/>
-  <circle cx="128" cy="180" r="64" fill="url(#g3)" stroke="#2C6F63" stroke-width="10"/>
-  <circle cx="76"  cy="128" r="64" fill="url(#g4)" stroke="#A67F5B" stroke-width="10"/>
+  <!-- Outer calm / chaos rings -->
+  <circle cx="128" cy="76"  r="64" fill="url(#g-teal-soft)" stroke="#5ABFA8" stroke-width="10"/>
+  <circle cx="188" cy="128" r="64" fill="url(#g-warm)" stroke="#CE9F77" stroke-width="10"/>
+  <circle cx="128" cy="188" r="64" fill="url(#g-teal-deep)" stroke="#2C6F63" stroke-width="10"/>
+  <circle cx="68"  cy="128" r="64" fill="url(#g-warm-deep)" stroke="#A67F5B" stroke-width="10"/>
 
   <!-- Centre clarity fade -->
   <circle cx="128" cy="128" r="70" fill="url(#core)"/>
 
-  <!-- The P -->
+  <!-- The P (deep teal for brand pop) -->
   <text x="130" y="154"
         font-family="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI'"
         font-weight="600"
         font-size="72"
-        fill="#E9ECEF"
+        fill="#2C6F63"
         text-anchor="middle">
     P
   </text>
