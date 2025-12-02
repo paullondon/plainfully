@@ -22,7 +22,7 @@ function pf_fmt_dt(?string $dt): string {
         return $dt;
     }
 }
-
+?>
 <?php
     /**  Defensive defaults in case view is hit oddly */
     $tldrText       = $tldrText       ?? ($clar['result_text'] ?? '');
