@@ -7,30 +7,35 @@
    ============================ */
 :root {
     /* Surfaces */
-    --pf-bg: #171717;
-    --pf-surface: #1f1f1f;
-    --pf-surface-soft: #232323;
-    --pf-border-subtle: #2b2b2b;
+    --pf-bg: #0C0F12;
+    --pf-surface: #151A1F;
+    --pf-surface-soft: #1D242B;
+    --pf-border-subtle: #262C33;
 
     /* Text */
-    --pf-text-main: #E8E8E8;
-    --pf-text-muted: #b5b5b5;
-    --pf-text-soft: #8c8c8c;
+    --pf-text-main: #E9ECEF;
+    --pf-text-muted: #A8B1B8;
+    --pf-text-soft: #6F7A83;
 
-    /* Logo chaos colours */
-    --pf-chaos-1: #C32148;
-    --pf-chaos-2: #8A122F;
-    --pf-chaos-3: #1AB385;
-    --pf-chaos-4: #0C6349;
+    /* Brand “chaos” colours mapped into new palette */
+    --pf-chaos-1: #D05A6B;   /* red / risk */
+    --pf-chaos-2: #A67F5B;   /* warm deep */
+    --pf-chaos-3: #5ABFA8;   /* primary accent */
+    --pf-chaos-4: #2C6F63;   /* deep accent */
 
     /* Accents */
-    --pf-accent: #1AB385;
-    --pf-accent-strong: #0C6349;
-    --pf-accent-soft: rgba(26, 179, 133, 0.16);
+    --pf-accent: #5ABFA8;
+    --pf-accent-strong: #2C6F63;
+    --pf-accent-hover: #7FD1BA;
+    --pf-accent-soft: rgba(90, 191, 168, 0.16);
 
-    /* Feedback */
-    --pf-danger: #C32148;
-    --pf-danger-soft: rgba(195, 33, 72, 0.16);
+    /* Warm reassurance accent */
+    --pf-warm: #CE9F77;
+    --pf-warm-deep: #A67F5B;
+
+    /* Feedback / danger */
+    --pf-danger: #D05A6B;
+    --pf-danger-soft: rgba(208, 90, 107, 0.16);
 
     /* Radii & Shadows */
     --pf-radius-lg: 18px;
@@ -59,7 +64,12 @@ body {
     min-height: 100vh;
     display: flex;
     flex-direction: column;
-    background: radial-gradient(circle at top, #202020 0, var(--pf-bg) 45%, #050505 100%);
+    background: radial-gradient(
+        circle at top,
+        #151A1F 0,
+        var(--pf-bg) 45%,
+        #05080C 100%
+    );
     color: var(--pf-text-main);
 }
 
@@ -131,14 +141,14 @@ body {
     padding: 0.7rem 0.9rem;
     border-radius: var(--pf-radius-md);
     border: 1px solid var(--pf-border-subtle);
-    background: #111;
+    background: var(--pf-surface-soft);
     color: var(--pf-text-main);
     font-size: 0.95rem;
 }
 
 .pf-input::placeholder,
 .pf-textarea::placeholder {
-    color: #555;
+    color: #505864;
 }
 
 .pf-input:focus,
@@ -180,38 +190,38 @@ body {
 
 /* Primary action */
 .pf-button--primary {
-    background: #18A57A;
-    color: #0B0C0E;
+    background: var(--pf-accent);
+    color: #0C0F12;
 }
 
 .pf-button--primary:hover {
-    background: #1EC48F;
-    box-shadow: 0 8px 20px rgba(24, 165, 122, 0.35);
+    background: var(--pf-accent-hover);
+    box-shadow: 0 8px 20px rgba(90, 191, 168, 0.35);
     transform: translateY(-1px);
 }
 
 /* Secondary / ghost */
 .pf-button--ghost {
     background: transparent;
-    border: 1px solid #272B33;
-    color: #F7F8FA;
+    border: 1px solid var(--pf-border-subtle);
+    color: var(--pf-text-main);
 }
 
 .pf-button--ghost:hover {
-    border-color: #18A57A;
-    color: #18A57A;
+    border-color: var(--pf-accent);
+    color: var(--pf-accent-hover);
 }
 
 /* Danger ghost */
 .pf-button--danger-ghost {
     background: transparent;
-    border: 1px solid #8B2F2F;
-    color: #E28D8D;
+    border: 1px solid var(--pf-danger);
+    color: #F2C2CB;
 }
 
 .pf-button--danger-ghost:hover {
-    border-color: #E28D8D;
-    color: #FFB4A9;
+    border-color: #F2C2CB;
+    color: #FCE2E6;
 }
 
 /* Small generic buttons (dashboard CTAs etc.) */
@@ -235,7 +245,7 @@ body {
 
 .pf-btn--primary {
     background: var(--pf-accent);
-    color: #07110e;
+    color: #0C0F12;
     box-shadow: var(--pf-shadow-soft);
 }
 
@@ -256,7 +266,7 @@ body {
 }
 
 .pf-btn--ghost:hover {
-    border-color: var(--pf-chaos-3);
+    border-color: var(--pf-accent);
     background: var(--pf-accent-soft);
 }
 
@@ -301,7 +311,7 @@ body {
 }
 
 .pf-link:hover {
-    color: var(--pf-accent-strong);
+    color: var(--pf-accent-hover);
 }
 
 .pf-link--inline {
@@ -322,11 +332,11 @@ body {
    ============================ */
 
 .pf-box {
-    background: #10131A;
-    border: 1px solid #272B33;
+    background: var(--pf-surface-soft);
+    border: 1px solid var(--pf-border-subtle);
     border-radius: 10px;
     padding: 16px 18px;
-    color: #F7F8FA;
+    color: var(--pf-text-main);
     font-size: 0.95rem;
     line-height: 1.45;
     overflow-x: auto;
@@ -335,7 +345,7 @@ body {
 
 .pf-box--mono {
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
-    background: #0D0F14;
+    background: #12171D;
 }
 
 .pf-box pre {
@@ -354,26 +364,26 @@ body {
     margin: 0.75rem 0 1.25rem;
     padding: 0.75rem 1rem;
     border-radius: 10px;
-    background: #10131A;
-    border: 1px solid #272B33;
+    background: var(--pf-surface-soft);
+    border: 1px solid var(--pf-border-subtle);
     font-size: 0.9rem;
-    color: #F7F8FA;
+    color: var(--pf-text-main);
 }
 
 .pf-upsell a {
-    color: #F26945;
+    color: var(--pf-warm);
     text-decoration: underline;
 }
 
 .pf-upsell a:hover {
-    color: #ff8f6c;
+    color: #E3B58F;
 }
 
 /* Debug panel for magic-link */
 .pf-alert--debug {
-    background: #1E1F24;
-    border: 1px dashed #F26945;
-    color: #F7F8FA;
+    background: #1A2027;
+    border: 1px dashed var(--pf-warm-deep);
+    color: var(--pf-text-main);
     padding: 0.75rem 1rem;
     margin-bottom: 1rem;
     border-radius: 8px;
@@ -381,12 +391,12 @@ body {
 }
 
 .pf-alert--debug a {
-    color: #F26945;
+    color: var(--pf-warm);
     text-decoration: underline;
 }
 
 .pf-alert--debug a:hover {
-    color: #ff8f6c;
+    color: #E3B58F;
 }
 
 /* ============================
@@ -634,12 +644,12 @@ body {
     padding: .9rem 1rem;
     border-radius: var(--pf-radius-md);
     background: var(--pf-accent-soft);
-    border: 1px solid rgba(26, 179, 133, 0.35);
+    border: 1px solid rgba(90, 191, 168, 0.35);
 }
 
 .pf-upsell-banner--soft {
-    background: rgba(195, 33, 72, 0.08);
-    border-color: rgba(195, 33, 72, 0.4);
+    background: rgba(208, 90, 107, 0.08);
+    border-color: rgba(208, 90, 107, 0.4);
 }
 
 .pf-upsell-text {
@@ -735,20 +745,20 @@ body {
 
 .pf-risk-badge--low {
     border-color: var(--pf-accent);
-    background: rgba(26, 179, 133, 0.14);
+    background: rgba(90, 191, 168, 0.14);
     color: var(--pf-accent);
 }
 
 .pf-risk-badge--medium {
-    border-color: #f2a93f;
-    background: rgba(242, 169, 63, 0.16);
-    color: #f7d18a;
+    border-color: var(--pf-warm);
+    background: rgba(206, 159, 119, 0.16);
+    color: var(--pf-warm);
 }
 
 .pf-risk-badge--high {
     border-color: var(--pf-danger);
-    background: rgba(195, 33, 72, 0.18);
-    color: #ffb3c4;
+    background: var(--pf-danger-soft);
+    color: #F2C2CB;
 }
 
 /* Mobile: stack badge above text nicely */
@@ -762,9 +772,9 @@ body {
 .pf-quickglance {
     display: flex;
     flex-direction: column;
-    justify-content: center;   /* vertical centring */
-    align-items: center;       /* horizontal centring */
-    text-align: center;        /* centre captions and summary text */
+    justify-content: center;
+    align-items: center;
+    text-align: center;
     padding: 1.25rem 1rem;
     gap: 1rem;
     flex-wrap: wrap;
@@ -814,7 +824,7 @@ body {
 /* Quick glance two-column layout */
 .pf-quickglance-grid {
     display: grid;
-    grid-template-columns: 1fr 2fr;   /* Risk box smaller, summary box wider */
+    grid-template-columns: 1fr 2fr;
     gap: 1.25rem;
     align-items: stretch;
 }
@@ -889,7 +899,7 @@ body {
 
 /* Tighten outer quick-glance box padding a bit */
 .pf-box {
-    padding: 4px 6px;
+    margin-top: 0.6rem;
 }
 
 /* Quick glance cards – less vertical padding */
@@ -905,14 +915,14 @@ body {
 
 /* RIGHT CARD: left-align text, no odd indent */
 .pf-quickglance-card--summary {
-    align-items: flex-start;   /* text hugs left inside card */
+    align-items: flex-start;
     text-align: left;
 }
 
 .pf-quickglance-text {
     font-size: 0.95rem;
     line-height: 1.5;
-    max-width: 100%;           /* no extra inset */
+    max-width: 100%;
 }
 
 /* Make the risk badge a bit more compact */
@@ -931,7 +941,7 @@ body {
 
 /* Use tighter padding only for this box */
 .pf-box--quickglance {
-    padding: 8px 14px;              /* trims top/bottom gap */
+    padding: 1.1rem 1.3rem;
 }
 
 /* Two columns on desktop: [risk] [summary] */
@@ -991,6 +1001,7 @@ body {
 .pf-box--quickglance .pf-risk-badge__icon {
     font-size: 1rem;
 }
+
 /* ============================
    Full report layout
    ============================ */
@@ -1018,28 +1029,28 @@ body {
     padding: 10px 14px;
     display: flex;
     flex-direction: column;
-    gap: 0.9rem;                 /* tighter gap between sub-boxes */
+    gap: 0.9rem;
 }
 
 /* Each sub-section card */
 .pf-fullreport-section {
-    background: #10131A;
+    background: var(--pf-surface-soft);
     border-radius: 10px;
-    border: 1px solid #272B33;
-    padding: 0.75rem 1rem;       /* less vertical padding */
+    border: 1px solid var(--pf-border-subtle);
+    padding: 0.75rem 1rem;
     box-sizing: border-box;
 }
 
 /* Heading inside each sub-box */
 .pf-fullreport-heading {
-    margin: 0 0 0.35rem;         /* remove big default <h3> margin */
+    margin: 0 0 0.35rem;
     font-size: 0.92rem;
     font-weight: 600;
 }
 
 /* Paragraph body */
 .pf-fullreport-body {
-    margin: 0;                   /* kill default <p> margins (no “indent”) */
+    margin: 0;
     font-size: 0.9rem;
     line-height: 1.5;
     color: var(--pf-text-main);
@@ -1057,6 +1068,7 @@ body {
 .pf-fullreport-list li + li {
     margin-top: 0.25rem;
 }
+
 /* ============================
    Full report – grouped layout
    ============================ */
@@ -1084,9 +1096,9 @@ body {
 
 /* The actual inner card with content */
 .pf-fullreport-section {
-    background: #10131A;
+    background: var(--pf-surface-soft);
     border-radius: 10px;
-    border: 1px solid #272B33;
+    border: 1px solid var(--pf-border-subtle);
     padding: 0.75rem 1rem;
     box-sizing: border-box;
 }
@@ -1165,7 +1177,7 @@ body {
 
 /* Inside detail pages, boxes sit a little closer to their titles */
 .pf-box {
-    margin-top: 0.6rem;
+    margin-top: 0.5rem;
 }
 
 /* Quick glance layout – ensure nice spacing in the card */
@@ -1191,7 +1203,7 @@ body {
     display: inline-flex;
     align-items: center;
     gap: 0.45rem;
-    padding: 0.55rem 0.95rem;
+    padding: 0.5rem 0.95rem;
     border-radius: 999px;
     font-size: 0.9rem;
     font-weight: 600;
@@ -1212,6 +1224,7 @@ body {
         grid-template-columns: 1fr;
     }
 }
+
 /* Centre-column card – SaaS-y detail page */
 .pf-card--narrow {
     max-width: 900px;
@@ -1301,16 +1314,17 @@ body {
         padding: 1.5rem 1.25rem 1.75rem;
     }
 }
+
 /* Secondary / Pro-teaser button */
 .pf-button--secondary {
-    background: #2b2b2b;
+    background: var(--pf-surface-soft);
     color: var(--pf-text-main);
     border: 1px solid var(--pf-border-subtle);
     font-weight: 500;
 }
 
 .pf-button--secondary:hover {
-    background: #333333;
+    background: #1F262E;
     border-color: var(--pf-accent);
 }
 
@@ -1321,6 +1335,7 @@ body {
     cursor: not-allowed;
     border-style: dashed;
 }
+
 /* ==== Clarification report – SaaS-style sections ==== */
 
 .pf-result-section {
@@ -1330,7 +1345,7 @@ body {
     border: 1px solid var(--pf-border-subtle);
     background: var(--pf-surface);
     box-shadow: var(--pf-shadow-subtle);
-    border-left: 4px solid transparent;  /* coloured per section */
+    border-left: 4px solid transparent;
 }
 
 /* Primary "Plainfully Simple Clarification" card */
@@ -1349,7 +1364,7 @@ body {
 }
 
 .pf-result-section--risk-medium {
-    border-left-color: #E3A018;  /* amber-ish */
+    border-left-color: var(--pf-warm);
 }
 
 .pf-result-section--risk-high {
@@ -1408,20 +1423,20 @@ body {
 
 /* Risk colours */
 .pf-risk-badge--low {
-    background: rgba(24, 165, 122, 0.12);
-    border-color: rgba(24, 165, 122, 0.55);
-    color: var(--pf-accent);
+    background: rgba(90, 191, 168, 0.12);
+    border-color: rgba(90, 191, 168, 0.55);
+    color: var(--pf-chaos-3);
 }
 
 .pf-risk-badge--medium {
-    background: rgba(227, 160, 24, 0.12);
-    border-color: rgba(227, 160, 24, 0.6);
-    color: #E3A018;
+    background: rgba(206, 159, 119, 0.12);
+    border-color: rgba(206, 159, 119, 0.6);
+    color: var(--pf-warm);
 }
 
 .pf-risk-badge--high {
-    background: rgba(195, 33, 72, 0.12);
-    border-color: rgba(195, 33, 72, 0.7);
+    background: rgba(208, 90, 107, 0.12);
+    border-color: rgba(208, 90, 107, 0.7);
     color: var(--pf-danger);
 }
 
@@ -1464,6 +1479,7 @@ body {
     opacity: 0.45;
     cursor: not-allowed;
 }
+
 /* ============================
    Clarification report layout
    ============================ */
@@ -1582,9 +1598,9 @@ body {
     border-left-color: var(--pf-chaos-1);
 }
 
-/* Risks → amber-ish (blend of red + accent) */
+/* Risks → amber-ish */
 .pf-report-card--risks::before {
-    border-left-color: #F29E4C;
+    border-left-color: var(--pf-warm);
 }
 
 /* Actions → green / clarity */
@@ -1652,20 +1668,20 @@ body {
 
 /* Low / medium / high – colour mapping */
 .pf-risk-badge--low {
-    background: rgba(26, 179, 133, 0.12);
-    border-color: rgba(26, 179, 133, 0.4);
+    background: rgba(90, 191, 168, 0.12);
+    border-color: rgba(90, 191, 168, 0.4);
     color: var(--pf-chaos-3);
 }
 
 .pf-risk-badge--medium {
-    background: rgba(242, 158, 76, 0.12);
-    border-color: rgba(242, 158, 76, 0.5);
-    color: #F29E4C;
+    background: rgba(206, 159, 119, 0.12);
+    border-color: rgba(206, 159, 119, 0.5);
+    color: var(--pf-warm);
 }
 
 .pf-risk-badge--high {
-    background: rgba(195, 33, 72, 0.14);
-    border-color: rgba(195, 33, 72, 0.6);
+    background: rgba(208, 90, 107, 0.14);
+    border-color: rgba(208, 90, 107, 0.6);
     color: var(--pf-chaos-1);
 }
 
