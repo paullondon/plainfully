@@ -1,16 +1,16 @@
 # PLAINFULLY — MASTER MVP TODO ROADMAP  
-This roadmap defines all features, releases, and tasks required for Plainfully MVP and multi-channel ingestion.  
+This roadmap defines all # FEATUREs, releases, and tasks required for Plainfully MVP and multi-channel ingestion.  
 This document **IS the prompt** for all future ChatGPT development sessions.
 
-Use commit naming: F{feature}-R{release}-{build number}
+Use commit naming: F{# FEATURE}-R{release}-{build number}
 
 ---
 
 
-FEATURE 1 — Core Consultation System (MVP)
+# FEATURE 1 — Core Consultation System (MVP)
 
 
-R1 — Consultation Data Layer (✓ Completed)
+## R1 — Consultation Data Layer (✓ Completed)
 - [x] consultations table  
 - [x] consultation_details (encrypted)  
 - [x] consultation_uploads (OCR metadata)  
@@ -21,7 +21,7 @@ R1 — Consultation Data Layer (✓ Completed)
 
 ---
 
-R2 — Consultation Input & Processing
+## R2 — Consultation Input & Processing
 - [x] /clarifications/new form  
 - [x] Validation rules  
 - [x] Persists consultation + details  
@@ -37,7 +37,7 @@ Additional items:
 
 ---
 
-R3 — Consultation Result Page
+## R3 — Consultation Result Page
 - [ ] Final result rendering (Plainfully styling)  
 - [ ] Upsell banner  
 - [ ] Do NOT show original user input  
@@ -46,7 +46,7 @@ R3 — Consultation Result Page
 
 ---
 
-R4 — Dashboard & UX Completion
+## R4 — Dashboard & UX Completion
 - [ ] Logo in welcome header  
 - [ ] Bronze/Silver/Gold plan badges  
 - [ ] Badge display near plan box  
@@ -56,21 +56,21 @@ R4 — Dashboard & UX Completion
 ---
 
 
-FEATURE 2 — OCR & Multi-Image Pipeline
+# FEATURE 2 — OCR & Multi-Image Pipeline
 
 
-R1 — Upload Pipeline
+## R1 — Upload Pipeline
 - [ ] Upload 1–20 images  
 - [ ] Temp storage with 28-day cleanup  
 - [ ] Decide on virus-scanning approach  
 - [ ] Decide on Cloudflare image staging  
 
-R2 — Image Quality Gate
+## R2 — Image Quality Gate
 - [ ] Vision clarity scoring  
 - [ ] “Blurry? Retake?” flow  
 - [ ] Build retake-guidance page  
 
-R3 — OCR Processing
+## R3 — OCR Processing
 - [ ] Sequential OCR  
 - [ ] Merge text with page markers  
 - [ ] Feed into consultation creation  
@@ -80,16 +80,16 @@ R3 — OCR Processing
 ---
 
 
-FEATURE 3 — Diagnostic Failure Pipeline
+# FEATURE 3 — Diagnostic Failure Pipeline
 
 
-R1 — Failure Capture
+## R1 — Failure Capture
 - [ ] “Send to support?” prompt  
 - [ ] diagnostic_reports table  
 - [ ] Store OCR text + uploads (28-day expiry)  
 - [ ] Admin email alert  
 
-R2 — Admin Tools
+## R2 — Admin Tools
 - [ ] Admin magic-link login  
 - [ ] 28-day diagnostic ticket list  
 - [ ] Secure diagnostic view page  
@@ -97,15 +97,15 @@ R2 — Admin Tools
 ---
 
 
-FEATURE 4 — Billing & Plans (Stripe)
+# FEATURE 4 — Billing & Plans (Stripe)
 
 
-R1 — Plan Definitions
+## R1 — Plan Definitions
 - [ ] Define Basic / Pro / Unlimited  
 - [ ] Quota logic  
 - [ ] Stripe price IDs  
 
-R2 — Checkout + Webhooks
+## R2 — Checkout + Webhooks
 - [ ] User↔Stripe customer link  
 - [ ] Stripe Checkout for upgrades  
 - [ ] Webhooks:
@@ -114,23 +114,23 @@ R2 — Checkout + Webhooks
   - [ ] customer.subscription.deleted  
 - [ ] Automatic plan transitions  
 
-R3 — Billing Portal
+## R3 — Billing Portal
 - [ ] Manage billing link  
 - [ ] Protect behind magic link  
 
 ---
 
 
-FEATURE 5 — Account & Session Layer
+# FEATURE 5 — Account & Session Layer
 
 
-R1 — Magic Link Auth
+## R1 — Magic Link Auth
 - [ ] Rate-limit per email/IP  
 - [ ] Expiring login tokens  
 - [ ] Hardened session cookies  
 - [ ] Session fingerprinting  
 
-R2 — Profile Page
+## R2 — Profile Page
 - [ ] Show user’s plan & limits  
 - [ ] Link to billing portal  
 - [ ] Minimal editable fields  
@@ -138,11 +138,11 @@ R2 — Profile Page
 ---
 
 
-FEATURE 6 — Multi-Channel Check Engine (CORE BRAIN)
+# FEATURE 6 — Multi-Channel Check Engine (CORE BRAIN)
 
 All Plainfully ingestion routes go through this engine.
 
-R1 — Core CheckEngine Service
+## R1 — Core CheckEngine Service
 - [ ] Create `checks` table:
   - `user_id`, `channel`, `source_identifier`,  
   - `raw_content`, `content_type`,  
@@ -165,7 +165,7 @@ R1 — Core CheckEngine Service
 
 ---
 
-R2 — Input Summary Capsule (NEW)
+## R2 — Input Summary Capsule (NEW)
 Displayed in reports instead of original user input.
 
 - [ ] Create “Input Summary Capsule” block:
@@ -187,7 +187,7 @@ Displayed in reports instead of original user input.
 
 ---
 
-R3 — Web Ingestion Integration
+## R3 — Web Ingestion Integration
 - [ ] Route existing consultation text via CheckEngine  
 - [ ] Enforce quotas  
 - [ ] Use Input Summary Capsule  
@@ -197,17 +197,17 @@ R3 — Web Ingestion Integration
 ---
 
 
-FEATURE 7 — Email Ingestion
+# FEATURE 7 — Email Ingestion
 
 
-R1 — Email Routing
+## R1 — Email Routing
 - [ ] Configure inbound:
   - scamcheck@plainfully.com  
   - clarify@plainfully.com  
 - [ ] Build `/ingest/email/*` handlers  
 - [ ] Normalise (from_email, subject, body, urls) → CheckEngine  
 
-R2 — Email Reply Logic
+## R2 — Email Reply Logic
 - Non-subscribers:
   - [ ] Short summary reply  
   - [ ] Magic link to dashboard  
@@ -219,16 +219,16 @@ R2 — Email Reply Logic
 ---
 
 
-FEATURE 8 — Messenger Ingestion
+# FEATURE 8 — Messenger Ingestion
 
 
-R1 — Messenger Setup
+## R1 — Messenger Setup
 - [ ] Meta App + Page  
 - [ ] `/ingest/messenger` webhook  
 - [ ] Extract sender + message  
 - [ ] Normalise → CheckEngine  
 
-R2 — Messenger Output
+## R2 — Messenger Output
 - [ ] Short verdict  
 - [ ] 1–2 reasons  
 - [ ] Link to full report  
@@ -236,10 +236,10 @@ R2 — Messenger Output
 ---
 
 
-FEATURE 9 — WhatsApp Ingestion
+# FEATURE 9 — WhatsApp Ingestion
 
 
-R1 — WhatsApp Cloud API
+## R1 — WhatsApp Cloud API
 - [ ] Register  
 - [ ] Build `/ingest/whatsapp`  
 - [ ] Normalise message → CheckEngine  
@@ -248,15 +248,15 @@ R1 — WhatsApp Cloud API
 ---
 
 
-FEATURE 10 — SMS Product (“TextCheck by Plainfully”)
+# FEATURE 10 — SMS Product (“TextCheck by Plainfully”)
 
 
-R1 — Cheap Long-Code Trial
+## R1 — Cheap Long-Code Trial
 - [ ] Twilio/Vonage inbound `/webhooks/sms/test`  
 - [ ] Normalise → CheckEngine  
 - [ ] SMS reply with short summary + dashboard link  
 
-R2 — Premium SMS (Paid £1/check)
+## R2 — Premium SMS (Paid £1/check)
 - [ ] Integrate premium-rate SMS aggregator  
 - [ ] Dedicated shortcode  
 - [ ] `/webhooks/sms/premium`  
@@ -268,10 +268,10 @@ R2 — Premium SMS (Paid £1/check)
 ---
 
 
-FEATURE 11 — Weekly Scam Report Engine
+# FEATURE 11 — Weekly Scam Report Engine
 
 
-R1 — Weekly Aggregator
+## R1 — Weekly Aggregator
 - [ ] weekly_reports table  
 - [ ] Cron summary:
   - top scam types  
@@ -281,7 +281,7 @@ R1 — Weekly Aggregator
 - [ ] AI-generated weekly report  
 - [ ] Store fb_post_text + blog_html  
 
-R2 — Facebook Auto-Posting (Optional)
+## R2 — Facebook Auto-Posting (Optional)
 - [ ] Meta App  
 - [ ] Page token  
 - [ ] Cron auto-post to FB Page  
@@ -290,10 +290,10 @@ R2 — Facebook Auto-Posting (Optional)
 ---
 
 
-FEATURE 12 — Security, Retention & Monitoring
+# FEATURE 12 — Security, Retention & Monitoring
 
 
-R1 — Retention & Cleanup
+## R1 — Retention & Cleanup
 - [ ] 28-day deletion cron  
 - [ ] Delete:
   - consultations  
@@ -303,13 +303,13 @@ R1 — Retention & Cleanup
   - temp tables  
 - [ ] Keep Stripe/financial records only  
 
-R2 — Storage Hardening
+## R2 — Storage Hardening
 - [ ] Encrypt consultation_details  
 - [ ] Minimise PII footprints  
 - [ ] Hash sensitive fields  
 - [ ] Avoid leaked meaning in table/column names  
 
-R3 — Observability
+## R3 — Observability
 - [ ] Internal dashboard:
   - checks per channel  
   - scam vs safe ratio  
@@ -321,20 +321,20 @@ R3 — Observability
 ---
 
 
-FEATURE 13 — Final Launch Preparation
+# FEATURE 13 — Final Launch Preparation
 
 
-R1 — Deployment
+## R1 — Deployment
 - [ ] Plesk config  
 - [ ] Cloudflare rules  
 - [ ] Email provider finalised  
 
-R2 — Stripe Live
+## R2 — Stripe Live
 - [ ] Live keys  
 - [ ] Live price IDs  
 - [ ] Full test cycle  
 
-R3 — Internal Tester Batch
+## R3 — Internal Tester Batch
 - [ ] Tester onboarding page  
 - [ ] Anonymous feedback  
 - [ ] Monitor logs for 72h  
