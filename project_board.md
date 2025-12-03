@@ -1,304 +1,340 @@
-# PLAINFULLY – MASTER MVP TODO ROADMAP  
-(Feature → Release Package structure)  
-This file maps the MVP into controllable build chunks.  
-Use commit format: F{feature}-R{release}-{build number} e.g. F1-R2-003
+# PLAINFULLY — MASTER MVP TODO ROADMAP  
+This roadmap defines all features, releases, and tasks required for Plainfully MVP and multi-channel ingestion.  
+This document **IS the prompt** for all future ChatGPT development sessions.
+
+Use commit naming: F{feature}-R{release}-{build number}
 
 ---
 
-# ============================================
-# FEATURE 1 — Core Consultation System (MVP)
-# ============================================
+=====================================================
+FEATURE 1 — Core Consultation System (MVP)
+=====================================================
 
-## R1 — Consultation Data Layer (Complete)
-- [x] Create `consultations` table  
-- [x] Create `consultation_details` (encrypted)  
-- [x] Create `consultation_uploads` (OCR text + metadata)  
-- [x] Add `expires_at` to non-financial tables  
-- [x] Daily cleanup job (28-day rolling deletion)  
-- [x] Isolate financial tables (no deletion)  
-- [x] Document retention policy  
-
----
-
-## R2 — Consultation Input & Processing
-- [x] `/clarifications/new` form  
-- [x] Validate fields  
-- [x] Save consultation + details  
-- [x] Temporary / stub AI output generator  
-- [x] Store result  
-- [x] Redirect to `/clarifications/view`  
-
-- [ ] A4 Input cleansing:
-  - [ ] Screen & sanitise text before AI  
-  - [ ] Fake push/get AI debug mode  
-  - [ ] Ensure fake reply is stored to correct consultation  
-  - [ ] Evidence of deletion of all raw text  
+R1 — Consultation Data Layer (✓ Completed)
+- [x] consultations table  
+- [x] consultation_details (encrypted)  
+- [x] consultation_uploads (OCR metadata)  
+- [x] expires_at column  
+- [x] 28-day deletion cron  
+- [x] isolate financial tables  
+- [x] retention documentation  
 
 ---
 
-## R3 — Consultation Result Page
-- [ ] Render final AI result using full Plainfully styling  
-- [ ] Add subtle plan-based upsell banner  
-- [ ] NEVER show user’s original input  
-- [ ] Abandoned consultations → instant delete & invisible  
-- [ ] Ensure user can return to Dashboard cleanly  
+R2 — Consultation Input & Processing
+- [x] /clarifications/new form  
+- [x] Validation rules  
+- [x] Persists consultation + details  
+- [x] Temporary AI stub  
+- [x] View redirect  
+
+Additional items:
+- [ ] Input sanitisation pipeline  
+- [ ] Text-screening before AI  
+- [ ] Fake push/get AI (debug toggle)  
+- [ ] Wipe all original raw text after use  
+- [ ] Prove deletion in logs  
 
 ---
 
-## R4 — Dashboard & UX Completion
-- [ ] Add Plainfully logo next to welcome  
-- [ ] Bronze / Silver / Gold badges  
-- [ ] Display badges in plan box  
-- [ ] Recent clarifications table (paginate inside box only)  
-- [ ] Final responsive layout pass  
+R3 — Consultation Result Page
+- [ ] Final result rendering (Plainfully styling)  
+- [ ] Upsell banner  
+- [ ] Do NOT show original user input  
+- [ ] Handle abandoned consultations (instant delete)  
+- [ ] Ensure return-to-dashboard path is clear  
 
 ---
 
-# ============================================
-# FEATURE 2 — OCR & Multi-Image Pipeline
-# ============================================
-
-## R1 — Upload Pipeline
-- [ ] 1–20 image upload  
-- [ ] Temp storage (auto-delete 28 days)  
-- [ ] Decide on virus scanning (Cloudflare or other?)  
-- [ ] Decide: store images on Cloudflare first → batch → OCR?  
-
-## R2 — Quality Check
-- [ ] Use AI Vision for clarity scoring  
-- [ ] “Too blurry? Retake?”  
-- [ ] Build retake guidance page  
-
-## R3 — OCR Processing
-- [ ] OCR pages sequentially  
-- [ ] Merge text + page markers  
-- [ ] Feed into consultation creation flow  
-- [ ] Abandoned upload → delete immediately  
-- [ ] Failed → send to diagnostic ticket pipeline  
+R4 — Dashboard & UX Completion
+- [ ] Logo in welcome header  
+- [ ] Bronze/Silver/Gold plan badges  
+- [ ] Badge display near plan box  
+- [ ] Recent clarifications table w/ internal pagination  
+- [ ] Responsive layout pass  
 
 ---
 
-# ============================================
-# FEATURE 3 — Failure Pipeline (Diagnostics)
-# ============================================
+=====================================================
+FEATURE 2 — OCR & Multi-Image Pipeline
+=====================================================
 
-## R1 — Ticket Creation
-- [ ] On OCR/processing failure → “Send to support?”  
-- [ ] Create row in `diagnostic_reports`  
+R1 — Upload Pipeline
+- [ ] Upload 1–20 images  
+- [ ] Temp storage with 28-day cleanup  
+- [ ] Decide on virus-scanning approach  
+- [ ] Decide on Cloudflare image staging  
+
+R2 — Image Quality Gate
+- [ ] Vision clarity scoring  
+- [ ] “Blurry? Retake?” flow  
+- [ ] Build retake-guidance page  
+
+R3 — OCR Processing
+- [ ] Sequential OCR  
+- [ ] Merge text with page markers  
+- [ ] Feed into consultation creation  
+- [ ] Abandoned uploads → purge immediately  
+- [ ] Failed OCR → diagnostic ticket flow  
+
+---
+
+=====================================================
+FEATURE 3 — Diagnostic Failure Pipeline
+=====================================================
+
+R1 — Failure Capture
+- [ ] “Send to support?” prompt  
+- [ ] diagnostic_reports table  
 - [ ] Store OCR text + uploads (28-day expiry)  
-- [ ] Email internal alert  
+- [ ] Admin email alert  
 
-## R2 — Admin Tools
-- [ ] Magic-link admin login  
-- [ ] 28-day “Diagnostic Tickets” view  
-- [ ] Protected diagnostic detail page  
-
----
-
-# ============================================
-# FEATURE 4 — Billing & Plans (Stripe)
-# ============================================
-
-## R1 — Plan Model
-- [ ] Basic / Pro / Unlimited definitions  
-- [ ] Monthly quota logic  
-- [ ] Store Stripe price IDs  
-
-## R2 — Checkout & Webhooks
-- [ ] Connect user ↔ Stripe customer  
-- [ ] Upgrade via Stripe Checkout  
-- [ ] Handle:
-  - [ ] `checkout.session.completed`  
-  - [ ] `customer.subscription.updated`  
-  - [ ] `customer.subscription.deleted`  
-- [ ] Auto-update user plan  
-
-## R3 — Billing Portal
-- [ ] Update card details / cancel  
-- [ ] Protect route behind magic link login  
+R2 — Admin Tools
+- [ ] Admin magic-link login  
+- [ ] 28-day diagnostic ticket list  
+- [ ] Secure diagnostic view page  
 
 ---
 
-# ============================================
-# FEATURE 5 — Account & Session Layer
-# ============================================
+=====================================================
+FEATURE 4 — Billing & Plans (Stripe)
+=====================================================
 
-## R1 — Magic Link Auth
-- [ ] Rate limit per email/IP  
-- [ ] Expiring tokens  
-- [ ] Hardened cookies  
+R1 — Plan Definitions
+- [ ] Define Basic / Pro / Unlimited  
+- [ ] Quota logic  
+- [ ] Stripe price IDs  
+
+R2 — Checkout + Webhooks
+- [ ] User↔Stripe customer link  
+- [ ] Stripe Checkout for upgrades  
+- [ ] Webhooks:
+  - [ ] checkout.session.completed  
+  - [ ] customer.subscription.updated  
+  - [ ] customer.subscription.deleted  
+- [ ] Automatic plan transitions  
+
+R3 — Billing Portal
+- [ ] Manage billing link  
+- [ ] Protect behind magic link  
+
+---
+
+=====================================================
+FEATURE 5 — Account & Session Layer
+=====================================================
+
+R1 — Magic Link Auth
+- [ ] Rate-limit per email/IP  
+- [ ] Expiring login tokens  
+- [ ] Hardened session cookies  
 - [ ] Session fingerprinting  
 
-## R2 — Profile Page
-- [ ] Show plan  
-- [ ] Link to Stripe portal  
-- [ ] Optional: name edit  
+R2 — Profile Page
+- [ ] Show user’s plan & limits  
+- [ ] Link to billing portal  
+- [ ] Minimal editable fields  
 
 ---
 
-# ============================================
-# FEATURE 6 — Multi-Channel Check Engine (Ingestion)
-# ============================================
-*A new core system powering SMS, Email, Web, Messenger, WhatsApp.*
+=====================================================
+FEATURE 6 — Multi-Channel Check Engine (CORE BRAIN)
+=====================================================
+All Plainfully ingestion routes go through this engine.
 
-## R1 — Core Check Engine (the brain)
-- [ ] Create `checks` table  
-  - [ ] `user_id`, `channel`, `source_identifier`, `raw_content`  
-  - [ ] `content_type` (text/email/ocr/etc.)  
-  - [ ] `ai_result_json`  
-  - [ ] `short_summary`  
-  - [ ] `is_scam`  
-  - [ ] `is_paid`  
-  - [ ] timestamps + indexes  
+R1 — Core CheckEngine Service
+- [ ] Create `checks` table:
+  - `user_id`, `channel`, `source_identifier`,  
+  - `raw_content`, `content_type`,  
+  - `ai_result_json`, `short_summary`,  
+  - `is_scam`, `is_paid`, timestamps  
 
-- [ ] Build `CheckEngine` service:  
-  - [ ] Normalised input  
-  - [ ] Create/find user  
-  - [ ] Enforce quotas  
-  - [ ] Call AI  
-  - [ ] Parse structured result  
-  - [ ] Save DB entry  
-  - [ ] Return short + long output  
+- [ ] Build `CheckEngine`:
+  - Normalised input object  
+  - Create/find user via email/phone/platform ID  
+  - Enforce plan limits  
+  - AI classification  
+  - Structured output parsing  
+  - Store result  
+  - Return short + long formats  
 
-- [ ] Safety checks:  
-  - [ ] Input size limit  
-  - [ ] Abuse detection  
-  - [ ] Graceful fallback replies  
+- [ ] Input-safety:
+  - Size caps  
+  - Abuse detection  
+  - Graceful fallback  
 
 ---
 
-## R2 — Web Ingestion (already partially exists)
-- [ ] Refactor current “clarification” text to use CheckEngine  
-- [ ] Connect quotas to subscription  
-- [ ] Show full result in dashboard  
-- [ ] Apply upsell wall when quota reached  
+R2 — Input Summary Capsule (NEW)
+Displayed in reports instead of original user input.
+
+- [ ] Create “Input Summary Capsule” block:
+  - Upload type  
+  - Character count  
+  - Keyword risk count  
+  - Clarity score (if applicable)  
+  - Words kept after reduction  
+  - Processing time  
+  - “Raw content has now been securely deleted.”  
+
+- [ ] Capsule must appear on:
+  - Web result page  
+  - Email full-report for subscribers  
+  - (Optional) Messenger/WhatsApp expanded views  
+
+- [ ] DO NOT store raw input.  
+- [ ] Capsule data must be generated WITHOUT keeping content.  
 
 ---
 
-## R3 — Email Ingestion
-- [ ] Route:
-  - [ ] `scamcheck@plainfully.com` → `/ingest/email/scamcheck`  
-  - [ ] `clarify@plainfully.com` → `/ingest/email/clarify`  
-- [ ] Build handlers:
-  - [ ] Validate inbound email  
-  - [ ] Extract From / Subject / Body / URLs  
-  - [ ] Send to CheckEngine  
-
-- [ ] Non-subscribers:
-  - [ ] Email short answer  
-  - [ ] Magic link to full response  
-
-- [ ] Subscribers:
-  - [ ] Full report returned in email  
+R3 — Web Ingestion Integration
+- [ ] Route existing consultation text via CheckEngine  
+- [ ] Enforce quotas  
+- [ ] Use Input Summary Capsule  
+- [ ] Show long-form AI clarity  
+- [ ] Apply upsell wall  
 
 ---
 
-## R4 — Messenger Ingestion
-- [ ] Meta App + Page integration  
-- [ ] `/ingest/messenger` route  
-- [ ] Extract sender + text  
-- [ ] Send to CheckEngine  
-- [ ] Reply with summary + dashboard link  
+=====================================================
+FEATURE 7 — Email Ingestion
+=====================================================
+
+R1 — Email Routing
+- [ ] Configure inbound:
+  - scamcheck@plainfully.com  
+  - clarify@plainfully.com  
+- [ ] Build `/ingest/email/*` handlers  
+- [ ] Normalise (from_email, subject, body, urls) → CheckEngine  
+
+R2 — Email Reply Logic
+- Non-subscribers:
+  - [ ] Short summary reply  
+  - [ ] Magic link to dashboard  
+
+- Subscribers:
+  - [ ] Full report inside email  
+  - [ ] Include Input Summary Capsule  
 
 ---
 
-## R5 — WhatsApp Ingestion
-- [ ] WhatsApp Cloud API setup  
-- [ ] `/ingest/whatsapp`  
-- [ ] Same normalisation → CheckEngine  
+=====================================================
+FEATURE 8 — Messenger Ingestion
+=====================================================
+
+R1 — Messenger Setup
+- [ ] Meta App + Page  
+- [ ] `/ingest/messenger` webhook  
+- [ ] Extract sender + message  
+- [ ] Normalise → CheckEngine  
+
+R2 — Messenger Output
+- [ ] Short verdict  
+- [ ] 1–2 reasons  
+- [ ] Link to full report  
+
+---
+
+=====================================================
+FEATURE 9 — WhatsApp Ingestion
+=====================================================
+
+R1 — WhatsApp Cloud API
+- [ ] Register  
+- [ ] Build `/ingest/whatsapp`  
+- [ ] Normalise message → CheckEngine  
 - [ ] Reply with summary + link  
 
 ---
 
-# ============================================
-# FEATURE 7 — SMS Product (TextCheck by Plainfully)
-# ============================================
+=====================================================
+FEATURE 10 — SMS Product (“TextCheck by Plainfully”)
+=====================================================
 
-## R1 — Test SMS (Cheap Long-Code Trial)
-- [ ] Twilio/Vonage inbound webhook `/webhooks/sms/test`  
-- [ ] Normalise to CheckEngine  
-- [ ] SMS short summary reply + dashboard link  
+R1 — Cheap Long-Code Trial
+- [ ] Twilio/Vonage inbound `/webhooks/sms/test`  
+- [ ] Normalise → CheckEngine  
+- [ ] SMS reply with short summary + dashboard link  
 
-## R2 — Premium SMS (Paid £1 per check)
-- [ ] Integrate UK premium SMS aggregator  
-- [ ] Dedicated shortcode rental  
-- [ ] `/webhooks/sms/premium` parsing  
+R2 — Premium SMS (Paid £1/check)
+- [ ] Integrate premium-rate SMS aggregator  
+- [ ] Dedicated shortcode  
+- [ ] `/webhooks/sms/premium`  
 - [ ] Extract `charged_amount`  
-- [ ] If `>= £1` → mark as `is_paid`  
-- [ ] short SMS reply (no quotas apply)  
+- [ ] If >= £1 → is_paid=true  
+- [ ] Short SMS reply  
+- [ ] Bypass monthly limits  
 
 ---
 
-# ============================================
-# FEATURE 8 — Weekly Scam Report Engine
-# ============================================
+=====================================================
+FEATURE 11 — Weekly Scam Report Engine
+=====================================================
 
-## R1 — Weekly Data Aggregator
-- [ ] Create `weekly_reports` table  
-- [ ] Cron job summarising:
-  - [ ] top scam types  
-  - [ ] impersonated brands  
-  - [ ] keywords  
-  - [ ] volumes  
-- [ ] AI generate weekly summary  
-- [ ] Store FB post text + blog HTML  
+R1 — Weekly Aggregator
+- [ ] weekly_reports table  
+- [ ] Cron summary:
+  - top scam types  
+  - impersonation trends  
+  - keywords  
+  - counts  
+- [ ] AI-generated weekly report  
+- [ ] Store fb_post_text + blog_html  
 
-## R2 — Facebook Auto-Posting (Optional)
+R2 — Facebook Auto-Posting (Optional)
 - [ ] Meta App  
-- [ ] Page access token  
-- [ ] Cron: auto-post weekly report  
-- [ ] Log post id  
+- [ ] Page token  
+- [ ] Cron auto-post to FB Page  
+- [ ] Log post ID  
 
 ---
 
-# ============================================
-# FEATURE 9 — Security, Retention & Monitoring
-# ============================================
+=====================================================
+FEATURE 12 — Security, Retention & Monitoring
+=====================================================
 
-## R1 — Retention & Deletion
-- [ ] CRON deletion engine (28 days)  
+R1 — Retention & Cleanup
+- [ ] 28-day deletion cron  
 - [ ] Delete:
   - consultations  
   - OCR uploads  
-  - diag tickets  
+  - check raw_content (never stored)  
+  - diagnostic tickets  
   - temp tables  
-- [ ] Don’t delete Stripe/financial records  
-- [ ] Log deletions  
+- [ ] Keep Stripe/financial records only  
 
-## R2 — Secure Storage
+R2 — Storage Hardening
 - [ ] Encrypt consultation_details  
-- [ ] Reduce stored PII  
+- [ ] Minimise PII footprints  
 - [ ] Hash sensitive fields  
-- [ ] Ensure table names don’t leak meaning  
+- [ ] Avoid leaked meaning in table/column names  
 
-## R3 — Observability
-- [ ] Admin dashboard:  
-  - [ ] daily checks by channel  
-  - [ ] scam/safe ratios  
-  - [ ] impersonated brand stats  
-- [ ] Error monitoring for:
-  - [ ] AI errors  
-  - [ ] Ingestion failures  
-  - [ ] Provider webhook issues  
+R3 — Observability
+- [ ] Internal dashboard:
+  - checks per channel  
+  - scam vs safe ratio  
+  - brand impersonation stats  
+- [ ] AI failure logs  
+- [ ] Ingestion failure alerts  
+- [ ] Provider webhook error pager  
 
 ---
 
-# ============================================
-# FEATURE 10 — Final Launch Prep
-# ============================================
+=====================================================
+FEATURE 13 — Final Launch Preparation
+=====================================================
 
-## R1 — Deployment
-- [ ] Plesk final config  
-- [ ] Cloudflare cache rules  
-- [ ] Cloudflare image resizing (if used)  
-- [ ] Email provider for magic links & alerts  
+R1 — Deployment
+- [ ] Plesk config  
+- [ ] Cloudflare rules  
+- [ ] Email provider finalised  
 
-## R2 — Stripe Live Transition
-- [ ] Switch to live keys  
+R2 — Stripe Live
+- [ ] Live keys  
 - [ ] Live price IDs  
-- [ ] Full end-to-end test  
+- [ ] Full test cycle  
 
-## R3 — Internal Tester Batch
+R3 — Internal Tester Batch
 - [ ] Tester onboarding page  
-- [ ] Anonymous feedback form  
+- [ ] Anonymous feedback  
 - [ ] Monitor logs for 72h  
