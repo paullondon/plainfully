@@ -6,9 +6,9 @@ Use commit naming: F{feature}-R{release}-{build number}
 
 ---
 
-===
+
 FEATURE 1 — Core Consultation System (MVP)
-===
+
 
 R1 — Consultation Data Layer (✓ Completed)
 - [x] consultations table  
@@ -55,9 +55,9 @@ R4 — Dashboard & UX Completion
 
 ---
 
-===
+
 FEATURE 2 — OCR & Multi-Image Pipeline
-===
+
 
 R1 — Upload Pipeline
 - [ ] Upload 1–20 images  
@@ -79,9 +79,9 @@ R3 — OCR Processing
 
 ---
 
-===
+
 FEATURE 3 — Diagnostic Failure Pipeline
-===
+
 
 R1 — Failure Capture
 - [ ] “Send to support?” prompt  
@@ -96,9 +96,9 @@ R2 — Admin Tools
 
 ---
 
-===
+
 FEATURE 4 — Billing & Plans (Stripe)
-===
+
 
 R1 — Plan Definitions
 - [ ] Define Basic / Pro / Unlimited  
@@ -120,9 +120,9 @@ R3 — Billing Portal
 
 ---
 
-===
+
 FEATURE 5 — Account & Session Layer
-===
+
 
 R1 — Magic Link Auth
 - [ ] Rate-limit per email/IP  
@@ -137,9 +137,9 @@ R2 — Profile Page
 
 ---
 
-===
+
 FEATURE 6 — Multi-Channel Check Engine (CORE BRAIN)
-===
+
 All Plainfully ingestion routes go through this engine.
 
 R1 — Core CheckEngine Service
@@ -196,9 +196,9 @@ R3 — Web Ingestion Integration
 
 ---
 
-===
+
 FEATURE 7 — Email Ingestion
-===
+
 
 R1 — Email Routing
 - [ ] Configure inbound:
@@ -218,9 +218,9 @@ R2 — Email Reply Logic
 
 ---
 
-===
+
 FEATURE 8 — Messenger Ingestion
-===
+
 
 R1 — Messenger Setup
 - [ ] Meta App + Page  
@@ -235,9 +235,9 @@ R2 — Messenger Output
 
 ---
 
-===
+
 FEATURE 9 — WhatsApp Ingestion
-===
+
 
 R1 — WhatsApp Cloud API
 - [ ] Register  
@@ -247,9 +247,9 @@ R1 — WhatsApp Cloud API
 
 ---
 
-===
+
 FEATURE 10 — SMS Product (“TextCheck by Plainfully”)
-===
+
 
 R1 — Cheap Long-Code Trial
 - [ ] Twilio/Vonage inbound `/webhooks/sms/test`  
@@ -267,9 +267,9 @@ R2 — Premium SMS (Paid £1/check)
 
 ---
 
-===
+
 FEATURE 11 — Weekly Scam Report Engine
-===
+
 
 R1 — Weekly Aggregator
 - [ ] weekly_reports table  
@@ -289,9 +289,9 @@ R2 — Facebook Auto-Posting (Optional)
 
 ---
 
-===
+
 FEATURE 12 — Security, Retention & Monitoring
-===
+
 
 R1 — Retention & Cleanup
 - [ ] 28-day deletion cron  
@@ -320,9 +320,9 @@ R3 — Observability
 
 ---
 
-===
+
 FEATURE 13 — Final Launch Preparation
-===
+
 
 R1 — Deployment
 - [ ] Plesk config  
