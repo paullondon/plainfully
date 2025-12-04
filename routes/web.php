@@ -132,12 +132,16 @@ switch (true) {
 
 // List recent consultations (debug only)
 $router->get('/debug/consultations', function () {
+    require_once dirname(__DIR__) . '/app/support/debug_consultations.php';
+    require_once dirname(__DIR__) . '/app/support/debug_guard.php';
     ensureDebugAccess();
     debug_list_consultations();
 });
 
 // View a single consultation (debug only)
 $router->get('/debug/consultations/view', function () {
+    require_once dirname(__DIR__) . '/app/support/debug_consultations.php';
+    require_once dirname(__DIR__) . '/app/support/debug_guard.php';
     ensureDebugAccess();
     debug_view_consultation();
 });
