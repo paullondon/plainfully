@@ -125,4 +125,33 @@ switch (true) {
             '<h1 class="pf-auth-title">404</h1><p class="pf-auth-subtitle">Page not found.</p>'
         );
         break;
+
+// =========================
+// Debug / Health routes
+// =========================
+
+// List recent consultations (debug only)
+$router->get('/debug/consultations', function () {
+    ensureDebugAccess();
+    debug_list_consultations();
+});
+
+// View a single consultation (debug only)
+$router->get('/debug/consultations/view', function () {
+    ensureDebugAccess();
+    debug_view_consultation();
+});
+
+// Simple health endpoint (can expand later)
+$router->get('/debug/health', function () {
+    ensureDebugAccess();
+
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode([
+        'status' => 'ok',
+        'time'   => date('c'),
+        'env'    => getenv('APP_ENV') ?: 'unknown',
+    ]);
+});
+
 }
