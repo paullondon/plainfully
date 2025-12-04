@@ -119,8 +119,7 @@ if (!function_exists('debug_view_consultation')) {
 
             $decrypted = null;
             if ($details && !empty($details['encrypted_payload'] ?? '')) {
-                // TODO: replace this with your actual decrypt helper if named differently.
-                $decrypted = decrypt_payload($details['encrypted_payload']);
+                $decrypted = plainfully_decrypt($details['encrypted_payload']);
             }
 
         } catch (Throwable $e) {
