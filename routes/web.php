@@ -115,6 +115,30 @@ switch (true) {
         handle_health($config);
         break;
 
+    case $path === '/debug/env-check' && $method === 'GET':
+            // Debug env + sanity check
+            ensureDebugAccess();
+
+            header('Content-Type: text/plain; charset=utf-8');
+            echo "web.php reached\n";
+            echo "APP_ENV=" . (getenv('APP_ENV') ?: 'null') . "\n";
+            echo "PLAINFULLY_DEBUG=" . (getenv('PLAINFULLY_DEBUG') ?: 'null') . "\n";
+            echo "PLAINFULLY_DEBUG_TOKEN=" . (getenv('PLAINFULLY_DEBUG_TOKEN') ?: 'null') . "\n";
+            break;
+
+    case $path === '/debug/consultations' && $method === 'GET':
+            // List recent consultations (debug only)
+            ensureDebugAccess();
+            debug_list_consultations();
+            break;
+
+    case $path === '/debug/consultations/view' && $method === 'GET':
+            // View single consultation (debug only)
+            ensureDebugAccess();
+            debug_view_consultation();
+            break;
+
+
     // -------------------------------------------------
     // 404 fallback
     // -------------------------------------------------
@@ -125,39 +149,3 @@ switch (true) {
             '<h1 class="pf-auth-title">404</h1><p class="pf-auth-subtitle">Page not found.</p>'
         );
         break;
-
-// =========================
-// Debug / Health routes
-// =========================
-$router->get('/debug/env-check', function () {
-    header('Content-Type: text/plain; charset=utf-8');
-    echo "APP_ENV=" . (getenv('APP_ENV') ?: 'null') . "\n";
-    echo "PLAINFULLY_DEBUG=" . (getenv('PLAINFULLY_DEBUG') ?: 'null') . "\n";
-    echo "PLAINFULLY_DEBUG_TOKEN=" . (getenv('PLAINFULLY_DEBUG_TOKEN') ?: 'null') . "\n";
-});
-
-// List recent consultations (debug only)
-$router->get('/debug/consultations', function () {
-    ensureDebugAccess();
-    debug_list_consultations();
-});
-
-// View a single consultation (debug only)
-$router->get('/debug/consultations/view', function () {
-    ensureDebugAccess();
-    debug_view_consultation();
-});
-
-// Simple health endpoint (can expand later)
-$router->get('/debug/health', function () {
-    ensureDebugAccess();
-
-    header('Content-Type: application/json; charset=utf-8');
-    echo json_encode([
-        'status' => 'ok',
-        'time'   => date('c'),
-        'env'    => getenv('APP_ENV') ?: 'unknown',
-    ]);
-});
-
-}
