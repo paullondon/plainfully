@@ -149,3 +149,4 @@ switch (true) {
             '<h1 class="pf-auth-title">404</h1><p class="pf-auth-subtitle">Page not found.</p>'
         );
         break;
+    };
