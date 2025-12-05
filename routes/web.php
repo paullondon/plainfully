@@ -129,6 +129,12 @@ switch (true) {
 // =========================
 // Debug / Health routes
 // =========================
+$router->get('/debug/env-check', function () {
+    header('Content-Type: text/plain; charset=utf-8');
+    echo "APP_ENV=" . (getenv('APP_ENV') ?: 'null') . "\n";
+    echo "PLAINFULLY_DEBUG=" . (getenv('PLAINFULLY_DEBUG') ?: 'null') . "\n";
+    echo "PLAINFULLY_DEBUG_TOKEN=" . (getenv('PLAINFULLY_DEBUG_TOKEN') ?: 'null') . "\n";
+});
 
 // List recent consultations (debug only)
 $router->get('/debug/consultations', function () {
