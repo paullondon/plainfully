@@ -20,7 +20,7 @@ if (!function_exists('debug_list_consultations')) {
         ensureDebugAccess();
 
         try {
-            $pdo = db(); // adapt if your DB helper is named differently
+            $pdo = pf_db(); // adapt if your DB helper is named differently
 
             $stmt = $pdo->query(
                 'SELECT id, created_at 
@@ -89,7 +89,7 @@ if (!function_exists('debug_view_consultation')) {
         }
 
         try {
-            $pdo = db(); // adapt if needed
+            $pdo = pf_db(); // adapt if needed
 
             // consultation row
             $stmt = $pdo->prepare(
