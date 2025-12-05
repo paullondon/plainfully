@@ -20,7 +20,7 @@ function ensureDebugAccess(): void
 {
     $env         = getenv('APP_ENV') ?: 'production';
     $debugFlag   = filter_var(getenv('PLAINFULLY_DEBUG') ?: 'false', FILTER_VALIDATE_BOOLEAN);
-    $secretToken = trim((string)(getenv('PLAINFULLY_DEBUG_TOKEN') ?? ''));
+    $secretToken = getenv('DEBUG_TOKEN') ?: '';
 
     // Where the caller can provide the token:
     $providedToken = '';
