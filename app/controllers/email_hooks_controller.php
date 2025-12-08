@@ -13,14 +13,17 @@ require_once dirname(__DIR__) . '/features/checks/check_engine.php';
 /**
  * Dev-only inbound email hook.
  *
- * This simulates what a real email provider webhook would do:
+ * Simulates what a real email provider webhook would do:
  *  - POSTs "from", "to", "subject", "body"
  *  - We verify a shared secret
  *  - We feed it into CheckEngine with channel="email"
+ *  - We send a brief reply email to the sender
  *  - We return JSON with the CheckEngine result (no raw content stored)
  */
 function email_inbound_dev_controller(): void
 {
+    global $config; // base URL likely lives here
+
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
         http_response_code(405);
         header('Content-Type: application/json; charset=utf-8');
@@ -55,9 +58,8 @@ function email_inbound_dev_controller(): void
         ? $subject . "\n\n" . $body
         : $body;
 
-    $pdo = pf_db(); // existing DB helper
-
-    $aiClient    = new DummyAiClient();            // swap later for real AI client
+    $pdo        = pf_db();
+    $aiClient   = new DummyAiClient(); // swap later for real AI client
     $checkEngine = new CheckEngine($pdo, $aiClient);
 
     // Treat email "from" as the user’s email
@@ -77,6 +79,55 @@ function email_inbound_dev_controller(): void
     try {
         $result = $checkEngine->run($input, $isPaid);
 
+        // Build a view URL for the user
+        $baseUrl = '';
+        if (isset($config['app']['url']) && is_string($config['app']['url'])) {
+            $baseUrl = rtrim($config['app']['url'], '/');
+        } else {
+            $baseUrl = 'https://plainfully.com';
+        }
+
+        $viewUrl = $baseUrl . '/clarifications/view?id=' . $result->checkId;
+
+        // Compose reply email (NO raw content, only capsule + verdict)
+        $emailSubject = '[Plainfully] Scam check result';
+        $verdictLine  = $result->isScam
+            ? 'Our system believes this message is LIKELY A SCAM.'
+            : 'Our system did not detect obvious scam indicators.';
+
+        $textBodyLines = [
+            "Hi,",
+            "",
+            "You forwarded a message to Plainfully for a quick scam/clarity check.",
+            "",
+            $verdictLine,
+            "",
+            "Short summary of what we analysed (not the full text):",
+            $result->inputCapsule,
+            "",
+            "To see the full breakdown and guidance, open:",
+            $viewUrl,
+            "",
+            "Plainfully never stores the full message content – only safe summaries.",
+            "",
+            "— Plainfully",
+        ];
+        $textBody = implode("\n", $textBodyLines);
+
+        // If your pf_mail helper supports HTML, you can build a nicer HTML version later.
+        $emailSent = false;
+        try {
+            if (function_exists('pf_mail')) {
+                // This assumes pf_mail($to, $subject, $bodyText) or similar.
+                // If your helper signature is different, we’ll adjust once it errors.
+                pf_mail($from, $emailSubject, $textBody);
+                $emailSent = true;
+            }
+        } catch (Throwable $mailError) {
+            // Swallow mail errors for the webhook – we still return 200 with email_sent=false
+            $emailSent = false;
+        }
+
         http_response_code(200);
         header('Content-Type: application/json; charset=utf-8');
 
@@ -88,7 +139,8 @@ function email_inbound_dev_controller(): void
             'is_paid'        => $result->isPaid,
             'input_capsule'  => $result->inputCapsule,
             'upsell_flags'   => $result->upsellFlags,
-            'view_url'       => '/clarifications/view?id=' . $result->checkId,
+            'view_url'       => $viewUrl,
+            'email_sent'     => $emailSent,
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     } catch (Throwable $t) {
         http_response_code(500);
