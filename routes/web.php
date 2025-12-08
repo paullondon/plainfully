@@ -43,25 +43,38 @@ switch (true) {
     // -------------------------------------------------
 
     case $path === '/clarifications/new' && $method === 'GET':
-        require_login();
-        require dirname(__DIR__) . '/app/views/clarifications/new.php';
-        break;
+        //require_login();
+        //require dirname(__DIR__) . '/app/views/clarifications/new.php';
+        //break;
+        clarifications_new_controller()
+        return;
 
     case $path === '/clarifications/new' && $method === 'POST':
-        require_login();
-        require dirname(__DIR__) . '/app/support/clarifications.php';
-        plainfully_handle_clarification_new_post_v2();
-        break;
-
+        //require_login();
+        //require dirname(__DIR__) . '/app/support/clarifications.php';
+        //plainfully_handle_clarification_new_post_v2();
+        //break;
+        clarifications_new_controller()
+        return;
     // -------------------------------------------------
     // Clarifications – view + cancel
     // -------------------------------------------------
 
+    case $path === '/clarifications' && $method === 'GET':
+        //require_login();
+        //require dirname(__DIR__) . '/app/support/clarifications.php';
+        //plainfully_handle_clarification_view();
+        //break;
+        clarifications_index_controller();
+        return;
+
     case $path === '/clarifications/view' && $method === 'GET':
-        require_login();
-        require dirname(__DIR__) . '/app/support/clarifications.php';
-        plainfully_handle_clarification_view();
-        break;
+        //require_login();
+        //require dirname(__DIR__) . '/app/support/clarifications.php';
+        //plainfully_handle_clarification_view();
+        //break;
+        clarifications_view_controller();
+        return;
 
     case $path === '/clarifications/cancel' && $method === 'POST':
         require_login();
@@ -137,6 +150,13 @@ switch (true) {
             ensureDebugAccess();
             debug_view_consultation();
             break;
+    
+    case $path === '/debug/consultations/view' && $method === 'GET':
+        // View single consultation (debug only)
+        ensureDebugAccess();
+        debug_view_consultation();
+        break;
+    
 
 
     // -------------------------------------------------

@@ -1,65 +1,33 @@
-<?php declare(strict_types=1);
-
-if (session_status() !== PHP_SESSION_ACTIVE) {
-    session_start();
-}
-
-$errors = $errors ?? [];
-$old    = $old ?? [];
-
+<?php
+/** @var string|null $error */
 ?>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Start a clarification | Plainfully</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="stylesheet" href="/assets/css/app.css">
-</head>
-<body class="pf-page-body">
-<main class="pf-page-main">
+<h1 class="pf-page-title">New clarification</h1>
 
-    <section class="pf-card pf-card--narrow">
+<p class="pf-page-subtitle">
+    Paste the message you want Plainfully to check. We’ll analyse it for scam risk and clarity.
+</p>
 
-        <h1 class="pf-heading">Start a new clarification</h1>
+<?php if (!empty($error)): ?>
+    <p class="pf-message-error">
+        <?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?>
+    </p>
+<?php endif; ?>
 
-        <?php if (!empty($errors)): ?>
-            <div class="pf-alert pf-alert--error">
-                <ul>
-                    <?php foreach ($errors as $err): ?>
-                        <li><?= htmlspecialchars($err, ENT_QUOTES, 'UTF-8') ?></li>
-                    <?php endforeach; ?>
-                </ul>
-            </div>
-        <?php endif; ?>
+<form method="post" class="pf-form">
+    <div class="pf-field">
+        <label for="content">Message to check</label>
+        <textarea id="content"
+                  name="content"
+                  rows="8"
+                  required
+                  placeholder="Paste suspicious email, text, or message here…"></textarea>
+    </div>
 
-        <form method="POST" action="/clarifications/new">
-            <?php pf_csrf_field(); ?>
+    <button type="submit" class="pf-button pf-button-primary">
+        Run clarification
+    </button>
+</form>
 
-            <div class="pf-field">
-                <label class="pf-label">What do you want Plainfully to clarify?</label>
-                <textarea
-                    name="text"
-                    class="pf-input pf-input--textarea"
-                    rows="10"
-                    maxlength="12000"
-                ><?= htmlspecialchars($old['text'] ?? '', ENT_QUOTES, 'UTF-8') ?></textarea>
-
-                <p class="pf-help">Max 12,000 characters.</p>
-            </div>
-
-            <button type="submit"
-                    class="pf-button pf-button--primary pf-button--full">
-                Generate clarification
-            </button>
-        </form>
-
-        <div class="pf-actions pf-actions--center">
-            <a href="/dashboard" class="pf-button pf-button--ghost">Back to dashboard</a>
-        </div>
-
-    </section>
-
-</main>
-</body>
-</html>
+<p style="margin-top:1.5rem;">
+    <a href="/clarifications">Back to your clarifications</a>
+</p>
