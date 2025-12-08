@@ -78,6 +78,13 @@ switch (true) {
         handle_logout();
         break;
 
+    // -------------------------------------------------
+    // Dev email inbound hook (no auth – token-based)
+    // -------------------------------------------------
+    case $path === '/hooks/email/inbound-dev' && $method === 'POST':
+        email_inbound_dev_controller();
+        break;
+
 
 // ======================
 // !! GUEST ROUTES     !!

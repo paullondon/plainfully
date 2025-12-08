@@ -124,6 +124,8 @@ require dirname(__DIR__) . '/app/controllers/health_controller.php';
 require dirname(__DIR__) . '/app/controllers/logout_controller.php';
 require dirname(__DIR__) . '/app/controllers/clarifications_controller.php';
 require dirname(__DIR__) . '/app/controllers/dashboard.php';
+require dirname(__DIR__) . '/app/controllers/email_hooks_controller.php';
+
 
 // router
 if (!defined('PLAINFULLY_SKIP_ROUTER')) {

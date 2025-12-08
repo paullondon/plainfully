@@ -35,7 +35,7 @@ This ordering ensures:
 ⚠️ **This is now the FIRST deliverable to build, before Email & SMS.**
 
 ## R1 — Core CheckEngine Service (PRIORITY)
-- [ ] Create `checks` table:
+- [x] Create `checks` table:
   - `user_id`, `channel`, `source_identifier`
   - `raw_content`
   - `content_type`
@@ -45,7 +45,7 @@ This ordering ensures:
   - `is_paid`
   - timestamps
 
-- [ ] Build `CheckEngine` class:
+- [x] Build `CheckEngine` class:
   - Normalised input object
   - Create/find user by email / phone / provider ID
   - AI classification
@@ -57,14 +57,14 @@ This ordering ensures:
     - long-form report
     - Input Summary Capsule
 
-- [ ] Input safety layer:
+- [x] Input safety layer:
   - Size caps
   - Spam detection
   - URL extraction + stripping
   - Offensive-content prefilter
   - Graceful fallback if AI fails
 
-- [ ] ZERO RAW STORAGE:
+- [x] ZERO RAW STORAGE:
   - Raw content processed in memory
   - Never stored in database
   - Only capsule & summaries persist
@@ -74,7 +74,7 @@ This ordering ensures:
 ## R2 — Input Summary Capsule
 Used everywhere instead of storing the raw user input.
 
-- [ ] Capsule fields:
+- [x] Capsule fields:
   - Input type (email, sms, upload, etc.)
   - Character count
   - Keyword risk count
@@ -82,7 +82,7 @@ Used everywhere instead of storing the raw user input.
   - Processing time
   - “Raw content securely discarded”
 
-- [ ] Capsule must appear:
+- [x] Capsule must appear:
   - Web result pages
   - Email full-report (subscriber only)
   - SMS/WhatsApp/Messenger expansions (future)
