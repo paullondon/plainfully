@@ -126,4 +126,6 @@ require dirname(__DIR__) . '/app/controllers/logout_controller.php';
 require dirname(__DIR__) . '/app/controllers/dashboard.php';
 
 // router
-require dirname(__DIR__) . '/routes/web.php';
+if (!defined('PLAINFULLY_SKIP_ROUTER')) {
+    require dirname(__DIR__) . '/routes/web.php';
+}

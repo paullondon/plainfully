@@ -5,6 +5,9 @@ use App\Features\Checks\CheckInput;
 use App\Features\Checks\CheckEngine;
 use App\Features\Checks\DummyAiClient;
 
+// Tell bootstrap not to load routes/web.php
+define('PLAINFULLY_SKIP_ROUTER', true);
+
 // 1) Load your app bootstrap (env, config, helpers, db, etc.)
 require __DIR__ . '/../bootstrap/app.php';
 
