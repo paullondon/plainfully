@@ -43,15 +43,72 @@ final class CheckEngine
     }
 
     private function enforceInputSafety(CheckInput $input): void
-    {
-        if (trim($input->rawContent) === '') {
-            throw new Exception('Empty content not allowed.');
-        }
+{
+    // 1) Normalise whitespace + line endings
+    $normalized = str_replace(["\r\n", "\r"], "\n", $input->rawContent);
+    $normalized = preg_replace('/[ \t]+/u', ' ', (string)$normalized);
+    $normalized = trim($normalized);
 
-        if (mb_strlen($input->rawContent) > $this->maxContentLength) {
-            $input->rawContent = mb_substr($input->rawContent, 0, $this->maxContentLength);
+    if ($normalized === '') {
+        throw new Exception('Please paste something to check.');
+    }
+
+    // 2) Hard length cap (protects AI + DB)
+    if (mb_strlen($normalized) > $this->maxContentLength) {
+        $normalized = mb_substr($normalized, 0, $this->maxContentLength);
+    }
+
+    // 3) URL extraction + stripping (neutralise links before AI)
+    $urlPattern = '/https?:\/\/[^\s]+/iu';
+    $urlCount   = 0;
+
+    $normalized = preg_replace_callback(
+        $urlPattern,
+        static function (array $matches) use (&$urlCount): string {
+            $urlCount++;
+            // Don’t keep the actual URL: just a generic marker
+            return '[link]';
+        },
+        $normalized
+    );
+
+    // 4) Very simple “offensive word” redaction (text still analysable, but softened)
+    //    NOTE: this is deliberately mild – AI will still see enough context.
+    $badWords = [
+        'fuck' => 'f**k',
+        'shit' => 's**t',
+    ];
+
+    foreach ($badWords as $word => $mask) {
+        $normalized = preg_replace(
+            '/' . preg_quote($word, '/') . '/iu',
+            $mask,
+            $normalized
+        );
+    }
+
+    // 5) Lightweight spam heuristic (not yet blocking – just ready for future use)
+    $len = mb_strlen($normalized);
+    $uppercaseRatio = 0.0;
+
+    if ($len > 0) {
+        $upperOnly = preg_replace('/[^A-Z]/u', '', $normalized);
+        if ($upperOnly !== '' && $len > 0) {
+            $uppercaseRatio = mb_strlen($upperOnly) / $len;
         }
     }
+
+    // Example: if you ever want to *block* obvious rubbish, we can uncomment this.
+    // For now we just let AI handle it.
+    //
+    // if ($urlCount > 10 || $uppercaseRatio > 0.9) {
+    //     throw new Exception('Message looks like automated spam. Please send a smaller, clearer snippet.');
+    // }
+
+    // 6) Write back the safe, normalised text
+    $input->rawContent = $normalized;
+}
+
 
     private function findOrCreateUser(CheckInput $input): int
     {
