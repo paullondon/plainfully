@@ -11,12 +11,6 @@ define('PLAINFULLY_SKIP_ROUTER', true);
 // 1) Load your app bootstrap (env, config, helpers, db, etc.)
 require __DIR__ . '/../bootstrap/app.php';
 
-// 2) Load the CheckEngine feature classes (no composer autoload yet)
-require __DIR__ . '/../app/features/checks/check_input.php';
-require __DIR__ . '/../app/features/checks/check_result.php';
-require __DIR__ . '/../app/features/checks/ai_client.php';
-require __DIR__ . '/../app/features/checks/check_engine.php';
-
 // 3) Get PDO via your existing DB helper (from app/support/db.php)
 $pdo = pf_db(); // this should already exist in your project
 

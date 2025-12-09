@@ -115,23 +115,27 @@ function email_inbound_dev_controller(): void
         $textBody = implode("\n", $textBodyLines);
 
         // If your pf_mail helper supports HTML, you can build a nicer HTML version later.
-        $emailSent = false;
+                $emailSent        = false;
+        $mailErrorMessage = null;
+
         try {
             if (function_exists('pf_mail')) {
-                // This assumes pf_mail($to, $subject, $bodyText) or similar.
-                // If your helper signature is different, we’ll adjust once it errors.
+                // Adjust this call if your pf_mail signature is different.
+                // We wrap in try/catch so ArgumentCountError / SMTP failures are all captured.
                 pf_mail($from, $emailSubject, $textBody);
                 $emailSent = true;
+            } else {
+                $mailErrorMessage = 'pf_mail helper not defined.';
             }
         } catch (Throwable $mailError) {
-            // Swallow mail errors for the webhook – we still return 200 with email_sent=false
-            $emailSent = false;
+            $emailSent        = false;
+            $mailErrorMessage = $mailError->getMessage();
         }
 
         http_response_code(200);
         header('Content-Type: application/json; charset=utf-8');
 
-        echo json_encode([
+        $payload = [
             'status'         => 'ok',
             'check_id'       => $result->checkId,
             'short_verdict'  => $result->shortVerdict,
@@ -141,7 +145,18 @@ function email_inbound_dev_controller(): void
             'upsell_flags'   => $result->upsellFlags,
             'view_url'       => $viewUrl,
             'email_sent'     => $emailSent,
-        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        ];
+
+        // In non-live environments, expose the mail error to help debugging.
+        $appEnv = getenv('APP_ENV') ?: 'local';
+        if (strtolower($appEnv) !== 'live' && strtolower($appEnv) !== 'production') {
+            if ($mailErrorMessage !== null) {
+                $payload['mail_error'] = $mailErrorMessage;
+            }
+        }
+
+        echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
     } catch (Throwable $t) {
         http_response_code(500);
         header('Content-Type: application/json; charset=utf-8');
