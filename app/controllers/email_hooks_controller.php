@@ -344,6 +344,13 @@ function sms_inbound_dev_controller(): void
     try {
         $result = $checkEngine->run($input, $isPaid);
 
+        // Build a simple SMS reply template (for future SMS provider integration)
+        if ($result->isScam) {
+            $smsReply = 'Plainfully: This text looks like a scam. Do not click links or share personal or payment details. If in doubt, contact the company using a trusted phone number or website.';
+        } else {
+            $smsReply = 'Plainfully: We did not find obvious scam signs in this text, but still be cautious with links and any requests for personal or payment details.';
+        }
+
         // Build a view URL for the user (same pattern as email)
         $baseUrl = '';
         if (isset($config['app']['url']) && is_string($config['app']['url'])) {
@@ -356,17 +363,19 @@ function sms_inbound_dev_controller(): void
 
         http_response_code(200);
         header('Content-Type: application/json; charset=utf-8');
-
+        
         echo json_encode([
-            'status'         => 'ok',
-            'check_id'       => $result->checkId,
-            'short_verdict'  => $result->shortVerdict,
-            'is_scam'        => $result->isScam,
-            'is_paid'        => $result->isPaid,
-            'input_capsule'  => $result->inputCapsule,
-            'upsell_flags'   => $result->upsellFlags,
-            'view_url'       => $viewUrl,
+            'status'              => 'ok',
+            'check_id'            => $result->checkId,
+            'short_verdict'       => $result->shortVerdict,
+            'is_scam'             => $result->isScam,
+            'is_paid'             => $result->isPaid,
+            'input_capsule'       => $result->inputCapsule,
+            'upsell_flags'        => $result->upsellFlags,
+            'view_url'            => $viewUrl,
+            'sms_reply_template'  => $smsReply,
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
     } catch (Throwable $t) {
         http_response_code(500);
         header('Content-Type: application/json; charset=utf-8');
