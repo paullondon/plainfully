@@ -4,22 +4,139 @@ use App\Features\Checks\CheckInput;
 use App\Features\Checks\CheckEngine;
 use App\Features\Checks\DummyAiClient;
 
-// Load CheckEngine classes for this controller
+// Load CheckEngine classes...
 require_once dirname(__DIR__) . '/features/checks/check_input.php';
 require_once dirname(__DIR__) . '/features/checks/check_result.php';
 require_once dirname(__DIR__) . '/features/checks/ai_client.php';
 require_once dirname(__DIR__) . '/features/checks/check_engine.php';
 
 /**
- * Dev-only inbound email hook.
- *
- * Simulates what a real email provider webhook would do:
- *  - POSTs "from", "to", "subject", "body"
- *  - We verify a shared secret
- *  - We feed it into CheckEngine with channel="email"
- *  - We send a brief reply email to the sender
- *  - We return JSON with the CheckEngine result (no raw content stored)
+ * Extract a "root" domain from a host, e.g.:
+ *  - mail.example.com -> example.com
+ *  - example.com      -> example.com
+ *  - something.co.uk  -> something.co.uk  (naive but good enough for heuristics)
  */
+function plainfully_root_domain_from_host(string $host): string
+{
+    $host = strtolower(trim($host));
+    // Strip port if any
+    $host = preg_replace('/:\d+$/', '', $host);
+
+    $parts = explode('.', $host);
+    $parts = array_values(array_filter($parts, static fn($p) => $p !== ''));
+
+    if (count($parts) <= 2) {
+        return implode('.', $parts);
+    }
+
+    // Naive handling for common UK style TLDs – good enough for our risk hint
+    $lastTwo  = implode('.', array_slice($parts, -2));
+    $lastThree = implode('.', array_slice($parts, -3));
+
+    $ukLikeTlds = ['co.uk', 'org.uk', 'gov.uk', 'ac.uk'];
+
+    if (in_array($lastTwo, $ukLikeTlds, true) && count($parts) >= 3) {
+        return $lastThree; // e.g. mycorp.co.uk
+    }
+
+    return $lastTwo; // e.g. example.com
+}
+
+/**
+ * Extract sender root domain from an email address.
+ */
+function plainfully_root_domain_from_email(?string $email): ?string
+{
+    if (!$email || !str_contains($email, '@')) {
+        return null;
+    }
+    [$local, $domain] = explode('@', $email, 2);
+    $domain = trim($domain);
+    if ($domain === '') {
+        return null;
+    }
+    return plainfully_root_domain_from_host($domain);
+}
+
+/**
+ * Turn subject + body (plain text OR HTML) into safe, visible text.
+ * - Strips HTML tags
+ * - Marks hyperlinks as "[link]" or "[link – potentially risky]"
+ *   if the href domain does not match the sender domain.
+ */
+function plainfully_normalise_email_text(string $subject, string $body, ?string $fromEmail = null): string
+{
+    // Combine subject + body first
+    $full = $subject !== '' ? ($subject . "\n\n" . $body) : $body;
+
+    $senderRoot = plainfully_root_domain_from_email($fromEmail);
+
+    // Fast path: if there's no sign of HTML, just return as-is (trimmed)
+    if (stripos($full, '<a ') === false &&
+        stripos($full, '<html') === false &&
+        stripos($full, '<body') === false) {
+        return trim($full);
+    }
+
+    // 1) Replace <a href="...">text</a> with "text [link]" or "text [link – potentially risky]"
+    $full = preg_replace_callback(
+        '/<a\b[^>]*>(.*?)<\/a>/is',
+        static function (array $matches) use ($senderRoot): string {
+            $anchorHtml  = $matches[0] ?? '';
+            $anchorInner = $matches[1] ?? '';
+
+            // Visible link text (without nested tags)
+            $anchorText = trim(strip_tags($anchorInner));
+            if ($anchorText === '') {
+                $anchorText = 'link';
+            }
+
+            $suffix = ' [link]';
+
+            // Try to extract href and compare domains (in-memory only)
+            if ($senderRoot !== null) {
+                $href = null;
+
+                if (preg_match('/href\s*=\s*"([^"]*)"/i', $anchorHtml, $m)) {
+                    $href = $m[1];
+                } elseif (preg_match("/href\s*=\s*'([^']*)'/i", $anchorHtml, $m)) {
+                    $href = $m[1];
+                }
+
+                if ($href !== null && $href !== '') {
+                    $host = parse_url($href, PHP_URL_HOST);
+
+                    if (is_string($host) && $host !== '') {
+                        $linkRoot = plainfully_root_domain_from_host($host);
+
+                        if ($linkRoot !== '' && strcasecmp($linkRoot, $senderRoot) !== 0) {
+                            // Different domain to sender -> nudge as risky
+                            $suffix = ' [link – potentially risky]';
+                        }
+                    }
+                }
+            }
+
+            return $anchorText . $suffix;
+        },
+        $full
+    );
+
+    // 2) Strip remaining tags
+    $full = strip_tags($full);
+
+    // 3) Decode HTML entities (e.g. &amp; → &)
+    $full = html_entity_decode($full, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+    // 4) Normalise whitespace
+    $full = str_replace(["\r\n", "\r"], "\n", $full);
+    $full = preg_replace('/[ \t]+/u', ' ', $full);
+    $full = preg_replace("/\n{3,}/u", "\n\n", $full);
+
+    return trim($full);
+}
+
+
 function email_inbound_dev_controller(): void
 {
     global $config; // base URL likely lives here
@@ -54,9 +171,8 @@ function email_inbound_dev_controller(): void
     }
 
     // Build the raw content (in-memory only; not stored)
-    $rawContent = $subject !== ''
-        ? $subject . "\n\n" . $body
-        : $body;
+    // Handles both plain text and HTML (anchors -> "[link]" / "[link – potentially risky]")
+    $rawContent = plainfully_normalise_email_text($subject, $body, $from);
 
     $pdo        = pf_db();
     $aiClient   = new DummyAiClient(); // swap later for real AI client

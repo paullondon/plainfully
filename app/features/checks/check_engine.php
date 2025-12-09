@@ -59,18 +59,22 @@ final class CheckEngine
     }
 
     // 3) URL extraction + stripping (neutralise links before AI)
-    $urlPattern = '/https?:\/\/[^\s]+/iu';
+    //    Match:
+    //      - http://something
+    //      - https://something
+    //      - www.something.tld/...
+    $urlPattern = '/\b((https?:\/\/|www\.)[a-z0-9\-]+(\.[a-z0-9\-]+)+[^\s]*)/iu';
     $urlCount   = 0;
 
     $normalized = preg_replace_callback(
         $urlPattern,
         static function (array $matches) use (&$urlCount): string {
             $urlCount++;
-            // Don’t keep the actual URL: just a generic marker
             return '[link]';
         },
         $normalized
     );
+
 
     // 4) Offensive word redaction using external config
     static $cachedFilters = null;
