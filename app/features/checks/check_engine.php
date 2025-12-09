@@ -72,12 +72,15 @@ final class CheckEngine
         $normalized
     );
 
-    // 4) Very simple “offensive word” redaction (text still analysable, but softened)
-    //    NOTE: this is deliberately mild – AI will still see enough context.
-    $badWords = [
-        'fuck' => 'f**k',
-        'shit' => 's**t',
-    ];
+    // 4) Offensive word redaction using external config
+    static $cachedFilters = null;
+
+    if ($cachedFilters === null) {
+        $configPath = dirname(__DIR__, 2) . '/config/word_filters.php';
+        $cachedFilters = is_readable($configPath) ? require $configPath : [];
+    }
+
+    $badWords = $cachedFilters;
 
     foreach ($badWords as $word => $mask) {
         $normalized = preg_replace(
@@ -86,6 +89,7 @@ final class CheckEngine
             $normalized
         );
     }
+
 
     // 5) Lightweight spam heuristic (not yet blocking – just ready for future use)
     $len = mb_strlen($normalized);
