@@ -278,5 +278,102 @@ function email_inbound_dev_controller(): void
             'error' => 'Internal error running CheckEngine.',
             'code'  => 'checkengine_failure',
         ]);
+    }   
+}
+/**
+ * Dev-only inbound SMS hook.
+ *
+ * Simulates an SMS provider webhook:
+ *  - POSTs "from", "body"
+ *  - We verify a shared secret
+ *  - We feed it into CheckEngine with channel="sms"
+ *  - We DO NOT send any email – only JSON response
+ */
+function sms_inbound_dev_controller(): void
+{
+    global $config;
+
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        http_response_code(405);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['error' => 'Method not allowed. Use POST.']);
+        return;
+    }
+
+    // Separate token so you can rotate / control SMS independently
+    $tokenHeader = $_SERVER['HTTP_X_PLAINFULLY_TOKEN'] ?? '';
+    $expected    = getenv('SMS_HOOK_TOKEN') ?: '';
+
+    if ($expected === '' || !hash_equals($expected, $tokenHeader)) {
+        http_response_code(401);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['error' => 'Unauthorised SMS hook call.']);
+        return;
+    }
+
+    $from = trim($_POST['from'] ?? '');
+    $body = trim($_POST['body'] ?? '');
+
+    if ($from === '' || $body === '') {
+        http_response_code(400);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['error' => 'Fields "from" and "body" are required.']);
+        return;
+    }
+
+    // For SMS we don’t need special HTML handling – CheckEngine’s
+    // enforceInputSafety will take care of length, URLs, swear filters, etc.
+    $rawContent = $body;
+
+    $pdo        = pf_db();
+    $aiClient   = new DummyAiClient();
+    $checkEngine = new CheckEngine($pdo, $aiClient);
+
+    $input = new CheckInput(
+        'sms',          // channel
+        $from,          // source_identifier (phone number)
+        'text/plain',   // content type
+        $rawContent,    // content (will be cleaned inside CheckEngine)
+        null,           // email
+        $from,          // phone
+        null            // provider_user_id
+    );
+
+    $isPaid = false;
+
+    try {
+        $result = $checkEngine->run($input, $isPaid);
+
+        // Build a view URL for the user (same pattern as email)
+        $baseUrl = '';
+        if (isset($config['app']['url']) && is_string($config['app']['url'])) {
+            $baseUrl = rtrim($config['app']['url'], '/');
+        } else {
+            $baseUrl = 'https://plainfully.com';
+        }
+
+        $viewUrl = $baseUrl . '/clarifications/view?id=' . $result->checkId;
+
+        http_response_code(200);
+        header('Content-Type: application/json; charset=utf-8');
+
+        echo json_encode([
+            'status'         => 'ok',
+            'check_id'       => $result->checkId,
+            'short_verdict'  => $result->shortVerdict,
+            'is_scam'        => $result->isScam,
+            'is_paid'        => $result->isPaid,
+            'input_capsule'  => $result->inputCapsule,
+            'upsell_flags'   => $result->upsellFlags,
+            'view_url'       => $viewUrl,
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    } catch (Throwable $t) {
+        http_response_code(500);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode([
+            'error' => 'Internal error running CheckEngine.',
+            'code'  => 'checkengine_failure',
+        ]);
     }
 }
+

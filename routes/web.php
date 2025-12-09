@@ -85,6 +85,11 @@ switch (true) {
         email_inbound_dev_controller();
         break;
 
+    case $path === '/hooks/sms/inbound-dev' && $method === 'POST':
+        sms_inbound_dev_controller();
+        break;
+
+
 
 // ======================
 // !! GUEST ROUTES     !!
