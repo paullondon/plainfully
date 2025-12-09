@@ -120,18 +120,32 @@ function email_inbound_dev_controller(): void
 
         try {
             if (function_exists('pf_mail')) {
-                // Adjust this call if your pf_mail signature is different.
-                // We wrap in try/catch so ArgumentCountError / SMTP failures are all captured.
-                pf_mail($from, $emailSubject, $textBody);
-                $emailSent = true;
+                // Future-proof: if you later add pf_mail in app/support/mailer.php.
+                $res = pf_mail($from, $emailSubject, $textBody);
+
+                // If pf_mail doesn’t return anything, just treat as success unless it throws.
+                $emailSent = ($res === null) ? true : (bool) $res;
             } else {
-                $mailErrorMessage = 'pf_mail helper not defined.';
+                // Fallback: use native mail() via Plesk
+                $fromAddress = 'no-reply@plainfully.com';
+
+                $headers  = 'From: Plainfully Scam Check <' . $fromAddress . ">\r\n";
+                $headers .= 'Reply-To: ' . $fromAddress . "\r\n";
+                $headers .= "Content-Type: text/plain; charset=utf-8\r\n";
+                $headers .= "MIME-Version: 1.0\r\n";
+
+                $ok = mail($from, $emailSubject, $textBody, $headers);
+
+                if (!$ok) {
+                    throw new RuntimeException('mail() returned false; email not sent.');
+                }
+
+                $emailSent = true;
             }
         } catch (Throwable $mailError) {
             $emailSent        = false;
             $mailErrorMessage = $mailError->getMessage();
         }
-
         http_response_code(200);
         header('Content-Type: application/json; charset=utf-8');
 
