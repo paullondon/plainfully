@@ -80,47 +80,45 @@ function plainfully_normalise_email_text(string $subject, string $body, ?string 
 
     // 1) Replace <a href="...">text</a> with "text [link]" or "text [link – potentially risky]"
     $full = preg_replace_callback(
-        '/<a\b[^>]*>(.*?)<\/a>/is',
-        static function (array $matches) use ($senderRoot): string {
-            $anchorHtml  = $matches[0] ?? '';
-            $anchorInner = $matches[1] ?? '';
+    '/<a\b[^>]*>(.*?)<\/a>/is',
+    static function (array $matches) use ($senderRoot): string {
+        $anchorHtml  = $matches[0] ?? '';
+        $anchorInner = $matches[1] ?? '';
 
-            // Visible link text (without nested tags)
-            $anchorText = trim(strip_tags($anchorInner));
-            if ($anchorText === '') {
-                $anchorText = 'link';
+        $anchorText = trim(strip_tags($anchorInner));
+        if ($anchorText === '') {
+            $anchorText = 'link';
+        }
+
+        $suffix = ' [link]';
+
+        if ($senderRoot !== null) {
+            $href = null;
+
+            if (preg_match('/href\s*=\s*"([^"]*)"/i', $anchorHtml, $m)) {
+                $href = $m[1];
+            } elseif (preg_match("/href\s*=\s*'([^']*)'/i", $anchorHtml, $m)) {
+                $href = $m[1];
             }
 
-            $suffix = ' [link]';
+            if ($href !== null && $href !== '') {
+                $host = parse_url($href, PHP_URL_HOST);
 
-            // Try to extract href and compare domains (in-memory only)
-            if ($senderRoot !== null) {
-                $href = null;
+                if (is_string($host) && $host !== '') {
+                    $linkRoot = plainfully_root_domain_from_host($host);
 
-                if (preg_match('/href\s*=\s*"([^"]*)"/i', $anchorHtml, $m)) {
-                    $href = $m[1];
-                } elseif (preg_match("/href\s*=\s*'([^']*)'/i", $anchorHtml, $m)) {
-                    $href = $m[1];
-                }
-
-                if ($href !== null && $href !== '') {
-                    $host = parse_url($href, PHP_URL_HOST);
-
-                    if (is_string($host) && $host !== '') {
-                        $linkRoot = plainfully_root_domain_from_host($host);
-
-                        if ($linkRoot !== '' && strcasecmp($linkRoot, $senderRoot) !== 0) {
-                            // Different domain to sender -> nudge as risky
-                            $suffix = ' [link – potentially risky]';
-                        }
+                    if ($linkRoot !== '' && strcasecmp($linkRoot, $senderRoot) !== 0) {
+                        $suffix = ' [link – potentially risky]';
                     }
                 }
             }
+        }
 
-            return $anchorText . $suffix;
-        },
-        $full
-    );
+        return $anchorText . $suffix;
+    },
+    $full
+);
+
 
     // 2) Strip remaining tags
     $full = strip_tags($full);
