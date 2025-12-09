@@ -76,8 +76,15 @@ final class CheckEngine
     static $cachedFilters = null;
 
     if ($cachedFilters === null) {
-        $configPath = dirname(__DIR__, 2) . '/config/word_filters.php';
-        $cachedFilters = is_readable($configPath) ? require $configPath : [];
+        // __DIR__ = /httpdocs/app/features/checks
+        // dirname(__DIR__, 3) = /httpdocs (project root)
+        $configPathRoot = dirname(__DIR__, 3) . '/config/word_filters.php';
+
+        if (is_readable($configPathRoot)) {
+            $cachedFilters = require $configPathRoot;
+        } else {
+            $cachedFilters = [];
+        }
     }
 
     $badWords = $cachedFilters;
@@ -89,6 +96,7 @@ final class CheckEngine
             $normalized
         );
     }
+
 
 
     // 5) Lightweight spam heuristic (not yet blocking – just ready for future use)
