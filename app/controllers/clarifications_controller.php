@@ -1,126 +1,95 @@
-<?php
-declare(strict_types=1);
+<?php declare(strict_types=1);
 
 use App\Features\Checks\CheckInput;
 use App\Features\Checks\CheckEngine;
 use App\Features\Checks\DummyAiClient;
 
-// Load CheckEngine feature classes (no composer yet)
+// Feature classes
 require_once dirname(__DIR__) . '/features/checks/check_input.php';
 require_once dirname(__DIR__) . '/features/checks/check_result.php';
 require_once dirname(__DIR__) . '/features/checks/ai_client.php';
 require_once dirname(__DIR__) . '/features/checks/check_engine.php';
 
 /**
- * Require a logged-in user, otherwise bail.
- * Adjust redirect/logic to match your real login route if needed.
+ * Helper: current user id + email from session.
  */
-function pf_require_logged_in_user(): int
+function pf_current_user_context(): array
 {
-    if (empty($_SESSION['user_id'])) {
-        header('Location: /login');
-        exit;
-    }
+    $userId    = isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : 0;
+    $userEmail = isset($_SESSION['user_email']) ? (string)$_SESSION['user_email'] : '';
 
-    return (int) $_SESSION['user_id'];
+    return [$userId, $userEmail];
 }
 
 /**
- * Small helper to load the current user row.
- */
-function pf_get_current_user_row(PDO $pdo, int $userId): array
-{
-    $stmt = $pdo->prepare('SELECT id, email, phone FROM users WHERE id = :id LIMIT 1');
-    $stmt->execute([':id' => $userId]);
-    $row = $stmt->fetch(PDO::FETCH_ASSOC);
-
-    if (!$row) {
-        throw new RuntimeException('User record not found.');
-    }
-
-    return $row;
-}
-
-/**
- * GET /clarifications
- * List of all checks for the logged in user.
- */
-function clarifications_index_controller(): void
-{
-    $userId = pf_require_logged_in_user();
-    $pdo    = pf_db();
-
-    $stmt = $pdo->prepare(
-        'SELECT id, channel, short_summary, is_scam, is_paid, created_at
-         FROM checks
-         WHERE user_id = :user_id
-         ORDER BY created_at DESC'
-    );
-    $stmt->execute([':user_id' => $userId]);
-    $checks = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
-
-    ob_start();
-    /** @var array $checks */
-    require dirname(__DIR__) . '/views/clarifications/index.php';
-    $inner = ob_get_clean();
-
-    pf_render_shell('Your clarifications', $inner);
-}
-
-/**
- * GET/POST /clarifications/new
- * Show form and on submit, run CheckEngine and redirect to /clarifications/view?id=...
+ * GET /clarifications/new
+ * POST /clarifications/new
  */
 function clarifications_new_controller(): void
 {
-    $userId = pf_require_logged_in_user();
-    $pdo    = pf_db();
+    require_login();
 
-    $userRow = pf_get_current_user_row($pdo, $userId);
+    $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 
-    $error   = null;
+    $errors   = [];
+    $oldText  = '';
+    $oldTone  = 'calm';
 
-    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        try {
-            $content = trim($_POST['content'] ?? '');
+    if ($method === 'POST') {
+        $oldText = trim($_POST['text'] ?? '');
+        $oldTone = trim($_POST['tone'] ?? 'calm');
 
-            if ($content === '') {
-                throw new RuntimeException('Please paste a message to check.');
-            }
+        // Basic validation
+        if ($oldText === '') {
+            $errors[] = 'Please paste or type the message you want Plainfully to check.';
+        } elseif (mb_strlen($oldText) < 10) {
+            $errors[] = 'The text is very short. Please include enough detail for us to analyse it properly.';
+        } elseif (mb_strlen($oldText) > 8000) {
+            $errors[] = 'The text is too long. Please trim it down or split into multiple checks.';
+        }
 
-            // Channel is "web" for now
-            $channel          = 'web';
-            $sourceIdentifier = $userRow['email'] ?: ($userRow['phone'] ?? 'web-user-' . $userId);
-            $contentType      = 'text/plain';
+        if (empty($errors)) {
+            // Build CheckEngine input
+            [$userId, $userEmail] = pf_current_user_context();
 
+            $pdo       = pf_db();
+            $aiClient  = new DummyAiClient();
+            $engine    = new CheckEngine($pdo, $aiClient);
+
+            // Channel = web, source identifier = user email (or user id)
+            $sourceIdentifier = $userEmail !== '' ? $userEmail : ('user#' . $userId);
+
+            // NOTE: raw content goes to CheckEngine; it is never stored as raw in DB.
             $input = new CheckInput(
-                $channel,
-                $sourceIdentifier,
-                $contentType,
-                $content,
-                $userRow['email'] ?: null,
-                $userRow['phone'] ?: null,
-                null // provider_user_id
+                'web',              // channel
+                $sourceIdentifier,  // source_identifier
+                'text/plain',       // content_type
+                $oldText,           // raw content (engine applies safety layer)
+                $userEmail ?: null, // email
+                null,               // phone
+                null                // provider_user_id
             );
 
-            $aiClient    = new DummyAiClient();      // swap later for real AI client
-            $checkEngine = new CheckEngine($pdo, $aiClient);
-
-            // For now, all web clarifications treated as free tier
+            // TODO: hook in billing / plan here
             $isPaid = false;
 
-            $result = $checkEngine->run($input, $isPaid);
+            try {
+                $result = $engine->run($input, $isPaid);
 
-            // Redirect to the new result page
-            header('Location: /clarifications/view?id=' . $result->checkId);
-            exit;
-        } catch (Throwable $t) {
-            $error = $t->getMessage();
+                // On success, redirect to the unified view
+                $checkId = $result->id;
+                pf_redirect('/clarifications/view?id=' . $checkId);
+                return;
+            } catch (Throwable $e) {
+                // Graceful failure – do NOT expose stack trace to user
+                error_log('CheckEngine error (web): ' . $e->getMessage());
+                $errors[] = 'Something went wrong while analysing your text. Please try again in a moment.';
+            }
         }
     }
 
+    // Render the form (GET, or POST with validation errors)
     ob_start();
-    /** @var string|null $error */
     require dirname(__DIR__) . '/views/clarifications/new.php';
     $inner = ob_get_clean();
 
@@ -128,45 +97,108 @@ function clarifications_new_controller(): void
 }
 
 /**
+ * GET /clarifications
+ * List checks for the logged-in user.
+ */
+function clarifications_index_controller(): void
+{
+    require_login();
+    [$userId, $userEmail] = pf_current_user_context();
+
+    $pdo = pf_db();
+
+    $stmt = $pdo->prepare("
+        SELECT id, channel, short_summary, is_scam, is_paid, created_at
+        FROM checks
+        WHERE user_id = :uid
+        ORDER BY id DESC
+        LIMIT 100
+    ");
+    $stmt->execute([':uid' => $userId]);
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    ob_start();
+    require dirname(__DIR__) . '/views/clarifications/index.php';
+    $inner = ob_get_clean();
+
+    pf_render_shell('Your clarifications', $inner);
+}
+
+/**
  * GET /clarifications/view?id=123
- * Show a single clarification = one row from checks.
+ * Show single clarification result.
  */
 function clarifications_view_controller(): void
 {
-    $userId = pf_require_logged_in_user();
-    $pdo    = pf_db();
+    require_login();
+    [$userId, $userEmail] = pf_current_user_context();
 
-    $id = isset($_GET['id']) ? (int) $_GET['id'] : 0;
+    $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
     if ($id <= 0) {
-        throw new RuntimeException('Invalid clarification ID.');
+        http_response_code(400);
+        pf_render_shell('Clarification', '<p>Invalid clarification id.</p>');
+        return;
     }
 
-    $stmt = $pdo->prepare(
-        'SELECT id, user_id, channel, source_identifier, content_type,
-                ai_result_json, short_summary, is_scam, is_paid, created_at
-         FROM checks
-         WHERE id = :id AND user_id = :user_id
-         LIMIT 1'
-    );
+    $pdo = pf_db();
+
+    $stmt = $pdo->prepare("
+        SELECT
+            id,
+            user_id,
+            channel,
+            source_identifier,
+            short_summary,
+            ai_result_json,
+            is_scam,
+            is_paid,
+            created_at
+        FROM checks
+        WHERE id = :id AND user_id = :uid
+        LIMIT 1
+    ");
     $stmt->execute([
-        ':id'      => $id,
-        ':user_id' => $userId,
+        ':id'  => $id,
+        ':uid' => $userId,
     ]);
 
-    $check = $stmt->fetch(PDO::FETCH_ASSOC);
-
-    if (!$check) {
-        throw new RuntimeException('Clarification not found.');
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$row) {
+        http_response_code(404);
+        pf_render_shell('Clarification', '<p>Clarification not found.</p>');
+        return;
     }
 
-    $ai = json_decode($check['ai_result_json'], true);
-    if (!is_array($ai)) {
-        throw new RuntimeException('Could not decode AI result JSON.');
+    // Parse AI JSON into PHP array with safe fallbacks
+    $ai = [];
+    if (!empty($row['ai_result_json'])) {
+        $decoded = json_decode((string)$row['ai_result_json'], true);
+        if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+            $ai = $decoded;
+        }
     }
+
+    // Derive view-friendly pieces
+    $plan = $ai['plan'] ?? [];
+    $viewModel = [
+        'check' => $row,
+        'plan'  => [
+            'name'     => $plan['name'] ?? 'Free plan',
+            'used'     => $plan['clarifications_used']  ?? null,
+            'limit'    => $plan['clarifications_limit'] ?? null,
+            'resetsAt' => $plan['resets_at'] ?? null,
+        ],
+        'key_points' => $ai['key_points'] ?? [
+            $ai['short_verdict'] ?? $row['short_summary'],
+        ],
+        'risks' => $ai['risks'] ?? [],
+        'next_steps' => $ai['typical_next_steps'] ?? [],
+        'short_verdict' => $ai['short_verdict'] ?? $row['short_summary'],
+    ];
 
     ob_start();
-    /** @var array $check */
-    /** @var array $ai */
+    // Expose $viewModel and $ai to the view
+    $vm = $viewModel;
     require dirname(__DIR__) . '/views/clarifications/view.php';
     $inner = ob_get_clean();
 
