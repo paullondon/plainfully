@@ -89,6 +89,15 @@ switch (true) {
         sms_inbound_dev_controller();
         break;
 
+    case $path === '/debug/checks' && $method === 'GET':
+        ensureDebugAccess();
+        debug_list_checks();
+        break;
+
+    case $path === '/debug/checks/view' && $method === 'GET':
+        ensureDebugAccess();
+        debug_view_check();
+        break;
 
 
 // ======================
