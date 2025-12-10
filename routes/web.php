@@ -115,8 +115,20 @@ switch (true) {
         header('Content-Type: text/plain; charset=utf-8');
         echo "web.php reached\n";
         echo "APP_ENV=" . (getenv('APP_ENV') ?: 'null') . "\n";
-        echo "PLAINFULLY_DEBUG=" . (getenv('PLAINFULLY_DEBUG') ?: 'null') . "\n";
         echo "PLAINFULLY_DEBUG_TOKEN=" . (getenv('PLAINFULLY_DEBUG_TOKEN') ?: 'null') . "\n";
+        break;
+
+    // -------------------------------------------------
+    // Debug – checks
+    // -------------------------------------------------
+    case $path === '/debug/checks' && $method === 'GET':
+        // TEMP: no debug guard
+        debug_list_checks();
+        break;
+
+    case $path === '/debug/checks/view' && $method === 'GET':
+        // TEMP: no debug guard
+        debug_view_check();
         break;
 
     // -------------------------------------------------
@@ -132,20 +144,7 @@ switch (true) {
         debug_view_consultation();
         break;
 
-    // -------------------------------------------------
-    // Debug – checks
-    // -------------------------------------------------
-    case $path === '/debug/checks' && $method === 'GET':
-        ensureDebugAccess();
-        debug_list_checks();
-        break;
-
-    case $path === '/debug/checks/view' && $method === 'GET':
-        ensureDebugAccess();
-        debug_view_check();
-        break;
-
-    // -------------------------------------------------
+        // -------------------------------------------------
     // 404 fallback – nicer page
     // -------------------------------------------------
     default:

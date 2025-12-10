@@ -127,7 +127,6 @@ require dirname(__DIR__) . '/app/controllers/dashboard.php';
 require dirname(__DIR__) . '/app/controllers/email_hooks_controller.php';
 require dirname(__DIR__) . '/app/controllers/checks_debug_controller.php';
 
-
 // router
 if (!defined('PLAINFULLY_SKIP_ROUTER')) {
     require dirname(__DIR__) . '/routes/web.php';
