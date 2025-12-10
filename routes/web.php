@@ -122,12 +122,12 @@ switch (true) {
     // Debug – checks
     // -------------------------------------------------
     case $path === '/debug/checks' && $method === 'GET':
-        // TEMP: no debug guard
+        ensureDebugAccess();
         debug_list_checks();
         break;
 
     case $path === '/debug/checks/view' && $method === 'GET':
-        // TEMP: no debug guard
+        ensureDebugAccess();
         debug_view_check();
         break;
 
@@ -144,35 +144,16 @@ switch (true) {
         debug_view_consultation();
         break;
 
-        // -------------------------------------------------
+    // -------------------------------------------------
     // 404 fallback – nicer page
     // -------------------------------------------------
     default:
-        http_response_code(404);
+    http_response_code(404);
 
-        ob_start();
-        ?>
-        <div class="pf-auth-card pf-auth-card-center pf-404-card">
-            <div class="pf-404-icon">🤔</div>
-            <h1 class="pf-auth-title">We couldn&rsquo;t find that page</h1>
-            <p class="pf-auth-subtitle">
-                The link you followed doesn&rsquo;t match anything in Plainfully right now.
-            </p>
+    ob_start();
+    require dirname(__DIR__) . '/app/views/errors/404.php';
+    $inner = ob_get_clean();
 
-            <ul class="pf-404-list">
-                <li>Check the address for typos.</li>
-                <li>Use your browser&rsquo;s back button to return.</li>
-                <li>Or head back to your dashboard to see your clarifications.</li>
-            </ul>
-
-            <div class="pf-404-actions">
-                <a href="/dashboard" class="pf-button pf-button-primary">Go to dashboard</a>
-                <a href="/login" class="pf-button pf-button-secondary">Log in</a>
-            </div>
-        </div>
-        <?php
-        $inner = ob_get_clean();
-
-        pf_render_shell('Page not found', $inner);
-        break;
+    pf_render_shell('Not found', $inner);
+    return;
 }

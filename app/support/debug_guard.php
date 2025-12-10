@@ -19,7 +19,6 @@ declare(strict_types=1);
 function ensureDebugAccess(): void
 {
     return;
-    /*
     $env         = getenv('APP_ENV') ?: 'production';
     $debugFlag   = filter_var(getenv('PLAINFULLY_DEBUG') ?: 'false', FILTER_VALIDATE_BOOLEAN);
     $secretToken = getenv('DEBUG_TOKEN') ?: '';
@@ -44,13 +43,12 @@ function ensureDebugAccess(): void
     if ($secretToken !== '') {
         if (!hash_equals($secretToken, $providedToken)) {
             http_response_code(404);
-            exit('Not found');
+            exit('Not found CASE 2');
         }
         return;
     }
 
     // CASE 3: production with no token configured → block by default
     http_response_code(404);
-    exit('Not found');
-    */
+    exit('Not found CASE3');
 }
