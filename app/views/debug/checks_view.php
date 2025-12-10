@@ -8,7 +8,7 @@
 }
 
 .pf-debug-wrapper {
-    max-width: 1400px;
+    max-width: 1800px;
     margin: 0 auto;
     padding: 32px 24px;
 }
