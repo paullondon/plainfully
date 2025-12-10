@@ -1,24 +1,35 @@
 <?php declare(strict_types=1); ?>
 
 <style>
-    /* For debug pages, let the main shell go full width */
-    .pf-shell-main,
-    .pf-main-inner {
-        max-width: 100% !important;
-        width: 100% !important;
-    }
+/* Completely override the normal shell layout on debug pages */
+.pf-shell-main {
+    max-width: 100% !important;
+    width: 100% !important;
+    padding: 0 !important;
+}
 
-    /* Keep content centred but wide */
-    .pf-debug-wrapper {
-        max-width: 1800px;
-        margin: 0 auto;
-        padding: 32px 24px;
-    }
+/* The inner shell body */
+.pf-main-inner {
+    max-width: 100% !important;
+    width: 100% !important;
+    padding: 32px 40px !important;
+}
 
-    /* Table already uses width:100% – this just ensures it fills the area */
-    .pf-debug-table-container {
-        width: 100%;
-    }
+/* Remove the card wrapper look */
+.pf-shell-card,
+.pf-shell-surface {
+    background: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+}
+
+/* Make the debug area responsive + wide */
+.pf-debug-wrapper {
+    max-width: 1400px;
+    margin: 0 auto;
+    width: 100%;
+}
 </style>
 
 <div class="pf-debug-wrapper">

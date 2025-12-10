@@ -1,20 +1,39 @@
 <?php declare(strict_types=1); ?>
 
 <style>
-.pf-shell-main,
+/* Completely override the normal shell layout on debug pages */
+.pf-shell-main {
+    max-width: 100% !important;
+    width: 100% !important;
+    padding: 0 !important;
+}
+
+/* The inner shell body */
 .pf-main-inner {
     max-width: 100% !important;
     width: 100% !important;
+    padding: 32px 40px !important;
 }
 
+/* Remove the card wrapper look */
+.pf-shell-card,
+.pf-shell-surface {
+    background: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+}
+
+/* Make the debug area responsive + wide */
 .pf-debug-wrapper {
-    max-width: 1800px;
+    max-width: 1400px;
     margin: 0 auto;
-    padding: 32px 24px;
+    width: 100%;
 }
 </style>
 
 <div class="pf-debug-wrapper">
+
     <div class="pf-debug-header">
         <h1>Debug – Check #<?= (int)$row['id'] ?></h1>
         <p class="pf-debug-sub">
