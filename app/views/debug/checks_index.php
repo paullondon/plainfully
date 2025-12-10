@@ -1,19 +1,28 @@
 <?php declare(strict_types=1); ?>
 
 <style>
-/* Make debug pages use a wider main content width */
-main,
-.pf-shell-main,
-.pf-main-inner,
-.pf-debug-wrapper {
-    max-width: 1200px;
-    width: 100%;
-    margin: 0 auto;
-}
+    /* For debug pages, let the main shell go full width */
+    .pf-shell-main,
+    .pf-main-inner {
+        max-width: 100% !important;
+        width: 100% !important;
+    }
+
+    /* Keep content centred but wide */
+    .pf-debug-wrapper {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 32px 24px;
+    }
+
+    /* Table already uses width:100% – this just ensures it fills the area */
+    .pf-debug-table-container {
+        width: 100%;
+    }
 </style>
 
 <div class="pf-debug-wrapper">
-    
+
     <div class="pf-debug-header">
         <h1>Debug – Recent checks</h1>
         <p class="pf-debug-sub">

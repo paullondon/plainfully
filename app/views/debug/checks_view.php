@@ -1,13 +1,16 @@
 <?php declare(strict_types=1); ?>
 
 <style>
-main,
 .pf-shell-main,
-.pf-main-inner,
+.pf-main-inner {
+    max-width: 100% !important;
+    width: 100% !important;
+}
+
 .pf-debug-wrapper {
-    max-width: 1200px;
-    width: 100%;
+    max-width: 1400px;
     margin: 0 auto;
+    padding: 32px 24px;
 }
 </style>
 
