@@ -21,7 +21,7 @@ return [
         'user' => getenv('DB_USER') ?: 'plainfully_user',
         'pass' => getenv('DB_PASS') ?: '',
     ],
-
+/*
     // Email settings (FROM details)
     'mail' => [
         // Prefer MAIL_FROM_EMAIL, fall back to MAIL_FROM, then a sane default
@@ -29,16 +29,24 @@ return [
             ?: (getenv('MAIL_FROM') ?: 'no-reply@plainfully.com'),
         'from_name'  => getenv('MAIL_FROM_NAME') ?: 'Plainfully',
     ],
-
+*/
     // SMTP / PHPMailer settings (IONOS-style, using MAIL_* vars)
     'smtp' => [
-        'host'     => getenv('MAIL_HOST')       ?: 'localhost',
-        'port'     => (int)(getenv('MAIL_PORT') ?: 25),
-        'username' => getenv('MAIL_USER')       ?: '',
-        'password' => getenv('MAIL_PASS')       ?: '',
-        'secure'   => getenv('MAIL_ENCRYPTION') ?: '',   // '', 'tls', or 'ssl'
-        'auth'     => true, // IONOS requires SMTP auth
+        'host'    => getenv('MAIL_HOST'),
+        'port'    => (int)getenv('MAIL_PORT'),
+        'secure'  => getenv('MAIL_ENCRYPTION'),
+        'auth'    => true,
+
+        'noreply_user'   => getenv('MAIL_NOREPLY_USER'),
+        'noreply_pass'   => getenv('MAIL_NOREPLY_PASS'),
+
+        'scamcheck_user' => getenv('MAIL_SCAMCHECK_USER'),
+        'scamcheck_pass' => getenv('MAIL_SCAMCHECK_PASS'),
+
+        'clarify_user'   => getenv('MAIL_CLARIFY_USER'),
+        'clarify_pass'   => getenv('MAIL_CLARIFY_PASS'),
     ],
+
 
     // Auth / magic-link settings
     'auth' => [

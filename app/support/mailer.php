@@ -51,55 +51,85 @@ if (!class_exists(PHPMailer::class)) {
  *
  * @return bool True on success, false on failure.
  */
-function pf_send_email(string $toEmail, string $subject, string $body): bool
-{
-    $config = require __DIR__ . '/../../config/app.php';
 
-    $mailCfg = $config['mail'];
-    $smtp    = $config['smtp'];
-
-    $mailer = new PHPMailer(true);
+function pf_mail_send(
+    string $fromUser,
+    string $fromPass,
+    string $to,
+    string $subject,
+    string $html,
+    ?string $text = null
+): bool {
+    global $config;
+    $smtp = $config['smtp'];
 
     try {
-        // Server settings
-        $mailer->isSMTP();
-        $mailer->Host       = $smtp['host'];
-        $mailer->Port       = $smtp['port'];
-        $mailer->SMTPAuth   = $smtp['auth'];
-        $mailer->Username   = $smtp['username'];
-        $mailer->Password   = $smtp['password'];
+        $mail = new PHPMailer(true);
+        $mail->isSMTP();
+        $mail->Host       = $smtp['host'];
+        $mail->SMTPAuth   = true;
+        $mail->Username   = $fromUser;
+        $mail->Password   = $fromPass;
+        $mail->SMTPSecure = $smtp['secure'];
+        $mail->Port       = $smtp['port'];
 
-        if ($smtp['secure'] !== '') {
-            $mailer->SMTPSecure = $smtp['secure']; // 'tls' or 'ssl'
+        $mail->setFrom($fromUser, 'Plainfully');
+        $mail->addAddress($to);
+
+        if ($text === null) {
+            $text = strip_tags($html);
         }
 
-        $mailer->CharSet    = 'UTF-8';
+        $mail->Subject = $subject;
+        $mail->Body    = $html;
+        $mail->AltBody = $text;
 
-        // From / To
-        $mailer->setFrom(
-            $mailCfg['from_email'],
-            $mailCfg['from_name']
-        );
-        $mailer->addAddress($toEmail);
-
-        // Content
-        $mailer->Subject = $subject;
-        $mailer->Body    = $body;
-        $mailer->isHTML(false); // plain-text for now
-
-        $mailer->send();
-        return true;
-    } catch (Exception $e) {
-        // In Live: fail quietly, just return false
-        $env = getenv('APP_ENV') ?: 'local';
-        if (in_array(strtolower($env), ['live', 'production'], true)) {
-            // TODO: log $e->getMessage()
-            return false;
-        }
-
-        // In local/dev: throw with detailed info so we can see the cause
-        throw new RuntimeException(
-            'Mail send failed: ' . $e->getMessage()
-        );
+        return $mail->send();
+    } catch (Throwable $e) {
+        error_log("pf_mail_send error: " . $e->getMessage());
+        return false;
     }
+}
+
+function pf_mail_noreply(string $to, string $subject, string $html, ?string $text = null): bool
+{
+    global $config;
+    $smtp = $config['smtp'];
+
+    return pf_mail_send(
+        $smtp['noreply_user'],
+        $smtp['noreply_pass'],
+        $to,
+        $subject,
+        $html,
+        $text
+    );
+}
+function pf_mail_scamcheck(string $to, string $subject, string $html, ?string $text = null): bool
+{
+    global $config;
+    $smtp = $config['smtp'];
+
+    return pf_mail_send(
+        $smtp['scamcheck_user'],
+        $smtp['scamcheck_pass'],
+        $to,
+        $subject,
+        $html,
+        $text
+    );
+}
+function pf_mail_clarify(string $to, string $subject, string $html, ?string $text = null): bool
+{
+    global $config;
+    $smtp = $config['smtp'];
+
+    return pf_mail_send(
+        $smtp['clarify_user'],
+        $smtp['clarify_pass'],
+        $to,
+        $subject,
+        $html,
+        $text
+    );
 }
