@@ -1,6 +1,17 @@
 <?php declare(strict_types=1); ?>
-<div class="pf-debug-wrapper">
 
+<style>
+main,
+.pf-shell-main,
+.pf-main-inner,
+.pf-debug-wrapper {
+    max-width: 1200px;
+    width: 100%;
+    margin: 0 auto;
+}
+</style>
+
+<div class="pf-debug-wrapper">
     <div class="pf-debug-header">
         <h1>Debug – Check #<?= (int)$row['id'] ?></h1>
         <p class="pf-debug-sub">

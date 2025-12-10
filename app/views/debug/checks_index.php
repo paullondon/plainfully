@@ -1,6 +1,19 @@
 <?php declare(strict_types=1); ?>
-<div class="pf-debug-wrapper">
 
+<style>
+/* Make debug pages use a wider main content width */
+main,
+.pf-shell-main,
+.pf-main-inner,
+.pf-debug-wrapper {
+    max-width: 1200px;
+    width: 100%;
+    margin: 0 auto;
+}
+</style>
+
+<div class="pf-debug-wrapper">
+    
     <div class="pf-debug-header">
         <h1>Debug – Recent checks</h1>
         <p class="pf-debug-sub">
@@ -63,6 +76,8 @@
 </div>
 
 <style>
+
+
 .pf-debug-wrapper {
     padding: 32px 20px;
 }
