@@ -78,28 +78,6 @@ switch (true) {
         handle_logout();
         break;
 
-    // -------------------------------------------------
-    // Dev email inbound hook (no auth – token-based)
-    // -------------------------------------------------
-    case $path === '/hooks/email/inbound-dev' && $method === 'POST':
-        email_inbound_dev_controller();
-        break;
-
-    case $path === '/hooks/sms/inbound-dev' && $method === 'POST':
-        sms_inbound_dev_controller();
-        break;
-
-    case $path === '/debug/checks' && $method === 'GET':
-        ensureDebugAccess();
-        debug_list_checks();
-        break;
-
-    case $path === '/debug/checks/view' && $method === 'GET':
-        ensureDebugAccess();
-        debug_view_check();
-        break;
-
-
 // ======================
 // !! GUEST ROUTES     !!
 // ======================
@@ -128,33 +106,74 @@ switch (true) {
         handle_health($config);
         break;
 
+    // -------------------------------------------------
+    // Debug – env sanity
+    // -------------------------------------------------
     case $path === '/debug/env-check' && $method === 'GET':
-            // Debug env + sanity check
-            ensureDebugAccess();
+        ensureDebugAccess();
 
-            header('Content-Type: text/plain; charset=utf-8');
-            echo "web.php reached\n";
-            echo "APP_ENV=" . (getenv('APP_ENV') ?: 'null') . "\n";
-            echo "PLAINFULLY_DEBUG=" . (getenv('PLAINFULLY_DEBUG') ?: 'null') . "\n";
-            echo "PLAINFULLY_DEBUG_TOKEN=" . (getenv('PLAINFULLY_DEBUG_TOKEN') ?: 'null') . "\n";
-            break;
-
-    case $path === '/debug/consultations' && $method === 'GET':
-            // List recent consultations (debug only)
-            ensureDebugAccess();
-            debug_list_consultations();
-            break;
-    
-
+        header('Content-Type: text/plain; charset=utf-8');
+        echo "web.php reached\n";
+        echo "APP_ENV=" . (getenv('APP_ENV') ?: 'null') . "\n";
+        echo "PLAINFULLY_DEBUG=" . (getenv('PLAINFULLY_DEBUG') ?: 'null') . "\n";
+        echo "PLAINFULLY_DEBUG_TOKEN=" . (getenv('PLAINFULLY_DEBUG_TOKEN') ?: 'null') . "\n";
+        break;
 
     // -------------------------------------------------
-    // 404 fallback
+    // Debug – consultations
+    // -------------------------------------------------
+    case $path === '/debug/consultations' && $method === 'GET':
+        ensureDebugAccess();
+        debug_list_consultations();
+        break;
+
+    case $path === '/debug/consultations/view' && $method === 'GET':
+        ensureDebugAccess();
+        debug_view_consultation();
+        break;
+
+    // -------------------------------------------------
+    // Debug – checks
+    // -------------------------------------------------
+    case $path === '/debug/checks' && $method === 'GET':
+        ensureDebugAccess();
+        debug_list_checks();
+        break;
+
+    case $path === '/debug/checks/view' && $method === 'GET':
+        ensureDebugAccess();
+        debug_view_check();
+        break;
+
+    // -------------------------------------------------
+    // 404 fallback – nicer page
     // -------------------------------------------------
     default:
         http_response_code(404);
-        pf_render_shell(
-            'Not found',
-            '<h1 class="pf-auth-title">404</h1><p class="pf-auth-subtitle">Page not found.</p>'
-        );
+
+        ob_start();
+        ?>
+        <div class="pf-auth-card pf-auth-card-center pf-404-card">
+            <div class="pf-404-icon">🤔</div>
+            <h1 class="pf-auth-title">We couldn&rsquo;t find that page</h1>
+            <p class="pf-auth-subtitle">
+                The link you followed doesn&rsquo;t match anything in Plainfully right now.
+            </p>
+
+            <ul class="pf-404-list">
+                <li>Check the address for typos.</li>
+                <li>Use your browser&rsquo;s back button to return.</li>
+                <li>Or head back to your dashboard to see your clarifications.</li>
+            </ul>
+
+            <div class="pf-404-actions">
+                <a href="/dashboard" class="pf-button pf-button-primary">Go to dashboard</a>
+                <a href="/login" class="pf-button pf-button-secondary">Log in</a>
+            </div>
+        </div>
+        <?php
+        $inner = ob_get_clean();
+
+        pf_render_shell('Page not found', $inner);
         break;
-    };
+}
