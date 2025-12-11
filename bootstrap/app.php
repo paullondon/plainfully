@@ -124,6 +124,7 @@ require dirname(__DIR__) . '/app/support/auth_log.php';
 require dirname(__DIR__) . '/app/support/debug_guard.php';
 require dirname(__DIR__) . '/app/support/debug_consultations.php';
 require dirname(__DIR__) . '/app/support/debug_shell.php';
+require dirname(__DIR__) . '/app/support/turnstile.php';
 
 // controllers
 require dirname(__DIR__) . '/app/controllers/welcome_controller.php';
