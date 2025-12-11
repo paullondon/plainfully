@@ -10,7 +10,28 @@ function handle_login_form(array $config): void
     $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 
     if ($method === 'POST') {
-        // POST -> delegate to magic link handler
+        // --- Turnstile verification first ---
+        $env   = strtolower(getenv('APP_ENV') ?: 'local');
+        $token = $_POST['cf-turnstile-response'] ?? null;
+
+        [$ok, $reason] = pf_turnstile_verify($token);
+
+        if (!$ok) {
+            // Always log the internal reason
+            error_log('Turnstile failed on /login: ' . $reason);
+
+            if ($env === 'live' || $env === 'production') {
+                $_SESSION['magic_link_error'] = 'There was an issue with your request. Please try again.';
+            } else {
+                // In local/dev show the exact reason so you can fix config/CSP/etc.
+                $_SESSION['magic_link_error'] = 'Turnstile failed: ' . $reason;
+            }
+
+            pf_redirect('/login');
+            return;
+        }
+
+        // Turnstile passed → delegate to magic link handler
         handle_magic_request($config);
         return;
     }
