@@ -72,7 +72,13 @@ set_exception_handler(function (Throwable $e): void {
 header('X-Frame-Options: SAMEORIGIN');
 header('X-Content-Type-Options: nosniff');
 header('Referrer-Policy: strict-origin-when-cross-origin');
-header("Content-Security-Policy: default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com;");
+header(
+    "Content-Security-Policy: " .
+    "default-src 'self'; " .
+    "style-src 'self' 'unsafe-inline'; " .
+    "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com; " .
+    "frame-src https://challenges.cloudflare.com;"
+);
 
 // ---------------------------------------------------------
 // 3. Sessions – secure cookie flags
