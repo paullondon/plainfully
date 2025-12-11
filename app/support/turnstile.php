@@ -10,7 +10,7 @@
 function pf_turnstile_verify(?string $token): array
 {
     $env = strtolower(getenv('APP_ENV') ?: 'local');
-    $secret = getenv('TURNSTILE_SECRET') ?: '';
+    $secret = getenv('TURNSTILE_SECRET_KEY') ?: '';
 
     if ($token === null || $token === '') {
         return [false, 'missing token (cf-turnstile-response not posted)'];
