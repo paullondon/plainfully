@@ -47,7 +47,7 @@ function pf_turnstile_verify(?string $token): array
     curl_close($ch);
 
     $decoded = json_decode($raw, true);
-    if (!is_arroay($decoded)) {
+    if (!is_array($decoded)) {
         return [false, 'invalid JSON from Turnstile: ' . substr($raw, 0, 200)];
     }
 
