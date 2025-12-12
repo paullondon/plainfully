@@ -1,4 +1,4 @@
-<<?php declare(strict_types=1);
+<?php declare(strict_types=1);
 
 function pf_turnstile_verify(?string $token): array
 {
