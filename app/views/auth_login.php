@@ -139,10 +139,5 @@ $cssVersion = htmlspecialchars((string)($config['css'] ?? '1'), ENT_QUOTES, 'UTF
 
     </section>
 </main>
-
-<?php if (!empty($siteKey)): ?>
-    <!-- Cloudflare Turnstile API -->
-    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
-<?php endif; ?>
 </body>
 </html>
