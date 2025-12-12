@@ -10,7 +10,7 @@ $siteKey    = $siteKey    ?? '';
 $loginError = $loginError ?? '';
 $loginOk    = $loginOk    ?? '';
 
-$cssVersion = htmlspecialchars((string)($config['css'] ?? '1'), ENT_QUOTES, 'UTF-8');
+$cssVersion = htmlspecialchars((string)($config[app]['css'] ?? '1'), ENT_QUOTES, 'UTF-8');
 ?>
 <!doctype html>
 <html lang="en">
@@ -18,10 +18,9 @@ $cssVersion = htmlspecialchars((string)($config['css'] ?? '1'), ENT_QUOTES, 'UTF
     <meta charset="utf-8">
     <title>Login | Plainfully</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-
     <!-- Main stylesheet with versioning taken from config -->
-    <link rel="stylesheet"
-          href="/assets/css/app.css?v=<?= $cssVersion ?>">
+    <link rel="stylesheet" href="/assets/css/app.css?v=<?= $cssVersion ?>">
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 </head>
 <body class="pf-shell">
 <main class="pf-page-center">
