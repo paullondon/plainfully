@@ -92,7 +92,7 @@ $cssVersion = htmlspecialchars((string)($config['css'] ?? '1'), ENT_QUOTES, 'UTF
 
         <!-- NOTE -->
         <p class="pf-note">
-            This link expires in about 30 minutes and can only be used once.
+            TEST!!!! This link expires in about 30 minutes and can only be used once.
         </p>
 
         <!-- MESSAGES -->
