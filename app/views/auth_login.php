@@ -10,7 +10,7 @@ $siteKey    = $siteKey    ?? '';
 $loginError = $loginError ?? '';
 $loginOk    = $loginOk    ?? '';
 
-$cssVersion = htmlspecialchars((string)($config[app]['css'] ?? '1'), ENT_QUOTES, 'UTF-8');
+$cssVersion = htmlspecialchars((string)($config['css'] ?? '1'), ENT_QUOTES, 'UTF-8');
 ?>
 <!doctype html>
 <html lang="en">
