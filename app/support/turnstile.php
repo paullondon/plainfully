@@ -1,15 +1,8 @@
-<?php declare(strict_types=1);
+<<?php declare(strict_types=1);
 
-/**
- * Verify a Cloudflare Turnstile token.
- *
- * Returns [bool $ok, string $reason].
- * In live: you show a generic message.
- * In local: you can show the $reason for debugging.
- */
 function pf_turnstile_verify(?string $token): array
 {
-    $env = strtolower(getenv('APP_ENV') ?: 'local');
+    $env    = strtolower(getenv('APP_ENV') ?: 'local');
     $secret = getenv('TURNSTILE_SECRET_KEY') ?: '';
 
     if ($token === null || $token === '') {
@@ -17,7 +10,7 @@ function pf_turnstile_verify(?string $token): array
     }
 
     if ($secret === '') {
-        return [false, 'TURNSTILE_SECRET not configured in .env'];
+        return [false, 'TURNSTILE_SECRET_KEY not configured in .env'];
     }
 
     $remoteIp = $_SERVER['REMOTE_ADDR'] ?? null;
@@ -53,6 +46,7 @@ function pf_turnstile_verify(?string $token): array
 
     $success = !empty($decoded['success']);
     $codes   = $decoded['error-codes'] ?? [];
+
     if (!$success) {
         $codeList = is_array($codes) ? implode(', ', $codes) : (string)$codes;
         return [false, 'Turnstile reported failure: ' . $codeList];
@@ -60,3 +54,4 @@ function pf_turnstile_verify(?string $token): array
 
     return [true, 'ok'];
 }
+
