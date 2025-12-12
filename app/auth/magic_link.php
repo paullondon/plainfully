@@ -31,7 +31,7 @@ if (!function_exists('handle_magic_request')) {
 
         // Turnstile
         $turnstileToken = $_POST['cf-turnstile-response'] ?? null;
-        if (!pf_verify_turnstile($turnstileToken)) {
+        if (!pf_turnstile_verify($turnstileToken)) {
             $_SESSION['magic_link_error'] = 'Verification failed. Please try again.';
             pf_log_auth_event('magic_link_turnstile_failed', null, $email, 'Turnstile verification failed');
             pf_redirect('/login');

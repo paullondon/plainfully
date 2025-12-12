@@ -38,7 +38,8 @@ function pf_generate_magic_token(): string
 /**
  * Verify Cloudflare Turnstile token server-side.
  */
-function pf_verify_turnstile(string $token = null): bool
+
+/* function pf_verify_turnstile(string $token = null): bool
 {
     $env = strtolower(getenv('APP_ENV') ?: 'local');
 
@@ -101,8 +102,7 @@ function pf_verify_turnstile(string $token = null): bool
         // Network/JSON errors: don't block in dev, do block in live
         return ($env !== 'live' && $env !== 'production');
     }
-}
-
+} */
 
 
 /**
