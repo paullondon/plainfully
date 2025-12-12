@@ -76,7 +76,6 @@ $cssVersion = htmlspecialchars((string)($config['css'] ?? '1'), ENT_QUOTES, 'UTF
                     <div class="cf-turnstile"
                          data-sitekey="<?= htmlspecialchars((string)$siteKey, ENT_QUOTES, 'UTF-8') ?>"
                          data-theme="dark">
-                        <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
                     </div>
                 </div>
             <?php else: ?>
