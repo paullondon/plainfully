@@ -73,14 +73,11 @@ $cssVersion = htmlspecialchars((string)($config['css'] ?? '1'), ENT_QUOTES, 'UTF
                 <div class="pf-field">
                     <label class="pf-label">Security check</label>
 
-                    <!-- Turnstile container (we render into this via JS) -->
-                    <div id="pf-turnstile-container"></div>
-
-                    <!-- Hidden field we explicitly populate with the token -->
-                    <input type="hidden"
-                           name="cf-turnstile-response"
-                           id="pf-turnstile-token"
-                           value="">
+                    <!-- Simple Turnstile widget; CF will handle the token -->
+                    <div class="cf-turnstile"
+                         data-sitekey="<?= htmlspecialchars((string)$siteKey, ENT_QUOTES, 'UTF-8') ?>"
+                         data-theme="dark">
+                    </div>
                 </div>
             <?php else: ?>
                 <p class="pf-note">
@@ -145,98 +142,6 @@ $cssVersion = htmlspecialchars((string)($config['css'] ?? '1'), ENT_QUOTES, 'UTF
 <?php if (!empty($siteKey)): ?>
     <!-- Cloudflare Turnstile API -->
     <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
-
-    <!-- Explicit render + execute for invisible Turnstile -->
-    <script>
-        (function () {
-            var widgetId = null;
-
-            function initTurnstile() {
-                var container = document.getElementById('pf-turnstile-container');
-                if (!container || typeof turnstile === 'undefined') {
-                    console.error('Turnstile JS not loaded or container missing');
-                    return;
-                }
-
-                widgetId = turnstile.render('#pf-turnstile-container', {
-                    sitekey: <?= json_encode($siteKey, JSON_UNESCAPED_SLASHES) ?>,
-                    size: 'invisible',
-                    action: 'magic_link',
-                    callback: pfOnTurnstileSuccess
-                });
-            }
-
-            // Intercept form submit and run Turnstile first
-            document.addEventListener('DOMContentLoaded', function () {
-                var form = document.getElementById('magic-link-form');
-                if (!form) {
-                    return;
-                }
-
-                form.addEventListener('submit', function (e) {
-                    // If we've already passed Turnstile once, allow normal submit
-                    if (form.dataset.turnstileOk === '1') {
-                        return;
-                    }
-
-                    e.preventDefault();
-
-                    if (typeof turnstile === 'undefined') {
-                        console.error('Turnstile JS not available, submitting anyway (dev fallback)');
-                        form.submit();
-                        return;
-                    }
-
-                    if (widgetId === null) {
-                        initTurnstile();
-                    }
-
-                    try {
-                        if (widgetId !== null) {
-                            turnstile.execute(widgetId);
-                        } else {
-                            // Fallback if something went weird, avoid locking user out
-                            form.submit();
-                        }
-                    } catch (err) {
-                        console.error('Error executing Turnstile:', err);
-                        form.submit();
-                    }
-                });
-
-                // Initialise as soon as DOM + Turnstile script are ready
-                if (typeof turnstile !== 'undefined') {
-                    initTurnstile();
-                } else {
-                    // In case script loads slightly after DOMContentLoaded
-                    var checkCount = 0;
-                    var intervalId = setInterval(function () {
-                        if (typeof turnstile !== 'undefined') {
-                            clearInterval(intervalId);
-                            initTurnstile();
-                        } else if (++checkCount > 20) {
-                            clearInterval(intervalId);
-                        }
-                    }, 250);
-                }
-            });
-
-            // Global callback used by Turnstile (must be global)
-            window.pfOnTurnstileSuccess = function (token) {
-                var form   = document.getElementById('magic-link-form');
-                var hidden = document.getElementById('pf-turnstile-token');
-
-                if (hidden) {
-                    hidden.value = token || '';
-                }
-
-                if (form) {
-                    form.dataset.turnstileOk = '1';
-                    form.submit();
-                }
-            };
-        })();
-    </script>
 <?php endif; ?>
 </body>
 </html>
