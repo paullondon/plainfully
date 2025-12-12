@@ -37,7 +37,7 @@ function handle_login_form(array $config): void
     }
 
     // GET -> render login view
-    $siteKey    = $config['turnstile_site_key'] ?? '';
+    $siteKey    = $config['security']['turnstile_site_key'] ?? '';
     $loginError = $_SESSION['magic_link_error'] ?? '';
     unset($_SESSION['magic_link_error']);
 
