@@ -1,9 +1,10 @@
 <?php declare(strict_types=1);
 
+/*
+ * TEMPORARY Turnstile bypass while debugging.
+ */
 function pf_turnstile_verify(?string $token): array
 {
-    // TEMP: always allow during dev while Turnstile is being flaky.
-    // Logs any odd cases so we can review later.
     $env = strtolower(getenv('APP_ENV') ?: 'local');
 
     if ($token === null || $token === '') {
