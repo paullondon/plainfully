@@ -29,14 +29,6 @@ if (!function_exists('handle_magic_request')) {
         pf_redirect('/login');
         }
 
-        // Turnstile
-        $turnstileToken = $_POST['cf-turnstile-response'] ?? null;
-        if (!pf_turnstile_verify($turnstileToken)) {
-            $_SESSION['magic_link_error'] = 'Verification failed. Please try again.';
-            pf_log_auth_event('magic_link_turnstile_failed', null, $email, 'Turnstile verification failed');
-            pf_redirect('/login');
-        }
-
         // Rate limit
         $ip = $_SERVER['REMOTE_ADDR'] ?? '';
         if (pf_rate_limit_magic_link($email, $ip)) {
