@@ -131,7 +131,8 @@ function email_inbound_dev_controller(): void
 {
     global $config;
 
-    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    // 1) Method + auth token
+    if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
         http_response_code(405);
         header('Content-Type: application/json; charset=utf-8');
         echo json_encode(['error' => 'Method not allowed. Use POST.']);
@@ -148,6 +149,7 @@ function email_inbound_dev_controller(): void
         return;
     }
 
+    // 2) Basic fields
     $from    = trim($_POST['from']    ?? '');
     $to      = trim($_POST['to']      ?? '');
     $subject = trim($_POST['subject'] ?? '');
@@ -160,99 +162,97 @@ function email_inbound_dev_controller(): void
         return;
     }
 
-    // Build the raw content (in-memory only; not stored)
-    // Handles both plain text and HTML (anchors -> "[link]" / "[link – potentially risky]")
+    // 3) Normalise email text (HTML → safe text, mark risky links)
     $rawContent = plainfully_normalise_email_text($subject, $body, $from);
 
-    $pdo        = pf_db();
-    $aiClient   = new DummyAiClient();
-    $checkEngine = new CheckEngine($pdo, $aiClient);
+    // 4) Decide mode based on TO address
+    $toLower      = strtolower($to);
+    $mode         = 'generic';
+    $checkChannel = 'email';
+    $emailChannel = 'noreply';
+
+    if ($toLower !== '') {
+        if (str_contains($toLower, 'scamcheck@')) {
+            $mode         = 'scamcheck';
+            $checkChannel = 'email-scamcheck';
+            $emailChannel = 'scamcheck';
+        } elseif (str_contains($toLower, 'clarify@')) {
+            $mode         = 'clarify';
+            $checkChannel = 'email-clarify';
+            $emailChannel = 'clarify';
+        }
+    }
+
+    // 5) Run through CheckEngine (CORE brain)
+    $pdo       = pf_db();
+    $aiClient  = new DummyAiClient();   // swap later for real AI client
+    $engine    = new CheckEngine($pdo, $aiClient);
 
     $input = new CheckInput(
-        'email',        // channel
-        $from,          // source_identifier
-        'text/plain',   // content type
-        $rawContent,    // safe content
-        $from,          // email
-        null,           // phone
-        null            // provider_user_id
+        $checkChannel,   // channel: email-scamcheck / email-clarify / email
+        $from,           // source_identifier (we use sender address)
+        'text/plain',    // content type
+        $rawContent,     // safe, normalised content
+        $from,           // email
+        null,            // phone
+        null             // provider_user_id
     );
 
     $isPaid = false;
 
     try {
-        $result = $checkEngine->run($input, $isPaid);
+        $result = $engine->run($input, $isPaid);
 
-        // Build a view URL for the user
-        $baseUrl = '';
-        if (isset($config['app']['url']) && is_string($config['app']['url'])) {
-            $baseUrl = rtrim($config['app']['url'], '/');
+        // 6) Build view URL
+        $baseUrl = rtrim($config['app']['base_url'] ?? 'https://plainfully.com', '/');
+        $viewUrl = $baseUrl . '/clarifications/view?id=' . $result->id;
+
+        // 7) Compose outbound email (different flavour per mode)
+        if ($mode === 'scamcheck') {
+            $outSubject = 'Plainfully ScamCheck result';
+            $intro      = 'You forwarded a message to Plainfully ScamCheck. Here is our quick verdict:';
+        } elseif ($mode === 'clarify') {
+            $outSubject = 'Plainfully clarification result';
+            $intro      = 'You emailed Plainfully for clarification. Here is your summary:';
         } else {
-            $baseUrl = 'https://plainfully.com';
+            $outSubject = 'Plainfully check result';
+            $intro      = 'Here is the summary of the text you sent to Plainfully:';
         }
 
-        $viewUrl = $baseUrl . '/clarifications/view?id=' . $result->checkId;
+        $htmlBody = '<p>' . htmlspecialchars($intro, ENT_QUOTES, 'UTF-8') . '</p>'
+                  . '<p><strong>Verdict:</strong> '
+                  . htmlspecialchars($result->shortVerdict, ENT_QUOTES, 'UTF-8') . '</p>'
+                  . '<p><strong>Summary:</strong><br>'
+                  . nl2br(htmlspecialchars($result->inputCapsule, ENT_QUOTES, 'UTF-8')) . '</p>'
+                  . '<p>You can view this check on Plainfully here:<br>'
+                  . '<a href="' . htmlspecialchars($viewUrl, ENT_QUOTES, 'UTF-8') . '">'
+                  . htmlspecialchars($viewUrl, ENT_QUOTES, 'UTF-8') . '</a></p>';
 
-        // Compose reply email (NO raw content, only capsule + verdict)
-        $emailSubject = '[Plainfully] Scam check result';
-        $verdictLine  = $result->isScam
-            ? 'Our system believes this message is LIKELY A SCAM.'
-            : 'Our system did not detect obvious scam indicators.';
+        $textBody = $intro . "\n\n"
+                  . 'Verdict: ' . $result->shortVerdict . "\n\n"
+                  . "Summary:\n" . $result->inputCapsule . "\n\n"
+                  . "View this check on Plainfully:\n" . $viewUrl . "\n";
 
-        $textBodyLines = [
-            "Hi,",
-            "",
-            "You forwarded a message to Plainfully for a quick scam/clarity check.",
-            "",
-            $verdictLine,
-            "",
-            "Short summary of what we analysed (not the full text):",
-            $result->inputCapsule,
-            "",
-            "To see the full breakdown and guidance, open:",
-            $viewUrl,
-            "",
-            "Plainfully never stores the full message content – only safe summaries.",
-            "",
-            "— Plainfully",
-        ];
-        $textBody = implode("\n", $textBodyLines);
+        $emailSent = false;
+        $mailError = null;
 
-        // Email sending with pf_mail() if it exists, otherwise native mail()
-        $emailSent        = false;
-        $mailErrorMessage = null;
-
-        try {
-            if (function_exists('pf_mail')) {
-                $res       = pf_mail($from, $emailSubject, $textBody);
-                $emailSent = ($res === null) ? true : (bool) $res;
-            } else {
-                $fromAddress = 'no-reply@plainfully.com';
-
-                $headers  = 'From: Plainfully Scam Check <' . $fromAddress . ">\r\n";
-                $headers .= 'Reply-To: ' . $fromAddress . "\r\n";
-                $headers .= "Content-Type: text/plain; charset=utf-8\r\n";
-                $headers .= "MIME-Version: 1.0\r\n";
-
-                $ok = mail($from, $emailSubject, $textBody, $headers);
-
-                if (!$ok) {
-                    throw new RuntimeException('mail() returned false; email not sent.');
-                }
-
-                $emailSent = true;
-            }
-        } catch (Throwable $mailError) {
-            $emailSent        = false;
-            $mailErrorMessage = $mailError->getMessage();
+        if (function_exists('pf_send_email')) {
+            [$emailSent, $mailError] = pf_send_email(
+                $from,
+                $outSubject,
+                $htmlBody,
+                $emailChannel,   // 'scamcheck' / 'clarify' / 'noreply'
+                $textBody
+            );
+        } else {
+            $mailError = 'pf_send_email helper not defined.';
         }
 
-        http_response_code(200);
+        // 8) JSON response for your PowerShell tests
         header('Content-Type: application/json; charset=utf-8');
-
-        $payload = [
+        echo json_encode([
             'status'         => 'ok',
-            'check_id'       => $result->checkId,
+            'check_id'       => $result->id,
             'short_verdict'  => $result->shortVerdict,
             'is_scam'        => $result->isScam,
             'is_paid'        => $result->isPaid,
@@ -260,26 +260,19 @@ function email_inbound_dev_controller(): void
             'upsell_flags'   => $result->upsellFlags,
             'view_url'       => $viewUrl,
             'email_sent'     => $emailSent,
-        ];
-
-        // Expose mail error only in non-live envs
-        $appEnv = getenv('APP_ENV') ?: 'local';
-        if (strtolower($appEnv) !== 'live' && strtolower($appEnv) !== 'production') {
-            if ($mailErrorMessage !== null) {
-                $payload['mail_error'] = $mailErrorMessage;
-            }
-        }
-
-        echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-    } catch (Throwable $t) {
+            'mail_error'     => $mailError,
+            'mode'           => $mode,
+        ]);
+    } catch (Throwable $e) {
+        error_log('email_inbound_dev_controller error: ' . $e->getMessage());
         http_response_code(500);
         header('Content-Type: application/json; charset=utf-8');
         echo json_encode([
-            'error' => 'Internal error running CheckEngine.',
-            'code'  => 'checkengine_failure',
+            'error' => 'Internal error processing email hook.',
         ]);
-    }   
+    }
 }
+
 /**
  * Dev-only inbound SMS hook.
  *

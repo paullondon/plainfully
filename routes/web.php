@@ -144,6 +144,10 @@ switch (true) {
         debug_view_consultation();
         break;
 
+    case $path === '/hooks/email/inbound-dev' && $method === 'POST':
+        email_inbound_dev_controller();
+        return;
+
     // -------------------------------------------------
     // 404 fallback – nicer page
     // -------------------------------------------------
