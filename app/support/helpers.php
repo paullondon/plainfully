@@ -102,12 +102,12 @@ function pf_generate_magic_token(): string
         // Network/JSON errors: don't block in dev, do block in live
         return ($env !== 'live' && $env !== 'production');
     }
-} */
+
 
 
 /**
  * Send magic-link email via PHPMailer wrapper.
- */
+ *
 function pf_send_magic_link_email(string $toEmail, string $link): bool
 {
     $subject = 'Your Plainfully sign-in link';
@@ -120,7 +120,7 @@ function pf_send_magic_link_email(string $toEmail, string $link): bool
 
     return pf_send_email($toEmail, $subject, $body);
 }
-
+*/
 /**
  *  Clarifications and plans
  * 

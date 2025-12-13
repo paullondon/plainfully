@@ -177,3 +177,39 @@ if (!function_exists('pf_send_email')) {
         }
     }
 }
+/**
+ * Magic-link emails MUST return bool because the login flow expects it.
+ * This simply routes to pf_mail_noreply() and returns ONLY true/false.
+ */
+if (!function_exists('pf_send_magic_link_email')) {
+    /**
+     * Send a Plainfully magic sign-in link.
+     *
+     * @param string $to   Recipient email
+     * @param string $link Fully-formed magic link URL
+     *
+     * @return bool True on success, false on failure
+     */
+    function pf_send_magic_link_email(string $to, string $link): bool
+    {
+        $subject = 'Your Plainfully sign-in link';
+
+        // Simple HTML body (you can prettify later)
+        $html = '<p>Hello,</p>'
+              . '<p>Here\'s your one-time link to sign in to Plainfully:</p>'
+              . '<p><a href="' . htmlspecialchars($link, ENT_QUOTES, 'UTF-8') . '">'
+              . htmlspecialchars($link, ENT_QUOTES, 'UTF-8')
+              . '</a></p>'
+              . '<p>This link will expire shortly and can only be used once.</p>'
+              . '<p>If you did not request this email, you can safely ignore it.</p>';
+
+        $text = "Hello,\n\n"
+              . "Here is your one-time link to sign in to Plainfully:\n\n"
+              . $link . "\n\n"
+              . "This link will expire shortly and can only be used once.\n"
+              . "If you did not request this email, you can safely ignore it.\n";
+
+        // Uses noreply@… SMTP as you already configured
+        return pf_mail_noreply($to, $subject, $html, $text);
+    }
+}
