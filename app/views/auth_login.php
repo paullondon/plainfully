@@ -20,7 +20,6 @@ $cssVersion = htmlspecialchars((string)($config['css'] ?? '1'), ENT_QUOTES, 'UTF
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <!-- Main stylesheet with versioning taken from config -->
     <link rel="stylesheet" href="/assets/css/app.css?v=<?= $cssVersion ?>">
-    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 </head>
 <body class="pf-shell">
 <main class="pf-page-center">
@@ -67,22 +66,6 @@ $cssVersion = htmlspecialchars((string)($config['css'] ?? '1'), ENT_QUOTES, 'UTF
                     class="pf-input"
                     placeholder="you@example.com">
             </div>
-
-            <?php if (!empty($siteKey)): ?>
-                <div class="pf-field">
-                    <label class="pf-label">Security check</label>
-
-                    <!-- Simple Turnstile widget; CF will handle the token -->
-                    <div class="cf-turnstile"
-                         data-sitekey="<?= htmlspecialchars((string)$siteKey, ENT_QUOTES, 'UTF-8') ?>"
-                         data-theme="dark">
-                    </div>
-                </div>
-            <?php else: ?>
-                <p class="pf-note">
-                    <strong>Warning:</strong> Turnstile site key is not configured.
-                </p>
-            <?php endif; ?>
 
             <button type="submit" class="pf-button">
                 Send magic link
