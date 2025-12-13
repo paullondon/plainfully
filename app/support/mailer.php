@@ -133,3 +133,47 @@ function pf_mail_clarify(string $to, string $subject, string $html, ?string $tex
         $text
     );
 }
+if (!function_exists('pf_send_email')) {
+    /**
+     * Plainfully email wrapper used by newer features.
+     *
+     * $channel:
+     *   - 'scamcheck' → sends from scamcheck@...
+     *   - 'clarify'   → sends from clarify@...
+     *   - anything else / default → sends from noreply@...
+     *
+     * Returns: [bool $ok, ?string $error]
+     */
+    function pf_send_email(
+        string $to,
+        string $subject,
+        string $html,
+        string $channel = 'noreply',
+        ?string $text = null
+    ): array {
+        try {
+            switch ($channel) {
+                case 'scamcheck':
+                    $ok = pf_mail_scamcheck($to, $subject, $html, $text);
+                    break;
+
+                case 'clarify':
+                    $ok = pf_mail_clarify($to, $subject, $html, $text);
+                    break;
+
+                default:
+                    $ok = pf_mail_noreply($to, $subject, $html, $text);
+                    break;
+            }
+
+            if (!$ok) {
+                return [false, 'pf_mail_* returned false'];
+            }
+
+            return [true, null];
+        } catch (Throwable $e) {
+            error_log('pf_send_email failed: ' . $e->getMessage());
+            return [false, $e->getMessage()];
+        }
+    }
+}
