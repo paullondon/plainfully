@@ -147,6 +147,13 @@ switch (true) {
     case $path === '/hooks/email/inbound-dev' && $method === 'POST':
         email_inbound_dev_controller();
         return;
+    
+    
+    require_once __DIR__ . '/../app/controllers/email_inbound.php';
+
+    $router->post('/api/email/inbound', function () {
+        handle_email_inbound();
+    });
 
     // -------------------------------------------------
     // 404 fallback – nicer page

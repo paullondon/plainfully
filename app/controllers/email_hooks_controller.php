@@ -127,6 +127,46 @@ function plainfully_normalise_email_text(string $subject, string $body, ?string 
  *  - We send a brief reply email to the sender
  *  - We return JSON with the CheckEngine result (no raw content stored)
  */
+
+<?php declare(strict_types=1);
+
+/**
+ * handle_email_inbound()
+ *
+ * Accepts POST JSON forwarded from the IMAP bridge.
+ * Always returns JSON. Never calls view helpers.
+ */
+
+function handle_email_inbound(): void
+{
+    header('Content-Type: application/json');
+
+    try {
+        $json = file_get_contents('php://input');
+        $payload = json_decode($json, true);
+
+        if (!is_array($payload)) {
+            http_response_code(400);
+            echo json_encode(['ok' => false, 'error' => 'Invalid or missing JSON']);
+            return;
+        }
+
+        // TODO: swap in real processing later
+        // For now we simply log the inbound payload for debugging.
+        error_log('Inbound email received: ' . $json);
+
+        echo json_encode(['ok' => true]);
+    }
+    catch (Throwable $e) {
+        http_response_code(500);
+        echo json_encode([
+            'ok'    => false,
+            'error' => $e->getMessage()
+        ]);
+    }
+}
+
+
 function email_inbound_dev_controller(): void
 {
     global $config;

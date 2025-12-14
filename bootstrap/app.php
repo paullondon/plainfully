@@ -44,27 +44,64 @@ set_error_handler(function (int $severity, string $message, string $file, int $l
 });
 
 set_exception_handler(function (Throwable $e): void {
-    // TODO: log to file / monitoring here
-    http_response_code(500);
+    // Always log something server-side
+    error_log('[Plainfully] Uncaught exception: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
 
+    http_response_code(500);
     $env = getenv('APP_ENV') ?: 'local';
 
+    $uri    = $_SERVER['REQUEST_URI'] ?? '';
+    $isCli  = (PHP_SAPI === 'cli');
+    $isHook = is_string($uri) && str_starts_with($uri, '/hooks/');
+
+    // For CLI + /hooks/... style endpoints → never try to render HTML
+    if ($isCli || $isHook) {
+        header('Content-Type: application/json; charset=utf-8');
+
+        if (strtolower($env) !== 'live' && strtolower($env) !== 'production') {
+            echo json_encode([
+                'ok'    => false,
+                'error' => 'Internal error',
+                'debug' => (string)$e,
+            ]);
+        } else {
+            echo json_encode([
+                'ok'    => false,
+                'error' => 'Internal server error',
+            ]);
+        }
+        exit;
+    }
+
+    // Normal web pages → keep existing behaviour
     if (strtolower($env) !== 'live' && strtolower($env) !== 'production') {
         // debug output
-        pf_render_shell(
-            'Error',
-            '<pre style="white-space:pre-wrap;">' . htmlspecialchars((string)$e, ENT_QUOTES, 'UTF-8') . '</pre>'
-        );
+        if (function_exists('pf_render_shell')) {
+            pf_render_shell(
+                'Error',
+                '<pre style="white-space:pre-wrap;">' . htmlspecialchars((string)$e, ENT_QUOTES, 'UTF-8') . '</pre>'
+            );
+        } else {
+            // Fallback if render helper somehow not loaded yet
+            header('Content-Type: text/plain; charset=utf-8');
+            echo (string)$e;
+        }
     } else {
         // user friendly
-        ob_start();
-        require dirname(__DIR__) . '/app/views/errors/500.php';
-        $inner = ob_get_clean();
-        pf_render_shell('Error', $inner);
+        if (function_exists('pf_render_shell')) {
+            ob_start();
+            require dirname(__DIR__) . '/app/views/errors/500.php';
+            $inner = ob_get_clean();
+            pf_render_shell('Error', $inner);
+        } else {
+            header('Content-Type: text/plain; charset=utf-8');
+            echo "Something went wrong.\n";
+        }
     }
 
     exit;
 });
+
 
 // ---------------------------------------------------------
 // 2. Security headers
