@@ -30,22 +30,34 @@ return [
         'from_name'  => getenv('MAIL_FROM_NAME') ?: 'Plainfully',
     ],
 */
-    // SMTP / PHPMailer settings (IONOS-style, using MAIL_* vars)
-    'smtp' => [
-        'host'    => getenv('MAIL_HOST'),
-        'port'    => (int)getenv('MAIL_PORT'),
-        'secure'  => getenv('MAIL_ENCRYPTION'),
-        'auth'    => true,
+'smtp' => [
+    'host'    => getenv('MAIL_HOST'),
+    'port'    => (int)getenv('MAIL_PORT'),
+    'secure'  => getenv('MAIL_ENCRYPTION'),
+    'auth'    => true,
 
-        'noreply_user'   => getenv('MAIL_NOREPLY_USER'),
-        'noreply_pass'   => getenv('MAIL_NOREPLY_PASS'),
+    'noreply_user'   => getenv('MAIL_NOREPLY_USER'),
+    'noreply_pass'   => getenv('MAIL_NOREPLY_PASS'),
 
-        'scamcheck_user' => getenv('MAIL_SCAMCHECK_USER'),
-        'scamcheck_pass' => getenv('MAIL_SCAMCHECK_PASS'),
+    'scamcheck_user' => getenv('MAIL_SCAMCHECK_USER'),
+    'scamcheck_pass' => getenv('MAIL_SCAMCHECK_PASS'),
 
-        'clarify_user'   => getenv('MAIL_CLARIFY_USER'),
-        'clarify_pass'   => getenv('MAIL_CLARIFY_PASS'),
-    ],
+    'clarify_user'   => getenv('MAIL_CLARIFY_USER'),
+    'clarify_pass'   => getenv('MAIL_CLARIFY_PASS'),
+]
+
+'imap' => [
+    'host'       => getenv('EMAIL_BRIDGE_IMAP_HOST'),
+    'port'       => (int)getenv('EMAIL_BRIDGE_IMAP_PORT'),
+    'encryption' => getenv('EMAIL_BRIDGE_IMAP_ENCRYPTION'),
+
+    // Mailboxes reuse MAIL_* credentials
+    'scamcheck_user' => getenv('MAIL_SCAMCHECK_USER'),
+    'scamcheck_pass' => getenv('MAIL_SCAMCHECK_PASS'),
+
+    'clarify_user'   => getenv('MAIL_CLARIFY_USER'),
+    'clarify_pass'   => getenv('MAIL_CLARIFY_PASS'),
+]
 
 
     // Auth / magic-link settings
