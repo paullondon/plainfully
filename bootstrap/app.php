@@ -35,26 +35,18 @@ if (strtolower($appEnv) === 'live' || strtolower($appEnv) === 'production') {
     error_reporting(E_ALL);
 }
 
-// Basic error / exception handlers – in live, log only
-set_error_handler(function (int $severity, string $message, string $file, int $line): bool {
-    if (!(error_reporting() & $severity)) {
-        return false;
-    }
-    throw new ErrorException($message, 0, $severity, $file, $line);
-});
-
 set_exception_handler(function (Throwable $e): void {
-    // Always log something server-side
-    error_log('[Plainfully] Uncaught exception: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
+    // Always log
+    error_log('[Plainfully] Uncaught exception: ' . $e->getMessage() . ' in ' .
+        $e->getFile() . ':' . $e->getLine());
 
     http_response_code(500);
-    $env = getenv('APP_ENV') ?: 'local';
-
-    $uri    = $_SERVER['REQUEST_URI'] ?? '';
-    $isCli  = (PHP_SAPI === 'cli');
+    $env   = getenv('APP_ENV') ?: 'local';
+    $uri   = $_SERVER['REQUEST_URI'] ?? '';
+    $isCli = (PHP_SAPI === 'cli');
     $isHook = is_string($uri) && str_starts_with($uri, '/hooks/');
 
-    // For CLI + /hooks/... style endpoints → never try to render HTML
+    // CLI and /hooks/* → JSON, no pf_render_shell usage
     if ($isCli || $isHook) {
         header('Content-Type: application/json; charset=utf-8');
 
@@ -73,21 +65,22 @@ set_exception_handler(function (Throwable $e): void {
         exit;
     }
 
-    // Normal web pages → keep existing behaviour
+    // Normal web requests
     if (strtolower($env) !== 'live' && strtolower($env) !== 'production') {
-        // debug output
+        // Debug page
         if (function_exists('pf_render_shell')) {
             pf_render_shell(
                 'Error',
-                '<pre style="white-space:pre-wrap;">' . htmlspecialchars((string)$e, ENT_QUOTES, 'UTF-8') . '</pre>'
+                '<pre style="white-space:pre-wrap;">' .
+                    htmlspecialchars((string)$e, ENT_QUOTES, 'UTF-8') .
+                '</pre>'
             );
         } else {
-            // Fallback if render helper somehow not loaded yet
             header('Content-Type: text/plain; charset=utf-8');
             echo (string)$e;
         }
     } else {
-        // user friendly
+        // Friendly 500 page
         if (function_exists('pf_render_shell')) {
             ob_start();
             require dirname(__DIR__) . '/app/views/errors/500.php';
@@ -101,6 +94,7 @@ set_exception_handler(function (Throwable $e): void {
 
     exit;
 });
+
 
 
 // ---------------------------------------------------------
