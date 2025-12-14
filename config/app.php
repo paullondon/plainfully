@@ -12,7 +12,7 @@ return [
     'app' => [
         'base_url' => getenv('APP_BASE_URL') ?: 'https://plainfully.com',
         'env'      => getenv('APP_ENV') ?: 'local', // 'Live' is fine, we just treat it as a label
-        'css' => 'A3-018'
+        'css' => 'A3-018',
     ],
 
     // Database connection (MariaDB / MySQL)
@@ -44,7 +44,7 @@ return [
 
     'clarify_user'   => getenv('MAIL_CLARIFY_USER'),
     'clarify_pass'   => getenv('MAIL_CLARIFY_PASS'),
-]
+],
 
 'imap' => [
     'host'       => getenv('EMAIL_BRIDGE_IMAP_HOST'),
@@ -57,7 +57,7 @@ return [
 
     'clarify_user'   => getenv('MAIL_CLARIFY_USER'),
     'clarify_pass'   => getenv('MAIL_CLARIFY_PASS'),
-]
+],
 
 
     // Auth / magic-link settings
