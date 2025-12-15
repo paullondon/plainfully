@@ -11,8 +11,8 @@ return [
     // Application settings
     'app' => [
         'base_url' => getenv('APP_BASE_URL') ?: 'https://plainfully.com',
-        'env'      => getenv('APP_ENV') ?: 'local', // 'Live' is fine, we just treat it as a label
-        'css' => 'A3-018',
+        'env'      => getenv('APP_ENV') ?: 'local',
+        'css'      => 'A3-018',
     ],
 
     // Database connection (MariaDB / MySQL)
@@ -21,49 +21,42 @@ return [
         'user' => getenv('DB_USER') ?: 'plainfully_user',
         'pass' => getenv('DB_PASS') ?: '',
     ],
-/*
-    // Email settings (FROM details)
-    'mail' => [
-        // Prefer MAIL_FROM_EMAIL, fall back to MAIL_FROM, then a sane default
-        'from_email' => getenv('MAIL_FROM_EMAIL')
-            ?: (getenv('MAIL_FROM') ?: 'no-reply@plainfully.com'),
-        'from_name'  => getenv('MAIL_FROM_NAME') ?: 'Plainfully',
+
+    // SMTP / PHPMailer (outbound)
+    'smtp' => [
+        'host'   => getenv('MAIL_HOST'),
+        'port'   => (int)getenv('MAIL_PORT'),
+        'secure' => getenv('MAIL_ENCRYPTION'), // 'tls' or 'ssl'
+        'auth'   => true,
+
+        'noreply_user'   => getenv('MAIL_NOREPLY_USER'),
+        'noreply_pass'   => getenv('MAIL_NOREPLY_PASS'),
+
+        'scamcheck_user' => getenv('MAIL_SCAMCHECK_USER'),
+        'scamcheck_pass' => getenv('MAIL_SCAMCHECK_PASS'),
+
+        'clarify_user'   => getenv('MAIL_CLARIFY_USER'),
+        'clarify_pass'   => getenv('MAIL_CLARIFY_PASS'),
     ],
-*/
-'smtp' => [
-    'host'    => getenv('MAIL_HOST'),
-    'port'    => (int)getenv('MAIL_PORT'),
-    'secure'  => getenv('MAIL_ENCRYPTION'),
-    'auth'    => true,
 
-    'noreply_user'   => getenv('MAIL_NOREPLY_USER'),
-    'noreply_pass'   => getenv('MAIL_NOREPLY_PASS'),
+    // IMAP settings for the email bridge (inbound)
+    'imap' => [
+        'host'       => getenv('EMAIL_BRIDGE_IMAP_HOST'),
+        'port'       => (int)getenv('EMAIL_BRIDGE_IMAP_PORT'),
+        'encryption' => getenv('EMAIL_BRIDGE_IMAP_ENCRYPTION'),
 
-    'scamcheck_user' => getenv('MAIL_SCAMCHECK_USER'),
-    'scamcheck_pass' => getenv('MAIL_SCAMCHECK_PASS'),
+        'scamcheck_user' => getenv('MAIL_SCAMCHECK_USER'),
+        'scamcheck_pass' => getenv('MAIL_SCAMCHECK_PASS'),
 
-    'clarify_user'   => getenv('MAIL_CLARIFY_USER'),
-    'clarify_pass'   => getenv('MAIL_CLARIFY_PASS'),
-],
-
-'imap' => [
-    'host'       => getenv('EMAIL_BRIDGE_IMAP_HOST'),
-    'port'       => (int)getenv('EMAIL_BRIDGE_IMAP_PORT'),
-    'encryption' => getenv('EMAIL_BRIDGE_IMAP_ENCRYPTION'),
-
-    // Mailboxes reuse MAIL_* credentials
-    'scamcheck_user' => getenv('MAIL_SCAMCHECK_USER'),
-    'scamcheck_pass' => getenv('MAIL_SCAMCHECK_PASS'),
-
-    'clarify_user'   => getenv('MAIL_CLARIFY_USER'),
-    'clarify_pass'   => getenv('MAIL_CLARIFY_PASS'),
-],
-
+        'clarify_user'   => getenv('MAIL_CLARIFY_USER'),
+        'clarify_pass'   => getenv('MAIL_CLARIFY_PASS'),
+    ],
 
     // Auth / magic-link settings
     'auth' => [
         'magic_link_ttl_minutes' => (int)(getenv('MAGIC_LINK_TTL_MINUTES') ?: 30),
     ],
+
     'debug' => [
         'magic_links' => (bool)(getenv('plainfully_debug_magic_links') ?: false),
     ],
