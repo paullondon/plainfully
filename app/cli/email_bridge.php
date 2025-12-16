@@ -202,11 +202,18 @@ function pf_process_mailbox(string $label, bool $dryRun): void
 
         if ($ok) {
             fwrite(STDOUT, "  [OK] Forwarded to hook, marking for deletion.\n");
-            imap_delete($inbox, $msgNo);
-        } else {
-            fwrite(STDERR, "  [ERROR] Failed to forward to hook: {$error}\n");
-            // Leave message for retry on next run.
+
+            // Convert UID → string for IMAP
+            $uidStr = (string)$uid;
+
+            // Delete by UID (correct + safe)
+            if (!imap_delete($inbox, $uidStr, FT_UID)) {
+                fwrite(STDERR, "  [ERROR] Failed to delete UID {$uidStr}.\n");
+            } else {
+                fwrite(STDOUT, "  [INFO] Marked UID {$uidStr} for deletion.\n");
+            }
         }
+
     }
 
     if (!$dryRun) {
