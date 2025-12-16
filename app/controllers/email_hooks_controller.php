@@ -128,8 +128,6 @@ function plainfully_normalise_email_text(string $subject, string $body, ?string 
  *  - We return JSON with the CheckEngine result (no raw content stored)
  */
 
-<?php declare(strict_types=1);
-
 /**
  * handle_email_inbound()
  *
