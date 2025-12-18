@@ -167,19 +167,24 @@ function pf_mail_send(
         $mail->SMTPSecure = $smtp['secure'];
         $mail->Port       = $smtp['port'];
 
-        $mail->setFrom($fromUser, 'Plainfully');
+
         $mail->addAddress($to);
 
         if ($text === null) {
             $text = strip_tags($html);
         }
-        $mail->isHTML(true);
-        $mail->CharSet = 'UTF-8';
+
         $mail->Subject = $subject;
         $mail->Body    = $html;
         $mail->AltBody = $text;
 
+        $mail->setFrom($fromUser, 'Plainfully');
+        $mail->isHTML(true);
+        $mail->CharSet = 'UTF-8';
+        $mail->addCustomHeader('X-Mailer', 'Plainfully');
+
         return $mail->send();
+        
     } catch (Throwable $e) {
         error_log("pf_mail_send error: " . $e->getMessage());
         return false;
