@@ -15,6 +15,10 @@
  *   php app/cli/email_bridge.php
  */
 
+// Safety limits
+const PF_MAX_EMAILS_PER_RUN = 50;   // per mailbox, per run
+
+
 // ---------------------------------------------------------
 // 0. Simple .env loader (root-level .env)
 // ---------------------------------------------------------
@@ -29,6 +33,15 @@ if (is_readable($envPath)) {
         putenv("$k=$v");
     }
 }
+
+//0.A - overlap cron stopper
+$lockFile = sys_get_temp_dir() . '/plainfully_email_bridge.lock';
+$lockFp = fopen($lockFile, 'c');
+if ($lockFp === false || !flock($lockFp, LOCK_EX | LOCK_NB)) {
+    fwrite(STDOUT, "[INFO] Another bridge run is active. Exiting.\n");
+    exit(0);
+}
+// keep $lockFp open until script ends
 
 // ---------------------------------------------------------
 // 1. Core config from env
@@ -148,17 +161,37 @@ function pf_process_mailbox(string $label, bool $dryRun): void
 
     // Fetch unseen messages only
     $emails = imap_search($inbox, 'UNSEEN', SE_UID);
+    
     if ($emails === false || empty($emails)) {
         fwrite(STDOUT, "[INFO] No unseen messages in '{$label}' mailbox.\n");
         imap_close($inbox);
         return;
     }
 
-    fwrite(STDOUT, "[INFO] Found " . count($emails) . " unseen message(s) in '{$label}'.\n");
+    // Process at most N per run to avoid runaway load
+    $emails = array_slice($emails, 0, PF_MAX_EMAILS_PER_RUN);
+    fwrite(
+        STDOUT,
+        "[INFO] Found " . count($emails) . " unseen message(s) in '{$label}' (capped per run).\n"
+    );
+
 
     foreach ($emails as $uid) {
         $msgNo  = imap_msgno($inbox, $uid);
         $header = imap_headerinfo($inbox, $msgNo);
+
+        // NEW: size guard (bytes)
+        $overview = imap_fetch_overview($inbox, (string)$msgNo, 0);
+        $sizeBytes = (int)($overview[0]->size ?? 0);
+        $maxSize   = 200 * 1024; // 200 KB guard rail
+
+        if ($sizeBytes > $maxSize) {
+            fwrite(
+                STDOUT,
+                "  [SKIP] Message UID {$uid} too large (" . $sizeBytes . " bytes). Leaving unread.\n"
+            );
+            continue; // do NOT forward or delete, just ignore for now
+        }
 
         $from    = '';
         $to      = '';
@@ -176,7 +209,7 @@ function pf_process_mailbox(string $label, bool $dryRun): void
 
         $subject = imap_utf8($header->subject ?? '');
 
-        $body = imap_body($inbox, $msgNo);
+        $body = imap_body($inbox, $msgNo, FT_PEEK);;
         if (!is_string($body)) {
             $body = '';
         }

@@ -14,6 +14,100 @@
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
 
+function pf_email_template(string $title, string $bodyHtml): string
+{
+    return '
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>' . htmlspecialchars($title, ENT_QUOTES, "UTF-8") . '</title>
+</head>
+<body style="
+  margin:0;
+  padding:0;
+  background:#f5f7fa;
+  font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  color:#111827;
+">
+
+  <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+    <tr>
+      <td align="center" style="padding:24px;">
+        <table width="100%" cellpadding="0" cellspacing="0" style="
+          max-width:560px;
+          background:#ffffff;
+          border-radius:12px;
+          box-shadow:0 10px 25px rgba(0,0,0,0.06);
+        ">
+          
+          <!-- Header -->
+          <tr>
+            <td style="padding:24px 28px 12px;">
+              <h1 style="
+                margin:0;
+                font-size:20px;
+                font-weight:700;
+                letter-spacing:-0.02em;
+              ">
+                Plainfully
+              </h1>
+              <p style="
+                margin:4px 0 0;
+                font-size:14px;
+                color:#6b7280;
+              ">
+                Clear answers. Fewer worries.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Divider -->
+          <tr>
+            <td style="padding:0 28px;">
+              <hr style="border:none;border-top:1px solid #e5e7eb;">
+            </td>
+          </tr>
+
+          <!-- Content -->
+          <tr>
+            <td style="padding:24px 28px;font-size:15px;line-height:1.6;">
+              ' . $bodyHtml . '
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding:20px 28px 24px;font-size:13px;color:#6b7280;">
+              <p style="margin:0;">
+                Sent by <strong>Plainfully</strong><br>
+                Operated by Hissing Goat Studios
+              </p>
+              <p style="margin:8px 0 0;">
+                If you didn’t request this, you can safely ignore this email.
+              </p>
+            </td>
+          </tr>
+
+        </table>
+
+        <!-- Legal -->
+        <p style="
+          margin:16px 0 0;
+          font-size:12px;
+          color:#9ca3af;
+        ">
+          © ' . date('Y') . ' Hissing Goat Studios · plainfully.com
+        </p>
+      </td>
+    </tr>
+  </table>
+
+</body>
+</html>';
+}
+
 // ---------------------------------------------------------
 // Load PHPMailer classes without Composer
 // ---------------------------------------------------------
@@ -79,7 +173,8 @@ function pf_mail_send(
         if ($text === null) {
             $text = strip_tags($html);
         }
-
+        $mail->isHTML(true);
+        $mail->CharSet = 'UTF-8';
         $mail->Subject = $subject;
         $mail->Body    = $html;
         $mail->AltBody = $text;
@@ -195,13 +290,16 @@ if (!function_exists('pf_send_magic_link_email')) {
         $subject = 'Your Plainfully sign-in link';
 
         // Simple HTML body (you can prettify later)
-        $html = '<p>Hello,</p>'
-              . '<p>Here\'s your one-time link to sign in to Plainfully:</p>'
-              . '<p><a href="' . htmlspecialchars($link, ENT_QUOTES, 'UTF-8') . '">'
-              . htmlspecialchars($link, ENT_QUOTES, 'UTF-8')
-              . '</a></p>'
-              . '<p>This link will expire shortly and can only be used once.</p>'
-              . '<p>If you did not request this email, you can safely ignore it.</p>';
+        // Inner content only (goes inside the card)
+        $inner = '<p>Hello,</p>'
+            . '<p>Here\'s your one-time link to sign in to <strong>Plainfully</strong>:</p>'
+            . '<p><a href="' . htmlspecialchars($link, ENT_QUOTES, 'UTF-8') . '">Sign in to Plainfully</a></p>'
+            . '<p style="color:#6b7280;font-size:13px;margin:16px 0 0;">'
+            . 'This link expires shortly and can only be used once.'
+            . '</p>';
+
+        // Full HTML email using your branded wrapper
+        $html = pf_email_template('Your Plainfully sign-in link', $inner);
 
         $text = "Hello,\n\n"
               . "Here is your one-time link to sign in to Plainfully:\n\n"

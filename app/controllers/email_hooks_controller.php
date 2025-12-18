@@ -200,6 +200,59 @@ function email_inbound_dev_controller(): void
         return;
     }
 
+        // 2b) Per-sender rate limit: max 20 checks per hour, 200 per day (example)
+        try {
+            $pdo = pf_db();
+
+            $hourAgo = (new DateTimeImmutable('-1 hour'))->format('Y-m-d H:i:s');
+            $dayAgo  = (new DateTimeImmutable('-1 day'))->format('Y-m-d H:i:s');
+
+            // Count recent checks by this sender on any email channel
+            $stmtHour = $pdo->prepare(
+                'SELECT COUNT(*) AS c
+                FROM checks
+                WHERE source_identifier = :email
+                    AND channel LIKE "email%"
+                    AND created_at >= :since'
+            );
+            $stmtHour->execute([
+                ':email' => $from,
+                ':since' => $hourAgo,
+            ]);
+            $hourCount = (int)$stmtHour->fetchColumn();
+
+            $stmtDay = $pdo->prepare(
+                'SELECT COUNT(*) AS c
+                FROM checks
+                WHERE source_identifier = :email
+                    AND channel LIKE "email%"
+                    AND created_at >= :since'
+            );
+            $stmtDay->execute([
+                ':email' => $from,
+                ':since' => $dayAgo,
+            ]);
+            $dayCount = (int)$stmtDay->fetchColumn();
+
+            $hourLimit = 20;
+            $dayLimit  = 200;
+
+            if ($hourCount >= $hourLimit || $dayCount >= $dayLimit) {
+                http_response_code(429);
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode([
+                    'error'      => 'Rate limit exceeded for this sender.',
+                    'hour_usage' => $hourCount,
+                    'day_usage'  => $dayCount,
+                ]);
+                return;
+            }
+        } catch (Throwable $e) {
+            // Fail open but log – we’d rather process than crash the hook.
+            error_log('email_inbound_dev_controller rate-limit error: ' . $e->getMessage());
+        }
+
+
     // 3) Normalise email text (HTML → safe text, mark risky links)
     $rawContent = plainfully_normalise_email_text($subject, $body, $from);
 
@@ -265,6 +318,7 @@ function email_inbound_dev_controller(): void
                   . '<p>You can view this check on Plainfully here:<br>'
                   . '<a href="' . htmlspecialchars($viewUrl, ENT_QUOTES, 'UTF-8') . '">'
                   . htmlspecialchars($viewUrl, ENT_QUOTES, 'UTF-8') . '</a></p>';
+        $htmlBody = pf_email_template($outSubject, $htmlBody);
 
         $textBody = $intro . "\n\n"
                   . 'Verdict: ' . $result->shortVerdict . "\n\n"
