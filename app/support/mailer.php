@@ -159,34 +159,44 @@ function pf_mail_send(
 
     try {
         $mail = new PHPMailer(true);
+
+        // SMTP
         $mail->isSMTP();
-        $mail->Host       = $smtp['host'];
+        $mail->Host       = (string)$smtp['host'];
         $mail->SMTPAuth   = true;
         $mail->Username   = $fromUser;
         $mail->Password   = $fromPass;
-        $mail->SMTPSecure = $smtp['secure'];
-        $mail->Port       = $smtp['port'];
+        $mail->SMTPSecure = (string)$smtp['secure']; // 'tls' or 'ssl'
+        $mail->Port       = (int)$smtp['port'];
 
+        // Message
+        $mail->CharSet = 'UTF-8';
+        $mail->isHTML(true);
 
+        // From / Sender (set BEFORE recipients)
+        $mail->setFrom($fromUser, 'Plainfully');
+        $mail->Sender = $fromUser; // helps alignment on some setups
+
+        // Headers (deliverability hints)
+        $mail->addCustomHeader('X-Mailer', 'Plainfully');
+        $mail->addCustomHeader('List-Unsubscribe', '<mailto:unsubscribe@plainfully.com>');
+
+        // Recipient
         $mail->addAddress($to);
 
+        // Content
         if ($text === null) {
-            $text = strip_tags($html);
+            $text = trim(strip_tags($html));
         }
 
         $mail->Subject = $subject;
         $mail->Body    = $html;
         $mail->AltBody = $text;
 
-        $mail->setFrom($fromUser, 'Plainfully');
-        $mail->isHTML(true);
-        $mail->CharSet = 'UTF-8';
-        $mail->addCustomHeader('X-Mailer', 'Plainfully');
-
         return $mail->send();
-        
+
     } catch (Throwable $e) {
-        error_log("pf_mail_send error: " . $e->getMessage());
+        error_log('pf_mail_send error: ' . $e->getMessage());
         return false;
     }
 }
