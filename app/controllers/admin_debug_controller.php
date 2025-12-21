@@ -65,7 +65,6 @@ function admin_debug_email_bridge(): void
 
 /**
  * Debug: show the email bridge trace log.
- * Protected by ensureDebugAccess() in the router (same as your other debug pages).
  */
 function debug_email_bridge(): void
 {
