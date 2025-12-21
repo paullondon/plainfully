@@ -1,26 +1,32 @@
 <?php declare(strict_types=1);
 
 /**
- * Plainfully Email Bridge
+ * Plainfully Email Bridge (IMAP -> HTTP hook)
  *
- * CLI script to pull emails from IONOS via IMAP and forward them
- * into the Plainfully email hook (/hooks/email/inbound-dev).
+ * - Pulls UNSEEN emails from IONOS (per mailbox)
+ * - Forwards to /hooks/email/inbound-dev
+ * - On success: deletes message
+ * - On deferral (402/429): marks SEEN + moves to "Deferred"
+ * - On failure: leaves UNSEEN (so it retries), but logs clearly
  *
- * - Supports two mailboxes: ScamCheck + Clarify
- * - Only deletes messages if the HTTP hook returns success
- * - Has a --dry-run mode for safe testing
- *
- * Usage (from project root):
+ * Usage:
  *   php app/cli/email_bridge.php --dry-run
  *   php app/cli/email_bridge.php
  */
 
-// Safety limits
-const PF_MAX_EMAILS_PER_RUN = 50;   // per mailbox, per run
+const PF_MAX_EMAILS_PER_RUN = 50;      // per mailbox per run
+const PF_MAX_EMAIL_BYTES    = 200000;  // 200KB guard rail
 
+require_once __DIR__ . '/../support/debug_trace.php';
+
+$runId = pf_trace_run_id();
+fwrite(STDOUT, "[INFO] Bridge run_id={$runId}\n");
+pf_trace($runId, 'email-bridge', 'start', 'info', 'Bridge run started', [
+    'argv' => $argv,
+]);
 
 // ---------------------------------------------------------
-// 0. Simple .env loader (root-level .env)
+// 0) Simple .env loader (root-level .env)
 // ---------------------------------------------------------
 $envPath = dirname(__DIR__, 2) . '/.env';
 if (is_readable($envPath)) {
@@ -29,35 +35,55 @@ if (is_readable($envPath)) {
         if ($line === '' || str_starts_with($line, '#')) {
             continue;
         }
-        [$k, $v] = array_map('trim', explode('=', $line, 2));
-        putenv("$k=$v");
+        $parts = explode('=', $line, 2);
+        if (count($parts) !== 2) {
+            continue;
+        }
+        $k = trim($parts[0]);
+        $v = trim($parts[1]);
+
+        // strip optional quotes
+        if ((str_starts_with($v, '"') && str_ends_with($v, '"')) || (str_starts_with($v, "'") && str_ends_with($v, "'"))) {
+            $v = substr($v, 1, -1);
+        }
+
+        putenv($k . '=' . $v);
     }
 }
 
-//0.A - overlap cron stopper
+// ---------------------------------------------------------
+// 0.A) Overlap stopper (lock file)
+// ---------------------------------------------------------
 $lockFile = sys_get_temp_dir() . '/plainfully_email_bridge.lock';
 $lockFp = fopen($lockFile, 'c');
 if ($lockFp === false || !flock($lockFp, LOCK_EX | LOCK_NB)) {
     fwrite(STDOUT, "[INFO] Another bridge run is active. Exiting.\n");
+    pf_trace($runId, 'email-bridge', 'lock', 'warn', 'Another bridge run active, exiting');
     exit(0);
 }
 // keep $lockFp open until script ends
 
 // ---------------------------------------------------------
-// 1. Core config from env
+// 1) Core config from env
 // ---------------------------------------------------------
 $hookUrl   = getenv('EMAIL_BRIDGE_HOOK_URL')   ?: 'https://plainfully.com/hooks/email/inbound-dev';
-$hookToken = getenv('EMAIL_BRIDGE_HOOK_TOKEN') ?: getenv('EMAIL_HOOK_TOKEN') ?: '';
+$hookToken = getenv('EMAIL_BRIDGE_HOOK_TOKEN') ?: (getenv('EMAIL_HOOK_TOKEN') ?: '');
 
 if ($hookToken === '') {
     fwrite(STDERR, "[FATAL] EMAIL_BRIDGE_HOOK_TOKEN or EMAIL_HOOK_TOKEN not set in .env\n");
+    pf_trace($runId, 'email-bridge', 'config', 'error', 'Missing hook token');
     exit(1);
 }
 
 $dryRun = in_array('--dry-run', $argv, true);
 
+pf_trace($runId, 'email-bridge', 'config', 'info', 'Loaded config', [
+    'hook_url' => $hookUrl,
+    'dry_run'  => $dryRun,
+]);
+
 // ---------------------------------------------------------
-// 2. Helper: IMAP mailbox string
+// 2) Helper: IMAP mailbox string
 // ---------------------------------------------------------
 function pf_build_imap_mailbox(string $host, int $port, string $encryption): string
 {
@@ -74,7 +100,7 @@ function pf_build_imap_mailbox(string $host, int $port, string $encryption): str
 }
 
 // ---------------------------------------------------------
-// 3. Helper: POST to Plainfully hook
+// 3) Helper: POST to Plainfully hook (returns http_code + body snippet)
 // ---------------------------------------------------------
 function pf_forward_to_hook(
     string $hookUrl,
@@ -96,7 +122,7 @@ function pf_forward_to_hook(
     curl_setopt_array($ch, [
         CURLOPT_POST           => true,
         CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT        => 10,
+        CURLOPT_TIMEOUT        => 15,
         CURLOPT_HTTPHEADER     => [
             'X-Plainfully-Token: ' . $hookToken,
         ],
@@ -107,101 +133,145 @@ function pf_forward_to_hook(
     if ($raw === false) {
         $err = curl_error($ch);
         curl_close($ch);
-        return [false, 'curl error: ' . $err];
+        return [false, 0, 'curl_error', $err];
     }
 
-    $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
 
-    if ($status < 200 || $status >= 300) {
-        return [false, 'HTTP ' . $status . ' from hook: ' . substr($raw, 0, 200)];
+    $snip = substr((string)$raw, 0, 240);
+
+    // classify outcomes:
+    // 2xx = success (delete)
+    // 402/429 = deferred (mark seen + move)
+    // other = failure (leave unseen)
+    if ($status >= 200 && $status < 300) {
+        return [true, $status, 'success', $snip];
     }
 
-    return [true, null];
+    if ($status === 402 || $status === 429) {
+        return [false, $status, 'deferred', $snip];
+    }
+
+    return [false, $status, 'error', $snip];
 }
 
 // ---------------------------------------------------------
-// 4. Helper: process one mailbox
+// 4) Helper: ensure a folder exists (best-effort)
 // ---------------------------------------------------------
-function pf_process_mailbox(string $label, bool $dryRun): void
+function pf_ensure_mailbox_folder($inbox, string $mailboxBase, string $folder): void
 {
-    $upper = strtoupper($label); // "SCAMCHECK" / "CLARIFY"
+    // mailboxBase example: "{host:port/imap/ssl}"
+    $target = $mailboxBase . $folder;
+    @imap_createmailbox($inbox, imap_utf7_encode($target));
+}
 
-    // Shared IMAP host/port/encryption
+// ---------------------------------------------------------
+// 5) Process one mailbox
+// ---------------------------------------------------------
+function pf_process_mailbox(string $label, bool $dryRun, string $hookUrl, string $hookToken, string $runId): void
+{
+    $upper = strtoupper($label); // SCAMCHECK / CLARIFY
+
     $host       = getenv('EMAIL_BRIDGE_IMAP_HOST')       ?: '';
     $port       = (int)(getenv('EMAIL_BRIDGE_IMAP_PORT') ?: 0);
     $encryption = getenv('EMAIL_BRIDGE_IMAP_ENCRYPTION') ?: 'ssl';
 
-    // Per-mailbox credentials – reuse MAIL_* from .env
     $user = getenv("MAIL_{$upper}_USER") ?: '';
     $pass = getenv("MAIL_{$upper}_PASS") ?: '';
 
     if ($host === '' || $port <= 0 || $user === '' || $pass === '') {
         fwrite(STDERR, "[WARN] Skipping mailbox '{$label}' – IMAP or MAIL_* env vars not fully set.\n");
+        pf_trace($runId, 'email-bridge', 'mailbox_skip', 'warn', 'Mailbox env missing', [
+            'label' => $label,
+            'host_set' => $host !== '',
+            'port' => $port,
+            'user_set' => $user !== '',
+        ]);
         return;
     }
 
-    global $hookUrl, $hookToken;
-
-    $mailbox = pf_build_imap_mailbox($host, $port, $encryption);
-
     if (!function_exists('imap_open')) {
-        fwrite(STDERR, "[FATAL] PHP IMAP extension not enabled. Cannot process mailbox '{$label}'.\n");
+        fwrite(STDERR, "[FATAL] PHP IMAP extension not enabled.\n");
+        pf_trace($runId, 'email-bridge', 'fatal', 'error', 'PHP IMAP extension missing');
         exit(1);
     }
 
+    $mailbox = pf_build_imap_mailbox($host, $port, $encryption);
+
+    // For folder operations we need the base "{host:port/flags}"
+    $enc = strtolower($encryption);
+    $flags = '/imap' . (($enc === 'ssl') ? '/ssl' : (($enc === 'tls') ? '/tls' : ''));
+    $mailboxBase = sprintf('{%s:%d%s}', $host, $port, $flags);
+
     fwrite(STDOUT, "[INFO] Connecting to {$label} mailbox: {$mailbox}\n");
+    pf_trace($runId, 'email-bridge', 'imap_connect', 'info', 'Connecting', [
+        'label' => $label,
+        'mailbox' => $mailbox,
+        'user' => $user,
+    ]);
 
     $inbox = @imap_open($mailbox, $user, $pass);
     if ($inbox === false) {
-        $err = imap_last_error();
+        $err = (string)imap_last_error();
         fwrite(STDERR, "[ERROR] imap_open failed for '{$label}': {$err}\n");
+        pf_trace($runId, 'email-bridge', 'imap_connect_fail', 'error', 'imap_open failed', [
+            'label' => $label,
+            'error' => $err,
+        ]);
         return;
     }
 
-    // Fetch unseen messages only
     $emails = imap_search($inbox, 'UNSEEN', SE_UID);
-    
+
     if ($emails === false || empty($emails)) {
         fwrite(STDOUT, "[INFO] No unseen messages in '{$label}' mailbox.\n");
+        pf_trace($runId, 'email-bridge', 'imap_search', 'info', 'No unseen messages', ['label' => $label]);
         imap_close($inbox);
         return;
     }
 
-    // Process at most N per run to avoid runaway load
     $emails = array_slice($emails, 0, PF_MAX_EMAILS_PER_RUN);
-    fwrite(
-        STDOUT,
-        "[INFO] Found " . count($emails) . " unseen message(s) in '{$label}' (capped per run).\n"
-    );
+    fwrite(STDOUT, "[INFO] Found " . count($emails) . " unseen message(s) in '{$label}'.\n");
+    pf_trace($runId, 'email-bridge', 'imap_search', 'info', 'Found unseen messages', [
+        'label' => $label,
+        'count' => count($emails),
+    ]);
 
+    // Ensure folders (best-effort)
+    pf_ensure_mailbox_folder($inbox, $mailboxBase, 'Deferred');
+    pf_ensure_mailbox_folder($inbox, $mailboxBase, 'Failed');
 
     foreach ($emails as $uid) {
         $msgNo  = imap_msgno($inbox, $uid);
         $header = imap_headerinfo($inbox, $msgNo);
 
-        // NEW: size guard (bytes)
         $overview = imap_fetch_overview($inbox, (string)$msgNo, 0);
         $sizeBytes = (int)($overview[0]->size ?? 0);
-        $maxSize   = 200 * 1024; // 200 KB guard rail
 
-        if ($sizeBytes > $maxSize) {
-            fwrite(
-                STDOUT,
-                "  [SKIP] Message UID {$uid} too large (" . $sizeBytes . " bytes). Leaving unread.\n"
-            );
-            continue; // do NOT forward or delete, just ignore for now
+        if ($sizeBytes > PF_MAX_EMAIL_BYTES) {
+            fwrite(STDOUT, "  [SKIP] UID {$uid} too large ({$sizeBytes} bytes). Moving to Failed.\n");
+            pf_trace($runId, 'email-bridge', 'message_skip_large', 'warn', 'Message too large', [
+                'label' => $label,
+                'uid' => $uid,
+                'size' => $sizeBytes,
+            ]);
+
+            if (!$dryRun) {
+                @imap_setflag_full($inbox, (string)$uid, "\\Seen", ST_UID);
+                @imap_mail_move($inbox, (string)$uid, 'Failed', CP_UID);
+            }
+            continue;
         }
 
-        $from    = '';
-        $to      = '';
+        $from = '';
+        $to = '';
         $subject = '';
 
         if (!empty($header->from) && is_array($header->from)) {
             $f = $header->from[0];
             $from = ($f->mailbox ?? '') . '@' . ($f->host ?? '');
         }
-
         if (!empty($header->to) && is_array($header->to)) {
             $t = $header->to[0];
             $to = ($t->mailbox ?? '') . '@' . ($t->host ?? '');
@@ -209,7 +279,8 @@ function pf_process_mailbox(string $label, bool $dryRun): void
 
         $subject = imap_utf8($header->subject ?? '');
 
-        $body = imap_body($inbox, $msgNo, FT_PEEK);;
+        // IMPORTANT: FT_PEEK keeps it UNSEEN unless we set \Seen ourselves later
+        $body = imap_body($inbox, $msgNo, FT_PEEK);
         if (!is_string($body)) {
             $body = '';
         }
@@ -219,12 +290,28 @@ function pf_process_mailbox(string $label, bool $dryRun): void
         fwrite(STDOUT, "  To:      {$to}\n");
         fwrite(STDOUT, "  Subject: {$subject}\n");
 
+        pf_trace($runId, 'email-bridge', 'message_parsed', 'info', 'Parsed message', [
+            'label' => $label,
+            'uid' => $uid,
+            'from' => $from,
+            'to' => $to,
+            'subject_len' => strlen($subject),
+            'body_len' => strlen($body),
+            'subject_hash' => pf_safe_hash($subject),
+        ]);
+
         if ($dryRun) {
-            fwrite(STDOUT, "  [DRY-RUN] Would forward this email to hook and NOT delete it.\n");
+            fwrite(STDOUT, "  [DRY-RUN] Would forward to hook and NOT modify mailbox.\n");
             continue;
         }
 
-        [$ok, $error] = pf_forward_to_hook(
+        pf_trace($runId, 'email-bridge', 'post_hook', 'info', 'Posting to hook', [
+            'label' => $label,
+            'uid' => $uid,
+            'hook' => $hookUrl,
+        ]);
+
+        [$ok, $httpCode, $class, $snip] = pf_forward_to_hook(
             $hookUrl,
             $hookToken,
             $from,
@@ -233,36 +320,74 @@ function pf_process_mailbox(string $label, bool $dryRun): void
             $body
         );
 
-        if ($ok) {
-            fwrite(STDOUT, "  [OK] Forwarded to hook, marking for deletion.\n");
+        pf_trace($runId, 'email-bridge', 'post_hook_done', $ok ? 'info' : (($class === 'deferred') ? 'warn' : 'error'), 'Hook response', [
+            'label' => $label,
+            'uid' => $uid,
+            'http_code' => $httpCode,
+            'class' => $class,
+            'resp_snip' => $snip,
+        ]);
 
-            // Convert UID → string for IMAP
+        if ($ok) {
+            fwrite(STDOUT, "  [OK] Hook accepted (HTTP {$httpCode}). Deleting.\n");
+
             $uidStr = (string)$uid;
 
-            // Delete by UID (correct + safe)
             if (!imap_delete($inbox, $uidStr, FT_UID)) {
-                fwrite(STDERR, "  [ERROR] Failed to delete UID {$uidStr}.\n");
+                fwrite(STDERR, "  [ERROR] Failed to mark UID {$uidStr} for deletion.\n");
+                pf_trace($runId, 'email-bridge', 'delete_fail', 'error', 'imap_delete failed', [
+                    'label' => $label,
+                    'uid' => $uidStr,
+                ]);
             } else {
-                fwrite(STDOUT, "  [INFO] Marked UID {$uidStr} for deletion.\n");
+                pf_trace($runId, 'email-bridge', 'delete_marked', 'info', 'Marked for deletion', [
+                    'label' => $label,
+                    'uid' => $uidStr,
+                ]);
             }
+
+            continue;
         }
 
+        if ($class === 'deferred') {
+            // This is your new limits world (free cap or fair-use).
+            // Do NOT keep retrying forever: mark seen + move to Deferred.
+            fwrite(STDOUT, "  [DEFER] Hook deferred (HTTP {$httpCode}). Marking SEEN + moving to Deferred.\n");
+
+            @imap_setflag_full($inbox, (string)$uid, "\\Seen", ST_UID);
+            @imap_mail_move($inbox, (string)$uid, 'Deferred', CP_UID);
+
+            pf_trace($runId, 'email-bridge', 'deferred_moved', 'warn', 'Moved to Deferred', [
+                'label' => $label,
+                'uid' => $uid,
+                'http_code' => $httpCode,
+            ]);
+
+            continue;
+        }
+
+        // Hard failure: leave UNSEEN so it retries next run,
+        // but also move to Failed if you prefer (I’m leaving it UNSEEN by default).
+        fwrite(STDOUT, "  [FAIL] Hook failed (HTTP {$httpCode}). Leaving UNSEEN for retry.\n");
     }
 
+    // Commit moves + deletions
     if (!$dryRun) {
-        imap_expunge($inbox);
+        @imap_expunge($inbox);
     }
 
     imap_close($inbox);
     fwrite(STDOUT, "[INFO] Finished mailbox '{$label}'.\n");
+    pf_trace($runId, 'email-bridge', 'mailbox_done', 'info', 'Finished mailbox', ['label' => $label]);
 }
 
 // ---------------------------------------------------------
-// 5. Run both mailboxes
+// 6) Run both mailboxes
 // ---------------------------------------------------------
 fwrite(STDOUT, "[INFO] Plainfully Email Bridge starting (dry-run=" . ($dryRun ? 'yes' : 'no') . ")\n");
 
-pf_process_mailbox('scamcheck', $dryRun);
-pf_process_mailbox('clarify',   $dryRun);
+pf_process_mailbox('scamcheck', $dryRun, $hookUrl, $hookToken, $runId);
+pf_process_mailbox('clarify',   $dryRun, $hookUrl, $hookToken, $runId);
 
 fwrite(STDOUT, "[INFO] Plainfully Email Bridge completed.\n");
+pf_trace($runId, 'email-bridge', 'done', 'info', 'Bridge run completed');
