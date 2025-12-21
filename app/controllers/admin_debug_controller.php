@@ -1,85 +1,97 @@
 <?php declare(strict_types=1);
 
-function admin_debug_email_bridge_controller(): void
+/**
+ * Admin debug endpoints (token-protected).
+ *
+ * SECURITY:
+ * - Requires ?token=... matching PLAINFULLY_DEBUG_TOKEN (or DEBUG_TOKEN fallback)
+ * - Returns 404 on failure (doesn't leak that a debug endpoint exists)
+ */
+
+function pf_debug_require_token(): void
 {
-    if (!(getenv('PLAINFULLY_DEBUG') === 'true' || getenv('PLAINFULLY_DEBUG') === '1')) {
+    $given = (string)($_GET['token'] ?? '');
+    $expected = getenv('PLAINFULLY_DEBUG_TOKEN') ?: (getenv('DEBUG_TOKEN') ?: '');
+
+    if ($expected === '' || !hash_equals($expected, $given)) {
         http_response_code(404);
-        echo 'Not found';
+        echo 'Not Found';
+        exit;
+    }
+}
+
+/**
+ * Shows the last N lines of the email bridge trace log.
+ * Set PLAINFULLY_DEBUG_TRACE_FILE in .env to wherever debug_trace.php writes.
+ */
+function admin_debug_email_bridge(): void
+{
+    pf_debug_require_token();
+
+    $file = getenv('PLAINFULLY_DEBUG_TRACE_FILE') ?: (sys_get_temp_dir() . '/plainfully_debug_trace.log');
+    $limit = max(10, min(2000, (int)($_GET['limit'] ?? 400)));
+
+    header('Content-Type: text/plain; charset=utf-8');
+
+    if (!is_readable($file)) {
+        echo "Trace file not found or not readable:\n{$file}\n\n";
+        echo "Set PLAINFULLY_DEBUG_TRACE_FILE in .env to the correct path.\n";
         return;
     }
 
-    $token = (string)($_GET['token'] ?? '');
-    $expected = (string)(getenv('DEBUG_TOKEN') ?: '');
-
-    if ($expected === '' || !hash_equals($expected, $token)) {
-        http_response_code(401);
-        echo 'Unauthorised';
+    // Efficient-ish tail (no shell)
+    $fp = fopen($file, 'rb');
+    if ($fp === false) {
+        echo "Failed to open trace file.\n";
         return;
     }
 
-    $pdo = pf_db();
+    $lines = [];
+    while (!feof($fp)) {
+        $line = fgets($fp);
+        if ($line !== false) {
+            $lines[] = $line;
+        }
+    }
+    fclose($fp);
 
-    $channel = (string)($_GET['channel'] ?? 'email-bridge');
-    $runId   = (string)($_GET['run'] ?? '');
-    $limit   = 200;
+    $slice = array_slice($lines, -$limit);
+    echo "Plainfully Debug · Email Bridge\n";
+    echo "File: {$file}\n";
+    echo "Showing last {$limit} lines\n";
+    echo str_repeat('-', 60) . "\n";
+    echo implode('', $slice);
+}
 
-    if ($runId !== '') {
-        $stmt = $pdo->prepare('
-            SELECT *
-            FROM debug_traces
-            WHERE run_id = :run_id
-            ORDER BY id ASC
-        ');
-        $stmt->execute([':run_id' => $runId]);
-        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
-    } else {
-        $stmt = $pdo->prepare('
-            SELECT *
-            FROM debug_traces
-            WHERE channel = :channel
-            ORDER BY id DESC
-            LIMIT :lim
-        ');
-        $stmt->bindValue(':channel', $channel);
-        $stmt->bindValue(':lim', $limit, PDO::PARAM_INT);
-        $stmt->execute();
-        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+/**
+ * Debug: show the email bridge trace log.
+ * Protected by ensureDebugAccess() in the router (same as your other debug pages).
+ */
+function debug_email_bridge(): void
+{
+    header('Content-Type: text/plain; charset=utf-8');
+
+    // This should match wherever debug_trace.php writes.
+    $file  = getenv('PLAINFULLY_DEBUG_TRACE_FILE') ?: (sys_get_temp_dir() . '/plainfully_debug_trace.log');
+    $limit = max(10, min(2000, (int)($_GET['limit'] ?? 400)));
+
+    if (!is_readable($file)) {
+        echo "Trace file not found/readable:\n{$file}\n\n";
+        echo "Fix by setting in .env:\nPLAINFULLY_DEBUG_TRACE_FILE=/tmp/plainfully_debug_trace.log\n";
+        return;
     }
 
-    header('Content-Type: text/html; charset=utf-8');
-
-    echo '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">';
-    echo '<title>Plainfully Debug · Email Bridge</title>';
-    echo '<style>body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;margin:20px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #ddd;padding:8px;font-size:13px}th{background:#f3f4f6;text-align:left}code{white-space:pre-wrap}</style>';
-    echo '</head><body>';
-
-    echo '<h2>Debug traces</h2>';
-    echo '<p><strong>Channel:</strong> ' . htmlspecialchars($channel) . '</p>';
-
-    echo '<form method="get" style="margin:12px 0">';
-    echo '<input type="hidden" name="token" value="' . htmlspecialchars($token) . '">';
-    echo '<label>Channel <input name="channel" value="' . htmlspecialchars($channel) . '"></label> ';
-    echo '<label>Run ID <input name="run" value="' . htmlspecialchars($runId) . '" placeholder="optional"></label> ';
-    echo '<button type="submit">View</button>';
-    echo '</form>';
-
-    echo '<table><thead><tr>';
-    echo '<th>Time</th><th>Run</th><th>Channel</th><th>Step</th><th>Level</th><th>Message</th><th>Meta</th>';
-    echo '</tr></thead><tbody>';
-
-    foreach ($rows as $r) {
-        $meta = $r['meta_json'] ?? '';
-        echo '<tr>';
-        echo '<td>' . htmlspecialchars((string)$r['created_at']) . '</td>';
-        echo '<td><a href="?token=' . urlencode($token) . '&channel=' . urlencode($channel) . '&run=' . urlencode((string)$r['run_id']) . '">' . htmlspecialchars((string)$r['run_id']) . '</a></td>';
-        echo '<td>' . htmlspecialchars((string)$r['channel']) . '</td>';
-        echo '<td>' . htmlspecialchars((string)$r['step']) . '</td>';
-        echo '<td>' . htmlspecialchars((string)$r['level']) . '</td>';
-        echo '<td>' . htmlspecialchars((string)$r['message']) . '</td>';
-        echo '<td><code>' . htmlspecialchars((string)$meta) . '</code></td>';
-        echo '</tr>';
+    $lines = @file($file, FILE_IGNORE_NEW_LINES);
+    if (!is_array($lines)) {
+        echo "Failed to read trace file.\n";
+        return;
     }
 
-    echo '</tbody></table>';
-    echo '</body></html>';
+    $slice = array_slice($lines, -$limit);
+
+    echo "Plainfully Debug · Email Bridge\n";
+    echo "File: {$file}\n";
+    echo "Last {$limit} lines\n";
+    echo str_repeat('-', 60) . "\n";
+    echo implode("\n", $slice) . "\n";
 }
