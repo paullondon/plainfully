@@ -148,18 +148,16 @@ switch (true) {
         email_inbound_dev_controller();
         return;
     
-    
+    case $path === '/debug/email-bridge' && $method === 'GET':
+        ensureDebugAccess();
+        admin_debug_email_bridge();
+        break;
+
     require_once __DIR__ . '/../app/controllers/email_inbound.php';
 
     $router->post('/api/email/inbound', function () {
         handle_email_inbound();
     });
-
-    require_once __DIR__ . '/../app/controllers/admin_debug_controller.php';
-
-    // GET /admin/debug/email-bridge?token=YOUR_DEBUG_TOKEN
-    $router->get('/admin/debug/email-bridge', 'admin_debug_email_bridge_controller');
-
 
     // -------------------------------------------------
     // 404 fallback – nicer page
