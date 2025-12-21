@@ -10,6 +10,7 @@
  *    (PHPMailer.php, SMTP.php, Exception.php)
  *  - MAIL_* env vars as per your .env (host, port, user, pass, etc.)
  */
+require_once __DIR__ . '/email_templates.php';
 
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;

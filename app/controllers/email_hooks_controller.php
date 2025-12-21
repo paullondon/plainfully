@@ -4,470 +4,561 @@ use App\Features\Checks\CheckInput;
 use App\Features\Checks\CheckEngine;
 use App\Features\Checks\DummyAiClient;
 
-// Load CheckEngine feature classes
+// Feature classes (no composer)
 require_once dirname(__DIR__) . '/features/checks/check_input.php';
 require_once dirname(__DIR__) . '/features/checks/check_result.php';
 require_once dirname(__DIR__) . '/features/checks/ai_client.php';
 require_once dirname(__DIR__) . '/features/checks/check_engine.php';
 
-/**
- * Get the domain part from an email address (after the @).
- * Used only for lightweight link-risk hints. We never store full URLs.
- */
-function plainfully_email_sender_domain(?string $email): ?string
-{
-    if (!$email || strpos($email, '@') === false) {
-        return null;
+/* ========================================================================== *
+ * ENV knobs (put these in .env)
+ * --------------------------------------------------------------------------
+ * FREE_CHECKS_LIMIT=3
+ *
+ * FAIRUSE_FREE_HOURLY=5
+ * FAIRUSE_FREE_DAILY=10
+ *
+ * FAIRUSE_PAID_HOURLY=60
+ * FAIRUSE_PAID_DAILY=500
+ *
+ * Notes:
+ * - Rolling window is HARD-CODED to 28 days (data retention policy).
+ * - SMS is always paid: currently NO throttling (by design).
+ *   If you later want stability caps for SMS, add envs and wire them in.
+ * ========================================================================== */
+
+const PLAINFULLY_ROLLING_DAYS = 28;
+
+if (!function_exists('pf_env_int')) {
+    /**
+     * Read an int from env safely (bounded).
+     */
+    function pf_env_int(string $key, int $default, int $min = 0, int $max = 1_000_000): int
+    {
+        $raw = getenv($key);
+        if ($raw === false || $raw === '') {
+            return $default;
+        }
+
+        $val = filter_var($raw, FILTER_VALIDATE_INT);
+        if ($val === false) {
+            return $default;
+        }
+
+        if ($val < $min) { return $min; }
+        if ($val > $max) { return $max; }
+        return $val;
     }
-
-    $domain = trim(substr(strrchr($email, '@'), 1) ?: '');
-    if ($domain === '') {
-        return null;
-    }
-
-    // Normalise and strip an optional :port
-    $domain = strtolower($domain);
-    $domain = preg_replace('/:\d+$/', '', $domain);
-
-    return $domain ?: null;
 }
 
-/**
- * Turn subject + body (plain text OR HTML) into safe, visible text.
- *
- * - Strips HTML tags.
- * - For <a href="...">text</a>:
- *      If link host loosely contains sender domain (or vice versa) -> "text [link]"
- *      Otherwise                                                   -> "text [link – potentially risky]"
- * - Does NOT store URLs anywhere; href is only inspected in-memory.
- */
-function plainfully_normalise_email_text(string $subject, string $body, ?string $fromEmail = null): string
-{
-    // Combine subject + body first
-    $full = $subject !== '' ? ($subject . "\n\n" . $body) : $body;
+if (!function_exists('plainfully_email_sender_domain')) {
+    function plainfully_email_sender_domain(?string $email): ?string
+    {
+        if (!$email || strpos($email, '@') === false) {
+            return null;
+        }
 
-    $senderDomain = plainfully_email_sender_domain($fromEmail);
+        $domain = trim(substr(strrchr($email, '@'), 1) ?: '');
+        if ($domain === '') {
+            return null;
+        }
 
-    // Fast path: if there's no obvious HTML, just return trimmed text
-    if (stripos($full, '<a ') === false &&
-        stripos($full, '<html') === false &&
-        stripos($full, '<body') === false) {
-        return trim($full);
+        $domain = strtolower($domain);
+        $domain = preg_replace('/:\d+$/', '', $domain);
+
+        return $domain ?: null;
     }
+}
 
-    // 1) Replace <a href="...">text</a> with "text [link]" or "text [link – potentially risky]"
-    $full = preg_replace_callback(
-        '/<a\b[^>]*>(.*?)<\/a>/is',
-        static function (array $matches) use ($senderDomain): string {
-            $anchorHtml  = $matches[0] ?? '';
-            $anchorInner = $matches[1] ?? '';
+if (!function_exists('plainfully_normalise_email_text')) {
+    /**
+     * Convert subject+body (plain or HTML) into safe visible text.
+     * - Strips tags
+     * - Converts <a>text</a> to "text [link]" or "text [link – potentially risky]"
+     */
+    function plainfully_normalise_email_text(string $subject, string $body, ?string $fromEmail = null): string
+    {
+        $full = $subject !== '' ? ($subject . "\n\n" . $body) : $body;
+        $senderDomain = plainfully_email_sender_domain($fromEmail);
 
-            // Visible link text (strip nested tags)
-            $anchorText = trim(strip_tags($anchorInner));
-            if ($anchorText === '') {
-                $anchorText = 'link';
-            }
+        // Fast path (no obvious HTML)
+        if (
+            stripos($full, '<a ') === false &&
+            stripos($full, '<html') === false &&
+            stripos($full, '<body') === false
+        ) {
+            return trim($full);
+        }
 
-            // Default: neutral link
-            $suffix = ' [link]';
+        // Replace anchors with safe text markers
+        $full = preg_replace_callback(
+            '/<a\b[^>]*>(.*?)<\/a>/is',
+            static function (array $matches) use ($senderDomain): string {
+                $anchorHtml  = $matches[0] ?? '';
+                $anchorInner = $matches[1] ?? '';
 
-            if ($senderDomain !== null) {
-                $href = null;
-
-                if (preg_match('/href\s*=\s*"([^"]*)"/i', $anchorHtml, $m)) {
-                    $href = $m[1];
-                } elseif (preg_match("/href\s*=\s*'([^']*)'/i", $anchorHtml, $m)) {
-                    $href = $m[1];
+                $anchorText = trim(strip_tags($anchorInner));
+                if ($anchorText === '') {
+                    $anchorText = 'link';
                 }
 
-                if ($href !== null && $href !== '') {
-                    $host = parse_url($href, PHP_URL_HOST);
+                $suffix = ' [link]';
 
-                    if (is_string($host) && $host !== '') {
-                        $host = strtolower($host);
+                if ($senderDomain !== null) {
+                    $href = null;
 
-                        // We never store $host – we only use it here to decide suffix.
-                        $isSimilar =
-                            stripos($host, $senderDomain) !== false ||
-                            stripos($senderDomain, $host) !== false;
+                    if (preg_match('/href\s*=\s*"([^"]*)"/i', $anchorHtml, $m)) {
+                        $href = $m[1];
+                    } elseif (preg_match("/href\s*=\s*'([^']*)'/i", $anchorHtml, $m)) {
+                        $href = $m[1];
+                    }
 
-                        if (!$isSimilar) {
-                            $suffix = ' [link – potentially risky]';
+                    if (is_string($href) && $href !== '') {
+                        $host = parse_url($href, PHP_URL_HOST);
+
+                        if (is_string($host) && $host !== '') {
+                            $host = strtolower($host);
+
+                            $isSimilar =
+                                stripos($host, $senderDomain) !== false ||
+                                stripos($senderDomain, $host) !== false;
+
+                            if (!$isSimilar) {
+                                $suffix = ' [link – potentially risky]';
+                            }
                         }
                     }
                 }
-            }
 
-            return $anchorText . $suffix;
-        },
-        $full
-    );
+                return $anchorText . $suffix;
+            },
+            $full
+        );
 
-    // 2) Strip remaining tags
-    $full = strip_tags($full);
+        $full = strip_tags($full);
+        $full = html_entity_decode($full, ENT_QUOTES | ENT_HTML5, 'UTF-8');
 
-    // 3) Decode HTML entities
-    $full = html_entity_decode($full, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $full = str_replace(["\r\n", "\r"], "\n", $full);
+        $full = preg_replace('/[ \t]+/u', ' ', $full);
+        $full = preg_replace("/\n{3,}/u", "\n\n", $full);
 
-    // 4) Normalise whitespace
-    $full = str_replace(["\r\n", "\r"], "\n", $full);
-    $full = preg_replace('/[ \t]+/u', ' ', $full);
-    $full = preg_replace("/\n{3,}/u", "\n\n", $full);
-
-    return trim($full);
+        return trim($full);
+    }
 }
 
-/**
- * Dev-only inbound email hook.
- *
- * Simulates an email provider webhook:
- *  - POSTs "from", "to", "subject", "body"
- *  - We verify a shared secret
- *  - We feed it into CheckEngine with channel="email"
- *  - We send a brief reply email to the sender
- *  - We return JSON with the CheckEngine result (no raw content stored)
- */
+if (!function_exists('pf_require_hook_token')) {
+    function pf_require_hook_token(string $envVarName): bool
+    {
+        $tokenHeader = $_SERVER['HTTP_X_PLAINFULLY_TOKEN'] ?? '';
+        $expected    = getenv($envVarName) ?: '';
 
-/**
- * handle_email_inbound()
- *
- * Accepts POST JSON forwarded from the IMAP bridge.
- * Always returns JSON. Never calls view helpers.
- */
-
-function handle_email_inbound(): void
-{
-    header('Content-Type: application/json');
-
-    try {
-        $json = file_get_contents('php://input');
-        $payload = json_decode($json, true);
-
-        if (!is_array($payload)) {
-            http_response_code(400);
-            echo json_encode(['ok' => false, 'error' => 'Invalid or missing JSON']);
-            return;
+        if ($expected === '' || !hash_equals($expected, $tokenHeader)) {
+            http_response_code(401);
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(['error' => 'Unauthorised hook call.']);
+            return false;
         }
 
-        // TODO: swap in real processing later
-        // For now we simply log the inbound payload for debugging.
-        error_log('Inbound email received: ' . $json);
-
-        echo json_encode(['ok' => true]);
-    }
-    catch (Throwable $e) {
-        http_response_code(500);
-        echo json_encode([
-            'ok'    => false,
-            'error' => $e->getMessage()
-        ]);
+        return true;
     }
 }
 
+if (!function_exists('pf_detect_paid_by_email')) {
+    /**
+     * Best-effort paid check.
+     * Fail-safe = treat as FREE if uncertain.
+     *
+     * Adjust the DB query if your users table differs.
+     */
+    function pf_detect_paid_by_email(string $email): bool
+    {
+        try {
+            // Prefer your own helper if it exists
+            if (function_exists('pf_user_find_by_email')) {
+                $u = pf_user_find_by_email($email);
+                return is_object($u) && isset($u->plan) && strtolower((string)$u->plan) === 'unlimited';
+            }
+            if (function_exists('pf_find_user_by_email')) {
+                $u = pf_find_user_by_email($email);
+                return is_object($u) && isset($u->plan) && strtolower((string)$u->plan) === 'unlimited';
+            }
 
-function email_inbound_dev_controller(): void
-{
-    global $config;
+            // Fallback: minimal DB probe
+            $pdo = pf_db();
+            $stmt = $pdo->prepare('SELECT plan FROM users WHERE email = :email LIMIT 1');
+            $stmt->execute([':email' => $email]);
+            $plan = $stmt->fetchColumn();
 
-    // 1) Method + auth token
-    if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
-        http_response_code(405);
-        header('Content-Type: application/json; charset=utf-8');
-        echo json_encode(['error' => 'Method not allowed. Use POST.']);
-        return;
+            return is_string($plan) && strtolower($plan) === 'unlimited';
+        } catch (Throwable $e) {
+            error_log('pf_detect_paid_by_email fail-safe (FREE): ' . $e->getMessage());
+            return false;
+        }
     }
+}
 
-    $tokenHeader = $_SERVER['HTTP_X_PLAINFULLY_TOKEN'] ?? '';
-    $expected    = getenv('EMAIL_HOOK_TOKEN') ?: '';
+if (!function_exists('pf_free_plan_limit_hit')) {
+    /**
+     * FREE plan hard cap: N checks per rolling 28 days (hard-coded).
+     *
+     * Returns: [bool $hit, ?int $nextAvailableEpoch]
+     */
+    function pf_free_plan_limit_hit(string $sourceIdentifier, int $limit): array
+    {
+        try {
+            $pdo = pf_db();
+            $since = (new DateTimeImmutable('-' . PLAINFULLY_ROLLING_DAYS . ' days'))->format('Y-m-d H:i:s');
 
-    if ($expected === '' || !hash_equals($expected, $tokenHeader)) {
-        http_response_code(401);
-        header('Content-Type: application/json; charset=utf-8');
-        echo json_encode(['error' => 'Unauthorised email hook call.']);
-        return;
+            $stmt = $pdo->prepare('
+                SELECT COUNT(*) AS c
+                FROM checks
+                WHERE source_identifier = :sid
+                  AND created_at >= :since
+            ');
+            $stmt->execute([
+                ':sid'   => $sourceIdentifier,
+                ':since' => $since,
+            ]);
+
+            $count = (int)$stmt->fetchColumn();
+            if ($count < $limit) {
+                return [false, null];
+            }
+
+            // Oldest in window => next free time
+            $stmtOldest = $pdo->prepare('
+                SELECT created_at
+                FROM checks
+                WHERE source_identifier = :sid
+                  AND created_at >= :since
+                ORDER BY created_at ASC
+                LIMIT 1
+            ');
+            $stmtOldest->execute([
+                ':sid'   => $sourceIdentifier,
+                ':since' => $since,
+            ]);
+
+            $oldest = $stmtOldest->fetchColumn();
+            if (!is_string($oldest) || $oldest === '') {
+                return [true, null];
+            }
+
+            $oldestDt = new DateTimeImmutable($oldest);
+            $nextDt   = $oldestDt->modify('+' . PLAINFULLY_ROLLING_DAYS . ' days');
+
+            return [true, $nextDt->getTimestamp()];
+        } catch (Throwable $e) {
+            // Fail-safe: block if we cannot compute usage
+            error_log('pf_free_plan_limit_hit error (fail-safe HIT): ' . $e->getMessage());
+            return [true, null];
+        }
     }
+}
 
-    // 2) Basic fields
-    $from    = trim($_POST['from']    ?? '');
-    $to      = trim($_POST['to']      ?? '');
-    $subject = trim($_POST['subject'] ?? '');
-    $body    = trim($_POST['body']    ?? '');
-
-    if ($from === '' || $body === '') {
-        http_response_code(400);
-        header('Content-Type: application/json; charset=utf-8');
-        echo json_encode(['error' => 'Fields "from" and "body" are required.']);
-        return;
-    }
-
-        // 2b) Per-sender rate limit: max 20 checks per hour, 200 per day (example)
+if (!function_exists('pf_sender_fairuse_limit_hit_email')) {
+    /**
+     * Fair-use caps for EMAIL channels (always enforced).
+     * Returns: [bool $hit, int $hourCount, int $dayCount]
+     */
+    function pf_sender_fairuse_limit_hit_email(string $fromEmail, int $hourLimit, int $dayLimit): array
+    {
         try {
             $pdo = pf_db();
 
             $hourAgo = (new DateTimeImmutable('-1 hour'))->format('Y-m-d H:i:s');
             $dayAgo  = (new DateTimeImmutable('-1 day'))->format('Y-m-d H:i:s');
 
-            // Count recent checks by this sender on any email channel
-            $stmtHour = $pdo->prepare(
-                'SELECT COUNT(*) AS c
+            $stmt = $pdo->prepare('
+                SELECT
+                    SUM(created_at >= :hourAgo) AS hour_count,
+                    SUM(created_at >= :dayAgo)  AS day_count
                 FROM checks
-                WHERE source_identifier = :email
-                    AND channel LIKE "email%"
-                    AND created_at >= :since'
-            );
-            $stmtHour->execute([
-                ':email' => $from,
-                ':since' => $hourAgo,
+                WHERE source_identifier = :sender
+                  AND channel IN ("email", "email-clarify", "email-scamcheck")
+            ');
+
+            $stmt->execute([
+                ':sender'  => $fromEmail,
+                ':hourAgo' => $hourAgo,
+                ':dayAgo'  => $dayAgo,
             ]);
-            $hourCount = (int)$stmtHour->fetchColumn();
 
-            $stmtDay = $pdo->prepare(
-                'SELECT COUNT(*) AS c
-                FROM checks
-                WHERE source_identifier = :email
-                    AND channel LIKE "email%"
-                    AND created_at >= :since'
-            );
-            $stmtDay->execute([
-                ':email' => $from,
-                ':since' => $dayAgo,
-            ]);
-            $dayCount = (int)$stmtDay->fetchColumn();
+            $row = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+            $hourCount = (int)($row['hour_count'] ?? 0);
+            $dayCount  = (int)($row['day_count'] ?? 0);
 
-            $hourLimit = 20;
-            $dayLimit  = 200;
+            $hit = ($hourLimit > 0 && $hourCount >= $hourLimit) || ($dayLimit > 0 && $dayCount >= $dayLimit);
+            return [$hit, $hourCount, $dayCount];
+        } catch (Throwable $e) {
+            // Fail-safe: block if we cannot compute fair-use
+            error_log('pf_sender_fairuse_limit_hit_email error (fail-safe HIT): ' . $e->getMessage());
+            return [true, 0, 0];
+        }
+    }
+}
 
-            if ($hourCount >= $hourLimit || $dayCount >= $dayLimit) {
-                http_response_code(429);
-                header('Content-Type: application/json; charset=utf-8');
+if (!function_exists('email_inbound_dev_controller')) {
+    function email_inbound_dev_controller(): void
+    {
+        global $config;
+
+        header('Content-Type: application/json; charset=utf-8');
+
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+            http_response_code(405);
+            echo json_encode(['error' => 'Method not allowed. Use POST.']);
+            return;
+        }
+
+        if (!pf_require_hook_token('EMAIL_HOOK_TOKEN')) {
+            return;
+        }
+
+        $from    = trim((string)($_POST['from'] ?? ''));
+        $to      = trim((string)($_POST['to'] ?? ''));
+        $subject = trim((string)($_POST['subject'] ?? ''));
+        $body    = trim((string)($_POST['body'] ?? ''));
+
+        if ($from === '' || $body === '') {
+            http_response_code(400);
+            echo json_encode(['error' => 'Fields "from" and "body" are required.']);
+            return;
+        }
+
+        // Decide mode based on TO address
+        $toLower      = strtolower($to);
+        $mode         = 'generic';
+        $checkChannel = 'email';
+        $emailChannel = 'noreply';
+
+        if ($toLower !== '') {
+            if (str_contains($toLower, 'scamcheck@')) {
+                $mode         = 'scamcheck';
+                $checkChannel = 'email-scamcheck';
+                $emailChannel = 'scamcheck';
+            } elseif (str_contains($toLower, 'clarify@')) {
+                $mode         = 'clarify';
+                $checkChannel = 'email-clarify';
+                $emailChannel = 'clarify';
+            }
+        }
+
+        // Determine paid status (fail-safe = free)
+        $isPaid = pf_detect_paid_by_email($from);
+
+        // ENV-driven caps
+        $freeLimit = pf_env_int('FREE_CHECKS_LIMIT', 3, 0, 1000);
+
+        $fairFreeHr  = pf_env_int('FAIRUSE_FREE_HOURLY', 5, 0, 100000);
+        $fairFreeDay = pf_env_int('FAIRUSE_FREE_DAILY', 10, 0, 100000);
+
+        $fairPaidHr  = pf_env_int('FAIRUSE_PAID_HOURLY', 60, 0, 100000);
+        $fairPaidDay = pf_env_int('FAIRUSE_PAID_DAILY', 500, 0, 100000);
+
+        // 1) Free plan hard cap (rolling 28 days)
+        if (!$isPaid && $freeLimit > 0) {
+            [$hit, $nextEpoch] = pf_free_plan_limit_hit($from, $freeLimit);
+            if ($hit) {
+                http_response_code(402);
                 echo json_encode([
-                    'error'      => 'Rate limit exceeded for this sender.',
-                    'hour_usage' => $hourCount,
-                    'day_usage'  => $dayCount,
-                ]);
+                    'error' => 'Free plan limit reached.',
+                    'plan'  => 'free',
+                    'limit' => $freeLimit,
+                    'rolling_days' => PLAINFULLY_ROLLING_DAYS,
+                    'next_free_epoch' => $nextEpoch,
+                ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
                 return;
             }
+        }
+
+        // 2) Fair-use caps (always enforced)
+        $hourLimit = $isPaid ? $fairPaidHr : $fairFreeHr;
+        $dayLimit  = $isPaid ? $fairPaidDay : $fairFreeDay;
+
+        if ($hourLimit > 0 || $dayLimit > 0) {
+            [$hit, $hourCount, $dayCount] = pf_sender_fairuse_limit_hit_email($from, $hourLimit, $dayLimit);
+            if ($hit) {
+                http_response_code(429);
+                echo json_encode([
+                    'error'      => 'Fair-use limit reached.',
+                    'plan'       => $isPaid ? 'paid' : 'free',
+                    'hour_usage' => $hourCount,
+                    'day_usage'  => $dayCount,
+                    'hour_limit' => $hourLimit,
+                    'day_limit'  => $dayLimit,
+                ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                return;
+            }
+        }
+
+        // Normalise HTML -> safe text
+        $rawContent = plainfully_normalise_email_text($subject, $body, $from);
+
+        // Run engine
+        $pdo      = pf_db();
+        $aiClient = new DummyAiClient();
+        $engine   = new CheckEngine($pdo, $aiClient);
+
+        $input = new CheckInput(
+            $checkChannel,
+            $from,
+            'text/plain',
+            $rawContent,
+            $from,
+            null,
+            null
+        );
+
+        try {
+            $result = $engine->run($input, $isPaid);
+
+            $baseUrl = rtrim((string)($config['app']['base_url'] ?? 'https://plainfully.com'), '/');
+            $checkId = (int)($result->id ?? 0);
+            $viewUrl = $baseUrl . '/clarifications/view?id=' . $checkId;
+
+            if ($mode === 'scamcheck') {
+                $outSubject = 'Plainfully ScamCheck result';
+                $intro      = 'We checked the message you forwarded to Plainfully ScamCheck.';
+            } elseif ($mode === 'clarify') {
+                $outSubject = 'Plainfully clarification result';
+                $intro      = 'Here’s your Plainfully clarification summary.';
+            } else {
+                $outSubject = 'Plainfully check result';
+                $intro      = 'Here’s the summary of the text you sent to Plainfully.';
+            }
+
+            $innerHtml =
+                '<p>' . htmlspecialchars($intro, ENT_QUOTES, 'UTF-8') . '</p>' .
+                '<p><strong>Verdict:</strong> ' . htmlspecialchars((string)$result->shortVerdict, ENT_QUOTES, 'UTF-8') . '</p>' .
+                '<p><strong>Key things to know:</strong><br>' .
+                nl2br(htmlspecialchars((string)$result->inputCapsule, ENT_QUOTES, 'UTF-8')) . '</p>' .
+                '<p><a href="' . htmlspecialchars($viewUrl, ENT_QUOTES, 'UTF-8') . '">View full details</a></p>';
+
+            $htmlBody = function_exists('pf_email_template')
+                ? pf_email_template($outSubject, $innerHtml)
+                : $innerHtml;
+
+            $textBody =
+                $intro . "\n\n" .
+                'Verdict: ' . (string)$result->shortVerdict . "\n\n" .
+                "Key things to know:\n" . (string)$result->inputCapsule . "\n\n" .
+                "View full details:\n" . $viewUrl . "\n";
+
+            $emailSent = false;
+            $mailError = null;
+
+            if (function_exists('pf_send_email')) {
+                [$emailSent, $mailError] = pf_send_email(
+                    $from,
+                    $outSubject,
+                    $htmlBody,
+                    $emailChannel,
+                    $textBody
+                );
+            } else {
+                $mailError = 'pf_send_email helper not defined.';
+            }
+
+            echo json_encode([
+                'status'        => 'ok',
+                'check_id'      => $checkId,
+                'short_verdict' => $result->shortVerdict,
+                'is_scam'       => $result->isScam,
+                'is_paid'       => $result->isPaid,
+                'view_url'      => $viewUrl,
+                'email_sent'    => $emailSent,
+                'mail_error'    => $mailError,
+                'mode'          => $mode,
+                'plan'          => $isPaid ? 'paid' : 'free',
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
         } catch (Throwable $e) {
-            // Fail open but log – we’d rather process than crash the hook.
-            error_log('email_inbound_dev_controller rate-limit error: ' . $e->getMessage());
+            error_log('email_inbound_dev_controller error: ' . $e->getMessage());
+            http_response_code(500);
+            echo json_encode(['error' => 'Internal error processing email hook.']);
         }
-
-
-    // 3) Normalise email text (HTML → safe text, mark risky links)
-    $rawContent = plainfully_normalise_email_text($subject, $body, $from);
-
-    // 4) Decide mode based on TO address
-    $toLower      = strtolower($to);
-    $mode         = 'generic';
-    $checkChannel = 'email';
-    $emailChannel = 'noreply';
-
-    if ($toLower !== '') {
-        if (str_contains($toLower, 'scamcheck@')) {
-            $mode         = 'scamcheck';
-            $checkChannel = 'email-scamcheck';
-            $emailChannel = 'scamcheck';
-        } elseif (str_contains($toLower, 'clarify@')) {
-            $mode         = 'clarify';
-            $checkChannel = 'email-clarify';
-            $emailChannel = 'clarify';
-        }
-    }
-
-    // 5) Run through CheckEngine (CORE brain)
-    $pdo       = pf_db();
-    $aiClient  = new DummyAiClient();   // swap later for real AI client
-    $engine    = new CheckEngine($pdo, $aiClient);
-
-    $input = new CheckInput(
-        $checkChannel,   // channel: email-scamcheck / email-clarify / email
-        $from,           // source_identifier (we use sender address)
-        'text/plain',    // content type
-        $rawContent,     // safe, normalised content
-        $from,           // email
-        null,            // phone
-        null             // provider_user_id
-    );
-
-    $isPaid = false;
-
-    try {
-        $result = $engine->run($input, $isPaid);
-
-        // 6) Build view URL
-        $baseUrl = rtrim($config['app']['base_url'] ?? 'https://plainfully.com', '/');
-        $viewUrl = $baseUrl . '/clarifications/view?id=' . $result->id;
-
-        // 7) Compose outbound email (different flavour per mode)
-        if ($mode === 'scamcheck') {
-            $outSubject = 'Plainfully ScamCheck result';
-            $intro      = 'You forwarded a message to Plainfully ScamCheck. Here is our quick verdict:';
-        } elseif ($mode === 'clarify') {
-            $outSubject = 'Plainfully clarification result';
-            $intro      = 'You emailed Plainfully for clarification. Here is your summary:';
-        } else {
-            $outSubject = 'Plainfully check result';
-            $intro      = 'Here is the summary of the text you sent to Plainfully:';
-        }
-
-        $htmlBody = '<p>' . htmlspecialchars($intro, ENT_QUOTES, 'UTF-8') . '</p>'
-                  . '<p><strong>Verdict:</strong> '
-                  . htmlspecialchars($result->shortVerdict, ENT_QUOTES, 'UTF-8') . '</p>'
-                  . '<p><strong>Summary:</strong><br>'
-                  . nl2br(htmlspecialchars($result->inputCapsule, ENT_QUOTES, 'UTF-8')) . '</p>'
-                  . '<p>You can view this check on Plainfully here:<br>'
-                  . '<a href="' . htmlspecialchars($viewUrl, ENT_QUOTES, 'UTF-8') . '">'
-                  . htmlspecialchars($viewUrl, ENT_QUOTES, 'UTF-8') . '</a></p>';
-        $htmlBody = pf_email_template($outSubject, $htmlBody);
-
-        $textBody = $intro . "\n\n"
-                  . 'Verdict: ' . $result->shortVerdict . "\n\n"
-                  . "Summary:\n" . $result->inputCapsule . "\n\n"
-                  . "View this check on Plainfully:\n" . $viewUrl . "\n";
-
-        $emailSent = false;
-        $mailError = null;
-
-        if (function_exists('pf_send_email')) {
-            [$emailSent, $mailError] = pf_send_email(
-                $from,
-                $outSubject,
-                $htmlBody,
-                $emailChannel,   // 'scamcheck' / 'clarify' / 'noreply'
-                $textBody
-            );
-        } else {
-            $mailError = 'pf_send_email helper not defined.';
-        }
-
-        // 8) JSON response for your PowerShell tests
-        header('Content-Type: application/json; charset=utf-8');
-        echo json_encode([
-            'status'         => 'ok',
-            'check_id'       => $result->id,
-            'short_verdict'  => $result->shortVerdict,
-            'is_scam'        => $result->isScam,
-            'is_paid'        => $result->isPaid,
-            'input_capsule'  => $result->inputCapsule,
-            'upsell_flags'   => $result->upsellFlags,
-            'view_url'       => $viewUrl,
-            'email_sent'     => $emailSent,
-            'mail_error'     => $mailError,
-            'mode'           => $mode,
-        ]);
-    } catch (Throwable $e) {
-        error_log('email_inbound_dev_controller error: ' . $e->getMessage());
-        http_response_code(500);
-        header('Content-Type: application/json; charset=utf-8');
-        echo json_encode([
-            'error' => 'Internal error processing email hook.',
-        ]);
     }
 }
 
-/**
- * Dev-only inbound SMS hook.
- *
- * Simulates an SMS provider webhook:
- *  - POSTs "from", "body"
- *  - We verify a shared secret
- *  - We feed it into CheckEngine with channel="sms"
- *  - We DO NOT send any email – only JSON response
- */
-function sms_inbound_dev_controller(): void
-{
-    global $config;
+if (!function_exists('sms_inbound_dev_controller')) {
+    /**
+     * DEV inbound SMS hook (POST: from, body)
+     *
+     * Your stated rule: SMS is ALWAYS paid.
+     * So: no free cap + no fair-use cap (unless you later want stability).
+     */
+    function sms_inbound_dev_controller(): void
+    {
+        global $config;
 
-    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-        http_response_code(405);
         header('Content-Type: application/json; charset=utf-8');
-        echo json_encode(['error' => 'Method not allowed. Use POST.']);
-        return;
-    }
 
-    // Separate token so you can rotate / control SMS independently
-    $tokenHeader = $_SERVER['HTTP_X_PLAINFULLY_TOKEN'] ?? '';
-    $expected    = getenv('SMS_HOOK_TOKEN') ?: '';
-
-    if ($expected === '' || !hash_equals($expected, $tokenHeader)) {
-        http_response_code(401);
-        header('Content-Type: application/json; charset=utf-8');
-        echo json_encode(['error' => 'Unauthorised SMS hook call.']);
-        return;
-    }
-
-    $from = trim($_POST['from'] ?? '');
-    $body = trim($_POST['body'] ?? '');
-
-    if ($from === '' || $body === '') {
-        http_response_code(400);
-        header('Content-Type: application/json; charset=utf-8');
-        echo json_encode(['error' => 'Fields "from" and "body" are required.']);
-        return;
-    }
-
-    // For SMS we don’t need special HTML handling – CheckEngine’s
-    // enforceInputSafety will take care of length, URLs, swear filters, etc.
-    $rawContent = $body;
-
-    $pdo        = pf_db();
-    $aiClient   = new DummyAiClient();
-    $checkEngine = new CheckEngine($pdo, $aiClient);
-
-    $input = new CheckInput(
-        'sms',          // channel
-        $from,          // source_identifier (phone number)
-        'text/plain',   // content type
-        $rawContent,    // content (will be cleaned inside CheckEngine)
-        null,           // email
-        $from,          // phone
-        null            // provider_user_id
-    );
-
-    $isPaid = false;
-
-    try {
-        $result = $checkEngine->run($input, $isPaid);
-
-        // Build a simple SMS reply template (for future SMS provider integration)
-        if ($result->isScam) {
-            $smsReply = 'Plainfully: This text looks like a scam. Do not click links or share personal or payment details. If in doubt, contact the company using a trusted phone number or website.';
-        } else {
-            $smsReply = 'Plainfully: We did not find obvious scam signs in this text, but still be cautious with links and any requests for personal or payment details.';
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+            http_response_code(405);
+            echo json_encode(['error' => 'Method not allowed. Use POST.']);
+            return;
         }
 
-        // Build a view URL for the user (same pattern as email)
-        $baseUrl = '';
-        if (isset($config['app']['url']) && is_string($config['app']['url'])) {
-            $baseUrl = rtrim($config['app']['url'], '/');
-        } else {
-            $baseUrl = 'https://plainfully.com';
+        if (!pf_require_hook_token('SMS_HOOK_TOKEN')) {
+            return;
         }
 
-        $viewUrl = $baseUrl . '/clarifications/view?id=' . $result->checkId;
+        $from = trim((string)($_POST['from'] ?? ''));
+        $body = trim((string)($_POST['body'] ?? ''));
 
-        http_response_code(200);
-        header('Content-Type: application/json; charset=utf-8');
-        
-        echo json_encode([
-            'status'              => 'ok',
-            'check_id'            => $result->checkId,
-            'short_verdict'       => $result->shortVerdict,
-            'is_scam'             => $result->isScam,
-            'is_paid'             => $result->isPaid,
-            'input_capsule'       => $result->inputCapsule,
-            'upsell_flags'        => $result->upsellFlags,
-            'view_url'            => $viewUrl,
-            'sms_reply_template'  => $smsReply,
-        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        if ($from === '' || $body === '') {
+            http_response_code(400);
+            echo json_encode(['error' => 'Fields "from" and "body" are required.']);
+            return;
+        }
 
-    } catch (Throwable $t) {
-        http_response_code(500);
-        header('Content-Type: application/json; charset=utf-8');
-        echo json_encode([
-            'error' => 'Internal error running CheckEngine.',
-            'code'  => 'checkengine_failure',
-        ]);
+        $pdo      = pf_db();
+        $aiClient = new DummyAiClient();
+        $engine   = new CheckEngine($pdo, $aiClient);
+
+        // SMS is always paid (per your rule)
+        $isPaid = true;
+
+        $input = new CheckInput(
+            'sms',
+            $from,
+            'text/plain',
+            $body,
+            null,
+            $from,
+            null
+        );
+
+        try {
+            $result = $engine->run($input, $isPaid);
+
+            $baseUrl = rtrim((string)($config['app']['base_url'] ?? 'https://plainfully.com'), '/');
+            $checkId = (int)($result->id ?? 0);
+            $viewUrl = $baseUrl . '/clarifications/view?id=' . $checkId;
+
+            $smsReply = $result->isScam
+                ? 'Plainfully: This text looks like a scam. Don’t click links or share codes. Verify the sender via a trusted source.'
+                : 'Plainfully: No obvious scam signs found, but stay cautious with links and requests for personal or payment details.';
+
+            echo json_encode([
+                'status'             => 'ok',
+                'check_id'           => $checkId,
+                'short_verdict'      => $result->shortVerdict,
+                'is_scam'            => $result->isScam,
+                'is_paid'            => $result->isPaid,
+                'view_url'           => $viewUrl,
+                'sms_reply_template' => $smsReply,
+                'plan'               => 'paid',
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+        } catch (Throwable $e) {
+            error_log('sms_inbound_dev_controller error: ' . $e->getMessage());
+            http_response_code(500);
+            echo json_encode([
+                'error' => 'Internal error running CheckEngine.',
+                'code'  => 'checkengine_failure',
+            ]);
+        }
     }
 }
-
