@@ -26,7 +26,7 @@ function pf_debug_require_token(): void
  */
 function admin_debug_email_bridge(): void
 {
-    pf_debug_require_token();
+    //pf_debug_require_token();
 
     $file = getenv('PLAINFULLY_DEBUG_TRACE_FILE') ?: (sys_get_temp_dir() . '/plainfully_debug_trace.log');
     $limit = max(10, min(2000, (int)($_GET['limit'] ?? 400)));
