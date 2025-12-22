@@ -270,32 +270,37 @@ function pf_process_mailbox(string $label, bool $dryRun, string $hookUrl, string
     pf_ensure_mailbox_folder($inbox, $mailboxBase, 'Failed');
 
     foreach ($emails as $uid) {
-        $fromLower = strtolower($from);
-        $subjectLower = strtolower($subject);
-
-        // Skip IONOS mailbox reports / system spam digests
-        if ($fromLower === 'noreply@ionos.com' || str_contains($subjectLower, 'daily report mailbox')) {
-            fwrite(STDOUT, "  [SKIP] System mailbox report email.\n");
-            continue;
-        }
-        
         $msgNo  = imap_msgno($inbox, $uid);
         $header = imap_headerinfo($inbox, $msgNo);
 
-        $overview = imap_fetch_overview($inbox, (string)$msgNo, 0);
-        $sizeBytes = (int)($overview[0]->size ?? 0);
+        // --- build safe strings FIRST ---
+        $from    = '';
+        $to      = '';
+        $subject = '';
 
-        if ($sizeBytes > PF_MAX_EMAIL_BYTES) {
-            fwrite(STDOUT, "  [SKIP] UID {$uid} too large ({$sizeBytes} bytes). Moving to Failed.\n");
-            pf_trace($runId, 'email-bridge', 'message_skip_large', 'warn', 'Message too large', [
-                'label' => $label,
-                'uid' => $uid,
-                'size' => $sizeBytes,
-            ]);
+        if (!empty($header->from) && is_array($header->from)) {
+            $f = $header->from[0];
+            $from = (string)(($f->mailbox ?? '') . '@' . ($f->host ?? ''));
+            $from = trim($from, " @\t\n\r\0\x0B");
+        }
 
+        if (!empty($header->to) && is_array($header->to)) {
+            $t = $header->to[0];
+            $to = (string)(($t->mailbox ?? '') . '@' . ($t->host ?? ''));
+            $to = trim($to, " @\t\n\r\0\x0B");
+        }
+
+        $subject = (string)imap_utf8($header->subject ?? '');
+        $subject = trim($subject);
+
+        // --- NOW you can safely do skip rules ---
+        $fromLower    = strtolower($from);
+        $subjectLower = strtolower($subject);
+
+        if ($fromLower === 'noreply@ionos.com' || str_contains($subjectLower, 'daily report mailbox')) {
+            fwrite(STDOUT, "  [SKIP] System mailbox report email.\n");
             if (!$dryRun) {
-                @imap_setflag_full($inbox, (string)$uid, "\\Seen", ST_UID);
-                @imap_mail_move($inbox, (string)$uid, 'Failed', CP_UID);
+                $deleteUid($inbox, $uid);
             }
             continue;
         }
