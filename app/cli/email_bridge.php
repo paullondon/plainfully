@@ -1,4 +1,7 @@
 <?php declare(strict_types=1);
+ini_set('display_errors', '1');
+ini_set('display_startup_errors', '1');
+error_reporting(E_ALL);
 
 /**
  * Plainfully Email Bridge (IMAP -> HTTP hook)
@@ -110,50 +113,74 @@ function pf_forward_to_hook(
     string $subject,
     string $body
 ): array {
-    $ch = curl_init($hookUrl);
-
-    $postFields = [
+    $postFields = http_build_query([
         'from'    => $from,
         'to'      => $to,
         'subject' => $subject,
         'body'    => $body,
-    ];
-
-    curl_setopt_array($ch, [
-        CURLOPT_POST           => true,
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT        => 15,
-        CURLOPT_HTTPHEADER     => [
-            'X-Plainfully-Token: ' . $hookToken,
-        ],
-        CURLOPT_POSTFIELDS     => $postFields,
     ]);
 
-    $raw = curl_exec($ch);
-    if ($raw === false) {
-        $err = curl_error($ch);
+    $headers = [
+        'Content-Type: application/x-www-form-urlencoded',
+        'X-Plainfully-Token: ' . $hookToken,
+    ];
+
+    // 1) Prefer cURL if available
+    if (function_exists('curl_init')) {
+        $ch = curl_init($hookUrl);
+
+        curl_setopt_array($ch, [
+            CURLOPT_POST           => true,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => 15,
+            CURLOPT_HTTPHEADER     => $headers,
+            CURLOPT_POSTFIELDS     => $postFields,
+        ]);
+
+        $raw = curl_exec($ch);
+        if ($raw === false) {
+            $err = curl_error($ch);
+            curl_close($ch);
+            return [false, 'curl error: ' . $err];
+        }
+
+        $status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
-        return [false, 0, 'curl_error', $err];
+
+        if ($status < 200 || $status >= 300) {
+            return [false, 'HTTP ' . $status . ' from hook: ' . substr((string)$raw, 0, 300)];
+        }
+
+        return [true, null];
     }
 
-    $status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
+    // 2) Fallback: file_get_contents (works without cURL)
+    $context = stream_context_create([
+        'http' => [
+            'method'  => 'POST',
+            'timeout' => 15,
+            'header'  => implode("\r\n", $headers),
+            'content' => $postFields,
+        ],
+    ]);
 
-    $snip = substr((string)$raw, 0, 240);
-
-    // classify outcomes:
-    // 2xx = success (delete)
-    // 402/429 = deferred (mark seen + move)
-    // other = failure (leave unseen)
-    if ($status >= 200 && $status < 300) {
-        return [true, $status, 'success', $snip];
+    $raw = @file_get_contents($hookUrl, false, $context);
+    if ($raw === false) {
+        $err = error_get_last();
+        return [false, 'file_get_contents error: ' . ($err['message'] ?? 'unknown')];
     }
 
-    if ($status === 402 || $status === 429) {
-        return [false, $status, 'deferred', $snip];
+    // Extract HTTP status from $http_response_header
+    $status = 0;
+    if (isset($http_response_header[0]) && preg_match('#HTTP/\S+\s+(\d+)#', $http_response_header[0], $m)) {
+        $status = (int)$m[1];
     }
 
-    return [false, $status, 'error', $snip];
+    if ($status < 200 || $status >= 300) {
+        return [false, 'HTTP ' . $status . ' from hook: ' . substr((string)$raw, 0, 300)];
+    }
+
+    return [true, null];
 }
 
 // ---------------------------------------------------------
