@@ -269,6 +269,17 @@ function pf_process_mailbox(string $label, bool $dryRun, string $hookUrl, string
     pf_ensure_mailbox_folder($inbox, $mailboxBase, 'Deferred');
     pf_ensure_mailbox_folder($inbox, $mailboxBase, 'Failed');
 
+    // Helper: delete by UID (mark now; expunge later)
+    $deleteUid = static function ($inbox, int $uid): void {
+        $uidStr = (string)$uid;
+
+        if (!imap_delete($inbox, $uidStr, FT_UID)) {
+            fwrite(STDERR, "  [ERROR] Failed to delete UID {$uidStr}.\n");
+        } else {
+            fwrite(STDOUT, "  [INFO] Marked UID {$uidStr} for deletion.\n");
+        }
+    };
+
     foreach ($emails as $uid) {
         $msgNo  = imap_msgno($inbox, $uid);
         $header = imap_headerinfo($inbox, $msgNo);
