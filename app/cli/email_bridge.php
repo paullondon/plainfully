@@ -270,6 +270,15 @@ function pf_process_mailbox(string $label, bool $dryRun, string $hookUrl, string
     pf_ensure_mailbox_folder($inbox, $mailboxBase, 'Failed');
 
     foreach ($emails as $uid) {
+        $fromLower = strtolower($from);
+        $subjectLower = strtolower($subject);
+
+        // Skip IONOS mailbox reports / system spam digests
+        if ($fromLower === 'noreply@ionos.com' || str_contains($subjectLower, 'daily report mailbox')) {
+            fwrite(STDOUT, "  [SKIP] System mailbox report email.\n");
+            continue;
+        }
+        
         $msgNo  = imap_msgno($inbox, $uid);
         $header = imap_headerinfo($inbox, $msgNo);
 
