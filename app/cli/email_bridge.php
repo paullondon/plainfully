@@ -29,30 +29,42 @@ pf_trace($runId, 'email-bridge', 'start', 'info', 'Bridge run started', [
 ]);
 
 // ---------------------------------------------------------
-// 0) Simple .env loader (root-level .env)
+// 0. Simple .env loader (root-level .env) - SAFE
 // ---------------------------------------------------------
 $envPath = dirname(__DIR__, 2) . '/.env';
 if (is_readable($envPath)) {
     foreach (file($envPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
         $line = trim($line);
+
+        // Skip blanks + comments
         if ($line === '' || str_starts_with($line, '#')) {
             continue;
         }
-        $parts = explode('=', $line, 2);
-        if (count($parts) !== 2) {
+
+        // Must contain '='
+        $pos = strpos($line, '=');
+        if ($pos === false) {
+            // Ignore malformed lines instead of exploding the script
             continue;
         }
-        $k = trim($parts[0]);
-        $v = trim($parts[1]);
 
-        // strip optional quotes
-        if ((str_starts_with($v, '"') && str_ends_with($v, '"')) || (str_starts_with($v, "'") && str_ends_with($v, "'"))) {
+        $k = trim(substr($line, 0, $pos));
+        $v = trim(substr($line, $pos + 1));
+
+        // Strip optional surrounding quotes
+        if ($v !== '' && (
+            ($v[0] === '"' && str_ends_with($v, '"')) ||
+            ($v[0] === "'" && str_ends_with($v, "'"))
+        )) {
             $v = substr($v, 1, -1);
         }
 
-        putenv($k . '=' . $v);
+        if ($k !== '') {
+            putenv($k . '=' . $v);
+        }
     }
 }
+
 
 // ---------------------------------------------------------
 // 0.A) Overlap stopper (lock file)
@@ -100,6 +112,48 @@ function pf_build_imap_mailbox(string $host, int $port, string $encryption): str
     }
 
     return sprintf('{%s:%d%s}INBOX', $host, $port, $flags);
+}
+
+//----------------------------------------------------------
+// 2.A) Fix email parsing (don’t assume indexes exist)
+//---------------------------------------------------------
+
+/**
+ * Safely extract a single email address from an IMAP header address list.
+ *
+ * @param mixed $addrList e.g. $header->from or $header->to
+ */
+function pf_imap_first_email($addrList): string
+{
+    if (!is_array($addrList) || empty($addrList)) {
+        return '';
+    }
+
+    $a = $addrList[0] ?? null;
+    if (!is_object($a)) {
+        return '';
+    }
+
+    $mailbox = isset($a->mailbox) ? (string)$a->mailbox : '';
+    $host    = isset($a->host) ? (string)$a->host : '';
+
+    if ($mailbox === '' || $host === '') {
+        return '';
+    }
+
+    return $mailbox . '@' . $host;
+}
+
+/**
+ * Safely decode subject (some subjects are mime-encoded).
+ */
+function pf_decode_subject($raw): string
+{
+    $s = is_string($raw) ? $raw : '';
+    if ($s === '') return '';
+    // imap_utf8 handles a lot of cases; fallback to original on failure
+    $decoded = @imap_utf8($s);
+    return is_string($decoded) && $decoded !== '' ? $decoded : $s;
 }
 
 // ---------------------------------------------------------
@@ -281,147 +335,140 @@ function pf_process_mailbox(string $label, bool $dryRun, string $hookUrl, string
     };
 
     foreach ($emails as $uid) {
-        $msgNo  = imap_msgno($inbox, $uid);
-        $header = imap_headerinfo($inbox, $msgNo);
+        try {
+            $msgNo  = imap_msgno($inbox, $uid);
+            $header = imap_headerinfo($inbox, $msgNo);
 
-        // --- build safe strings FIRST ---
-        $from    = '';
-        $to      = '';
-        $subject = '';
+            $from    = pf_imap_first_email($header->from ?? null);
+            $to      = pf_imap_first_email($header->to ?? null);
+            $subject = pf_decode_subject($header->subject ?? '');
 
-        if (!empty($header->from) && is_array($header->from)) {
-            $f = $header->from[0];
-            $from = (string)(($f->mailbox ?? '') . '@' . ($f->host ?? ''));
-            $from = trim($from, " @\t\n\r\0\x0B");
-        }
+            $subject = (string)imap_utf8($header->subject ?? '');
+            $subject = trim($subject);
 
-        if (!empty($header->to) && is_array($header->to)) {
-            $t = $header->to[0];
-            $to = (string)(($t->mailbox ?? '') . '@' . ($t->host ?? ''));
-            $to = trim($to, " @\t\n\r\0\x0B");
-        }
+            // --- NOW you can safely do skip rules ---
+            $fromLower    = strtolower($from);
+            $subjectLower = strtolower($subject);
 
-        $subject = (string)imap_utf8($header->subject ?? '');
-        $subject = trim($subject);
-
-        // --- NOW you can safely do skip rules ---
-        $fromLower    = strtolower($from);
-        $subjectLower = strtolower($subject);
-
-        if ($fromLower === 'noreply@ionos.com' || str_contains($subjectLower, 'daily report mailbox')) {
-            fwrite(STDOUT, "  [SKIP] System mailbox report email.\n");
-            if (!$dryRun) {
-                $deleteUid($inbox, $uid);
-            }
-            continue;
-        }
-
-        $from = '';
-        $to = '';
-        $subject = '';
-
-        if (!empty($header->from) && is_array($header->from)) {
-            $f = $header->from[0];
-            $from = ($f->mailbox ?? '') . '@' . ($f->host ?? '');
-        }
-        if (!empty($header->to) && is_array($header->to)) {
-            $t = $header->to[0];
-            $to = ($t->mailbox ?? '') . '@' . ($t->host ?? '');
-        }
-
-        $subject = imap_utf8($header->subject ?? '');
-
-        // IMPORTANT: FT_PEEK keeps it UNSEEN unless we set \Seen ourselves later
-        $body = imap_body($inbox, $msgNo, FT_PEEK);
-        if (!is_string($body)) {
-            $body = '';
-        }
-
-        fwrite(STDOUT, "\n[INFO] Processing UID {$uid} ({$label})\n");
-        fwrite(STDOUT, "  From:    {$from}\n");
-        fwrite(STDOUT, "  To:      {$to}\n");
-        fwrite(STDOUT, "  Subject: {$subject}\n");
-
-        pf_trace($runId, 'email-bridge', 'message_parsed', 'info', 'Parsed message', [
-            'label' => $label,
-            'uid' => $uid,
-            'from' => $from,
-            'to' => $to,
-            'subject_len' => strlen($subject),
-            'body_len' => strlen($body),
-            'subject_hash' => pf_safe_hash($subject),
-        ]);
-
-        if ($dryRun) {
-            fwrite(STDOUT, "  [DRY-RUN] Would forward to hook and NOT modify mailbox.\n");
-            continue;
-        }
-
-        pf_trace($runId, 'email-bridge', 'post_hook', 'info', 'Posting to hook', [
-            'label' => $label,
-            'uid' => $uid,
-            'hook' => $hookUrl,
-        ]);
-
-        [$ok, $httpCode, $class, $snip] = pf_forward_to_hook(
-            $hookUrl,
-            $hookToken,
-            $from,
-            ($to !== '' ? $to : $user),
-            $subject,
-            $body
-        );
-
-        pf_trace($runId, 'email-bridge', 'post_hook_done', $ok ? 'info' : (($class === 'deferred') ? 'warn' : 'error'), 'Hook response', [
-            'label' => $label,
-            'uid' => $uid,
-            'http_code' => $httpCode,
-            'class' => $class,
-            'resp_snip' => $snip,
-        ]);
-
-        if ($ok) {
-            fwrite(STDOUT, "  [OK] Hook accepted (HTTP {$httpCode}). Deleting.\n");
-
-            $uidStr = (string)$uid;
-
-            if (!imap_delete($inbox, $uidStr, FT_UID)) {
-                fwrite(STDERR, "  [ERROR] Failed to mark UID {$uidStr} for deletion.\n");
-                pf_trace($runId, 'email-bridge', 'delete_fail', 'error', 'imap_delete failed', [
-                    'label' => $label,
-                    'uid' => $uidStr,
-                ]);
-            } else {
-                pf_trace($runId, 'email-bridge', 'delete_marked', 'info', 'Marked for deletion', [
-                    'label' => $label,
-                    'uid' => $uidStr,
-                ]);
+            if ($fromLower === 'noreply@ionos.com' || str_contains($subjectLower, 'daily report mailbox')) {
+                fwrite(STDOUT, "  [SKIP] System mailbox report email.\n");
+                if (!$dryRun) {
+                    $deleteUid($inbox, $uid);
+                }
+                continue;
             }
 
-            continue;
-        }
+            $from = '';
+            $to = '';
+            $subject = '';
 
-        if ($class === 'deferred') {
-            // This is your new limits world (free cap or fair-use).
-            // Do NOT keep retrying forever: mark seen + move to Deferred.
-            fwrite(STDOUT, "  [DEFER] Hook deferred (HTTP {$httpCode}). Marking SEEN + moving to Deferred.\n");
+            if (!empty($header->from) && is_array($header->from)) {
+                $f = $header->from[0];
+                $from = ($f->mailbox ?? '') . '@' . ($f->host ?? '');
+            }
+            if (!empty($header->to) && is_array($header->to)) {
+                $t = $header->to[0];
+                $to = ($t->mailbox ?? '') . '@' . ($t->host ?? '');
+            }
 
-            @imap_setflag_full($inbox, (string)$uid, "\\Seen", ST_UID);
-            @imap_mail_move($inbox, (string)$uid, 'Deferred', CP_UID);
+            $subject = imap_utf8($header->subject ?? '');
 
-            pf_trace($runId, 'email-bridge', 'deferred_moved', 'warn', 'Moved to Deferred', [
+            // IMPORTANT: FT_PEEK keeps it UNSEEN unless we set \Seen ourselves later
+            $body = imap_body($inbox, $msgNo, FT_PEEK);
+            if (!is_string($body)) {
+                $body = '';
+            }
+
+            fwrite(STDOUT, "\n[INFO] Processing UID {$uid} ({$label})\n");
+            fwrite(STDOUT, "  From:    {$from}\n");
+            fwrite(STDOUT, "  To:      {$to}\n");
+            fwrite(STDOUT, "  Subject: {$subject}\n");
+
+            pf_trace($runId, 'email-bridge', 'message_parsed', 'info', 'Parsed message', [
+                'label' => $label,
+                'uid' => $uid,
+                'from' => $from,
+                'to' => $to,
+                'subject_len' => strlen($subject),
+                'body_len' => strlen($body),
+                'subject_hash' => pf_safe_hash($subject),
+            ]);
+
+            if ($dryRun) {
+                fwrite(STDOUT, "  [DRY-RUN] Would forward to hook and NOT modify mailbox.\n");
+                continue;
+            }
+
+            pf_trace($runId, 'email-bridge', 'post_hook', 'info', 'Posting to hook', [
+                'label' => $label,
+                'uid' => $uid,
+                'hook' => $hookUrl,
+            ]);
+
+            [$ok, $httpCode, $class, $snip] = pf_forward_to_hook(
+                $hookUrl,
+                $hookToken,
+                $from,
+                ($to !== '' ? $to : $user),
+                $subject,
+                $body
+            );
+
+            pf_trace($runId, 'email-bridge', 'post_hook_done', $ok ? 'info' : (($class === 'deferred') ? 'warn' : 'error'), 'Hook response', [
                 'label' => $label,
                 'uid' => $uid,
                 'http_code' => $httpCode,
+                'class' => $class,
+                'resp_snip' => $snip,
             ]);
 
-            continue;
-        }
+            if ($ok) {
+                fwrite(STDOUT, "  [OK] Hook accepted (HTTP {$httpCode}). Deleting.\n");
 
-        // Hard failure: leave UNSEEN so it retries next run,
-        // but also move to Failed if you prefer (I’m leaving it UNSEEN by default).
-        fwrite(STDOUT, "  [FAIL] Hook failed (HTTP {$httpCode}). Leaving UNSEEN for retry.\n");
-    }
+                $uidStr = (string)$uid;
+
+                if (!imap_delete($inbox, $uidStr, FT_UID)) {
+                    fwrite(STDERR, "  [ERROR] Failed to mark UID {$uidStr} for deletion.\n");
+                    pf_trace($runId, 'email-bridge', 'delete_fail', 'error', 'imap_delete failed', [
+                        'label' => $label,
+                        'uid' => $uidStr,
+                    ]);
+                } else {
+                    pf_trace($runId, 'email-bridge', 'delete_marked', 'info', 'Marked for deletion', [
+                        'label' => $label,
+                        'uid' => $uidStr,
+                    ]);
+                }
+
+                continue;
+            }
+
+            if ($class === 'deferred') {
+                // This is your new limits world (free cap or fair-use).
+                // Do NOT keep retrying forever: mark seen + move to Deferred.
+                fwrite(STDOUT, "  [DEFER] Hook deferred (HTTP {$httpCode}). Marking SEEN + moving to Deferred.\n");
+
+                @imap_setflag_full($inbox, (string)$uid, "\\Seen", ST_UID);
+                @imap_mail_move($inbox, (string)$uid, 'Deferred', CP_UID);
+
+                pf_trace($runId, 'email-bridge', 'deferred_moved', 'warn', 'Moved to Deferred', [
+                    'label' => $label,
+                    'uid' => $uid,
+                    'http_code' => $httpCode,
+                ]);
+
+                continue;
+            }
+
+            // Hard failure: leave UNSEEN so it retries next run,
+            // but also move to Failed if you prefer (I’m leaving it UNSEEN by default).
+            fwrite(STDOUT, "  [FAIL] Hook failed (HTTP {$httpCode}). Leaving UNSEEN for retry.\n");
+                } catch (Throwable $t) {
+                fwrite(STDERR, "[ERROR] UID {$uid} failed: " . $t->getMessage() . "\n");
+                // IMPORTANT: do not delete; leave it unread so you can inspect it
+                continue;
+            }
+        }    
 
     // Commit moves + deletions
     if (!$dryRun) {
