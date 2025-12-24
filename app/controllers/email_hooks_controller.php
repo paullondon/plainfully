@@ -10,47 +10,15 @@ require_once dirname(__DIR__) . '/features/checks/check_result.php';
 require_once dirname(__DIR__) . '/features/checks/ai_client.php';
 require_once dirname(__DIR__) . '/features/checks/check_engine.php';
 
-/* ========================================================================== *
- * ENV knobs (put these in .env)
- * --------------------------------------------------------------------------
- * FREE_CHECKS_LIMIT=3
- *
- * FAIRUSE_FREE_HOURLY=5
- * FAIRUSE_FREE_DAILY=10
- *
- * FAIRUSE_PAID_HOURLY=60
- * FAIRUSE_PAID_DAILY=500
- *
- * Notes:
- * - Rolling window is HARD-CODED to 28 days (data retention policy).
- * - SMS is always paid: currently NO throttling (by design).
- *   If you later want stability caps for SMS, add envs and wire them in.
- * ========================================================================== */
+// Billing (plan + limits) – safe to include even if you haven’t deployed yet
+$pfBillingPath = dirname(__DIR__) . '/features/billing/billing.php';
+$pfLimitsPath  = dirname(__DIR__) . '/features/billing/limits.php';
+if (is_readable($pfBillingPath)) { require_once $pfBillingPath; }
+if (is_readable($pfLimitsPath))  { require_once $pfLimitsPath; }
 
-const PLAINFULLY_ROLLING_DAYS = 28;
-
-if (!function_exists('pf_env_int')) {
-    /**
-     * Read an int from env safely (bounded).
-     */
-    function pf_env_int(string $key, int $default, int $min = 0, int $max = 1_000_000): int
-    {
-        $raw = getenv($key);
-        if ($raw === false || $raw === '') {
-            return $default;
-        }
-
-        $val = filter_var($raw, FILTER_VALIDATE_INT);
-        if ($val === false) {
-            return $default;
-        }
-
-        if ($val < $min) { return $min; }
-        if ($val > $max) { return $max; }
-        return $val;
-    }
-}
-
+/**
+ * Get domain part from an email address (after @).
+ */
 if (!function_exists('plainfully_email_sender_domain')) {
     function plainfully_email_sender_domain(?string $email): ?string
     {
@@ -70,15 +38,16 @@ if (!function_exists('plainfully_email_sender_domain')) {
     }
 }
 
+/**
+ * Convert subject+body (plain or HTML) into safe visible text.
+ * - Strips tags
+ * - Converts <a>text</a> to "text [link]" or "text [link – potentially risky]"
+ */
 if (!function_exists('plainfully_normalise_email_text')) {
-    /**
-     * Convert subject+body (plain or HTML) into safe visible text.
-     * - Strips tags
-     * - Converts <a>text</a> to "text [link]" or "text [link – potentially risky]"
-     */
     function plainfully_normalise_email_text(string $subject, string $body, ?string $fromEmail = null): string
     {
         $full = $subject !== '' ? ($subject . "\n\n" . $body) : $body;
+
         $senderDomain = plainfully_email_sender_domain($fromEmail);
 
         // Fast path (no obvious HTML)
@@ -146,6 +115,9 @@ if (!function_exists('plainfully_normalise_email_text')) {
     }
 }
 
+/**
+ * Auth guard for dev inbound hooks (shared token).
+ */
 if (!function_exists('pf_require_hook_token')) {
     function pf_require_hook_token(string $envVarName): bool
     {
@@ -163,150 +135,247 @@ if (!function_exists('pf_require_hook_token')) {
     }
 }
 
-if (!function_exists('pf_detect_paid_by_email')) {
-    /**
-     * Best-effort paid check.
-     * Fail-safe = treat as FREE if uncertain.
-     *
-     * Adjust the DB query if your users table differs.
-     */
-    function pf_detect_paid_by_email(string $email): bool
+/**
+ * Read integer env with fallback. Returns >= 0.
+ */
+if (!function_exists('pf_env_int_nonneg')) {
+    function pf_env_int_nonneg(string $key, int $default): int
+    {
+        $v = getenv($key);
+        if ($v === false || $v === '') {
+            return $default;
+        }
+        $n = (int)$v;
+        return $n >= 0 ? $n : $default;
+    }
+}
+
+/**
+ * Count how many email-channel checks this sender has created since $since.
+ */
+if (!function_exists('pf_email_checks_count_since')) {
+    function pf_email_checks_count_since(string $fromEmail, string $since): int
+    {
+        $pdo = pf_db();
+        $stmt = $pdo->prepare('
+            SELECT COUNT(*)
+            FROM checks
+            WHERE source_identifier = :sender
+              AND channel IN ("email", "email-clarify", "email-scamcheck")
+              AND created_at >= :since
+        ');
+        $stmt->execute([
+            ':sender' => $fromEmail,
+            ':since'  => $since,
+        ]);
+        return (int)$stmt->fetchColumn();
+    }
+}
+
+/**
+ * Find the sender's subscription tier (free vs unlimited).
+ * If billing helpers are deployed, they are the source of truth.
+ */
+if (!function_exists('pf_is_unlimited_tier_for_email')) {
+    function pf_is_unlimited_tier_for_email(string $email): bool
+    {
+        if (class_exists('PfBilling') && method_exists('PfBilling', 'planByEmail')) {
+            try {
+                $plan = (string)PfBilling::planByEmail($email);
+                return ($plan === 'unlimited');
+            } catch (Throwable $e) {
+                error_log('pf_is_unlimited_tier_for_email billing lookup failed (fallback to free): ' . $e->getMessage());
+                return false;
+            }
+        }
+
+        return false;
+    }
+}
+
+/**
+ * Email inbound limit check (28-day rolling + optional burst caps).
+ *
+ * ENV knobs:
+ *  - EMAIL_FREE_CAP_28D (default 3)
+ *  - EMAIL_UNLIMITED_CAP_28D (default 500)
+ *  - EMAIL_CAP_PER_HOUR (default 20)   [burst safety]
+ *  - EMAIL_CAP_PER_DAY  (default 200)  [burst safety]
+ *
+ * FAIL-OPEN.
+ */
+if (!function_exists('pf_email_inbound_limit_status')) {
+    function pf_email_inbound_limit_status(string $fromEmail, bool $isUnlimited): array
     {
         try {
-            // Prefer your own helper if it exists
-            if (function_exists('pf_user_find_by_email')) {
-                $u = pf_user_find_by_email($email);
-                return is_object($u) && isset($u->plan) && strtolower((string)$u->plan) === 'unlimited';
-            }
-            if (function_exists('pf_find_user_by_email')) {
-                $u = pf_find_user_by_email($email);
-                return is_object($u) && isset($u->plan) && strtolower((string)$u->plan) === 'unlimited';
+            $now = new DateTimeImmutable('now');
+
+            $since28 = $now->sub(new DateInterval('P28D'))->format('Y-m-d H:i:s');
+            $since1h = $now->sub(new DateInterval('PT1H'))->format('Y-m-d H:i:s');
+            $since1d = $now->sub(new DateInterval('P1D'))->format('Y-m-d H:i:s');
+
+            $cap28Free      = pf_env_int_nonneg('EMAIL_FREE_CAP_28D', 3);
+            $cap28Unlimited = pf_env_int_nonneg('EMAIL_UNLIMITED_CAP_28D', 500);
+
+            $capHour = pf_env_int_nonneg('EMAIL_CAP_PER_HOUR', 20);
+            $capDay  = pf_env_int_nonneg('EMAIL_CAP_PER_DAY', 200);
+
+            $cap28 = $isUnlimited ? $cap28Unlimited : $cap28Free;
+
+            $count28 = pf_email_checks_count_since($fromEmail, $since28);
+            $count1h = pf_email_checks_count_since($fromEmail, $since1h);
+            $count1d = pf_email_checks_count_since($fromEmail, $since1d);
+
+            $limited = false;
+            $reason  = '';
+
+            if ($cap28 > 0 && $count28 >= $cap28) {
+                $limited = true;
+                $reason  = 'cap_28d';
+            } elseif ($capHour > 0 && $count1h >= $capHour) {
+                $limited = true;
+                $reason  = 'cap_hour';
+            } elseif ($capDay > 0 && $count1d >= $capDay) {
+                $limited = true;
+                $reason  = 'cap_day';
             }
 
-            // Fallback: minimal DB probe
-            $pdo = pf_db();
-            $stmt = $pdo->prepare('SELECT plan FROM users WHERE email = :email LIMIT 1');
-            $stmt->execute([':email' => $email]);
-            $plan = $stmt->fetchColumn();
+            $resetSeconds = null;
+            if ($limited && $reason === 'cap_28d') {
+                try {
+                    $pdo = pf_db();
+                    $stmt = $pdo->prepare('
+                        SELECT created_at
+                        FROM checks
+                        WHERE source_identifier = :sender
+                          AND channel IN ("email", "email-clarify", "email-scamcheck")
+                          AND created_at >= :since
+                        ORDER BY created_at ASC
+                        LIMIT 1
+                    ');
+                    $stmt->execute([':sender' => $fromEmail, ':since' => $since28]);
+                    $oldest = $stmt->fetchColumn();
+                    if (is_string($oldest) && $oldest !== '') {
+                        $oldestDt = new DateTimeImmutable($oldest);
+                        $resetAt  = $oldestDt->add(new DateInterval('P28D'));
+                        $resetSeconds = max(0, $resetAt->getTimestamp() - $now->getTimestamp());
+                    }
+                } catch (Throwable $t) {
+                    // ignore
+                }
+            }
 
-            return is_string($plan) && strtolower($plan) === 'unlimited';
+            return [
+                'limited' => $limited,
+                'reason'  => $reason,
+                'counts'  => [
+                    'tier'        => $isUnlimited ? 'unlimited' : 'free',
+                    'cap_28'      => $cap28,
+                    'used_28'     => $count28,
+                    'cap_hour'    => $capHour,
+                    'used_hour'   => $count1h,
+                    'cap_day'     => $capDay,
+                    'used_day'    => $count1d,
+                ],
+                'reset_in_seconds' => $resetSeconds,
+            ];
         } catch (Throwable $e) {
-            error_log('pf_detect_paid_by_email fail-safe (FREE): ' . $e->getMessage());
-            return false;
+            error_log('pf_email_inbound_limit_status fail-open: ' . $e->getMessage());
+            return [
+                'limited' => false,
+                'reason'  => '',
+                'counts'  => ['fail_open' => true],
+                'reset_in_seconds' => null,
+            ];
         }
     }
 }
 
-if (!function_exists('pf_free_plan_limit_hit')) {
-    /**
-     * FREE plan hard cap: N checks per rolling 28 days (hard-coded).
-     *
-     * Returns: [bool $hit, ?int $nextAvailableEpoch]
-     */
-    function pf_free_plan_limit_hit(string $sourceIdentifier, int $limit): array
+/**
+ * Send a polite limit/upsell email response.
+ * CRITICAL: states we did NOT store the original submission.
+ */
+if (!function_exists('pf_send_limit_upsell_email')) {
+    function pf_send_limit_upsell_email(string $toEmail, string $mode, array $limitCounts, ?int $resetInSeconds): array
     {
-        try {
-            $pdo = pf_db();
-            $since = (new DateTimeImmutable('-' . PLAINFULLY_ROLLING_DAYS . ' days'))->format('Y-m-d H:i:s');
+        global $config;
 
-            $stmt = $pdo->prepare('
-                SELECT COUNT(*) AS c
-                FROM checks
-                WHERE source_identifier = :sid
-                  AND created_at >= :since
-            ');
-            $stmt->execute([
-                ':sid'   => $sourceIdentifier,
-                ':since' => $since,
-            ]);
+        $baseUrl    = rtrim((string)($config['app']['base_url'] ?? 'https://plainfully.com'), '/');
+        $upgradeUrl = (string)(getenv('PLAINFULLY_UPGRADE_URL') ?: ($baseUrl . '/pricing'));
 
-            $count = (int)$stmt->fetchColumn();
-            if ($count < $limit) {
-                return [false, null];
-            }
+        $used28 = (int)($limitCounts['used_28'] ?? 0);
+        $cap28  = (int)($limitCounts['cap_28'] ?? 0);
 
-            // Oldest in window => next free time
-            $stmtOldest = $pdo->prepare('
-                SELECT created_at
-                FROM checks
-                WHERE source_identifier = :sid
-                  AND created_at >= :since
-                ORDER BY created_at ASC
-                LIMIT 1
-            ');
-            $stmtOldest->execute([
-                ':sid'   => $sourceIdentifier,
-                ':since' => $since,
-            ]);
+        $productLabel = ($mode === 'scamcheck') ? 'Plainfully ScamCheck' : (($mode === 'clarify') ? 'Plainfully Clarify' : 'Plainfully');
 
-            $oldest = $stmtOldest->fetchColumn();
-            if (!is_string($oldest) || $oldest === '') {
-                return [true, null];
-            }
+        $when = '';
+        if (is_int($resetInSeconds) && $resetInSeconds > 0) {
+            $days  = intdiv($resetInSeconds, 86400);
+            $hours = intdiv($resetInSeconds % 86400, 3600);
+            $mins  = intdiv($resetInSeconds % 3600, 60);
 
-            $oldestDt = new DateTimeImmutable($oldest);
-            $nextDt   = $oldestDt->modify('+' . PLAINFULLY_ROLLING_DAYS . ' days');
-
-            return [true, $nextDt->getTimestamp()];
-        } catch (Throwable $e) {
-            // Fail-safe: block if we cannot compute usage
-            error_log('pf_free_plan_limit_hit error (fail-safe HIT): ' . $e->getMessage());
-            return [true, null];
+            $parts = [];
+            if ($days > 0)  { $parts[] = $days . ' day' . ($days === 1 ? '' : 's'); }
+            if ($hours > 0) { $parts[] = $hours . ' hour' . ($hours === 1 ? '' : 's'); }
+            if ($mins > 0 && $days === 0) { $parts[] = $mins . ' min' . ($mins === 1 ? '' : 's'); }
+            $when = 'Your next check becomes available in ' . implode(' ', $parts) . '.';
+        } else {
+            $when = 'Your allowance refreshes on a rolling 28‑day basis.';
         }
+
+        $subject = "{$productLabel}: limit reached — upgrade to keep going";
+
+        $inner =
+            '<p>Hello,</p>' .
+            '<p>You’ve reached your current limit for email checks (<strong>' .
+            htmlspecialchars((string)$used28, ENT_QUOTES, 'UTF-8') . ' / ' .
+            htmlspecialchars((string)$cap28, ENT_QUOTES, 'UTF-8') .
+            '</strong> in the last 28 days).</p>' .
+            '<p><strong>' . htmlspecialchars($when, ENT_QUOTES, 'UTF-8') . '</strong></p>' .
+            '<p>Upgrade to Unlimited (fair use) to keep going right now:</p>' .
+            '<ul>' .
+            '<li>Unlimited checks (fair use)</li>' .
+            '<li>Instant access — no waiting for your allowance to refresh</li>' .
+            '<li>Priority improvements as we ship new features</li>' .
+            '</ul>' .
+            '<p><a href="' . htmlspecialchars($upgradeUrl, ENT_QUOTES, 'UTF-8') . '">Upgrade to Unlimited</a></p>' .
+            '<p style="color:#6b7280;font-size:13px;margin:16px 0 0;">' .
+            'Privacy note: because you were over the limit, we did not store your email content. ' .
+            'Once your allowance refreshes or you upgrade, simply resend the message.' .
+            '</p>';
+
+        $html = function_exists('pf_email_template')
+            ? pf_email_template($subject, $inner)
+            : $inner;
+
+        $text =
+            "Hello,\n\n" .
+            "You've reached your current limit for email checks ({$used28} / {$cap28} in the last 28 days).\n" .
+            $when . "\n\n" .
+            "Upgrade to Unlimited to keep going now:\n{$upgradeUrl}\n\n" .
+            "Privacy note: because you were over the limit, we did not store your email content. Once your allowance refreshes or you upgrade, resend the message.\n";
+
+        if (!function_exists('pf_send_email')) {
+            return [false, 'pf_send_email helper not defined.'];
+        }
+
+        return pf_send_email($toEmail, $subject, $html, 'noreply', $text);
     }
 }
 
-if (!function_exists('pf_sender_fairuse_limit_hit_email')) {
-    /**
-     * Fair-use caps for EMAIL channels (always enforced).
-     * Returns: [bool $hit, int $hourCount, int $dayCount]
-     */
-    function pf_sender_fairuse_limit_hit_email(string $fromEmail, int $hourLimit, int $dayLimit): array
-    {
-        try {
-            $pdo = pf_db();
-
-            $hourAgo = (new DateTimeImmutable('-1 hour'))->format('Y-m-d H:i:s');
-            $dayAgo  = (new DateTimeImmutable('-1 day'))->format('Y-m-d H:i:s');
-
-            $stmt = $pdo->prepare('
-                SELECT
-                    SUM(created_at >= :hourAgo) AS hour_count,
-                    SUM(created_at >= :dayAgo)  AS day_count
-                FROM checks
-                WHERE source_identifier = :sender
-                  AND channel IN ("email", "email-clarify", "email-scamcheck")
-            ');
-
-            $stmt->execute([
-                ':sender'  => $fromEmail,
-                ':hourAgo' => $hourAgo,
-                ':dayAgo'  => $dayAgo,
-            ]);
-
-            $row = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
-            $hourCount = (int)($row['hour_count'] ?? 0);
-            $dayCount  = (int)($row['day_count'] ?? 0);
-
-            $hit = ($hourLimit > 0 && $hourCount >= $hourLimit) || ($dayLimit > 0 && $dayCount >= $dayLimit);
-            return [$hit, $hourCount, $dayCount];
-        } catch (Throwable $e) {
-            // Fail-safe: block if we cannot compute fair-use
-            error_log('pf_sender_fairuse_limit_hit_email error (fail-safe HIT): ' . $e->getMessage());
-            return [true, 0, 0];
-        }
-    }
-}
-
+/**
+ * DEV inbound email hook used by your IMAP bridge:
+ * POST form fields: from, to, subject, body
+ * Header: X-Plainfully-Token
+ */
 if (!function_exists('email_inbound_dev_controller')) {
     function email_inbound_dev_controller(): void
     {
         global $config;
 
-        header('Content-Type: application/json; charset=utf-8');
-
         if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
             http_response_code(405);
+            header('Content-Type: application/json; charset=utf-8');
             echo json_encode(['error' => 'Method not allowed. Use POST.']);
             return;
         }
@@ -322,6 +391,7 @@ if (!function_exists('email_inbound_dev_controller')) {
 
         if ($from === '' || $body === '') {
             http_response_code(400);
+            header('Content-Type: application/json; charset=utf-8');
             echo json_encode(['error' => 'Fields "from" and "body" are required.']);
             return;
         }
@@ -344,58 +414,46 @@ if (!function_exists('email_inbound_dev_controller')) {
             }
         }
 
-        // Determine paid status (fail-safe = free)
-        $isPaid = pf_detect_paid_by_email($from);
+        // Plan lookup (email -> user -> billing). If not deployed, defaults to free.
+        $isUnlimited = pf_is_unlimited_tier_for_email($from);
 
-        // ENV-driven caps
-        $freeLimit = pf_env_int('FREE_CHECKS_LIMIT', 3, 0, 1000);
+        // ✅ LIMIT CHECK BEFORE CheckEngine (so we store NOTHING when over limit)
+        $limit = pf_email_inbound_limit_status($from, $isUnlimited);
+        if (($limit['limited'] ?? false) === true) {
+            $emailSent = false;
+            $mailError = null;
 
-        $fairFreeHr  = pf_env_int('FAIRUSE_FREE_HOURLY', 5, 0, 100000);
-        $fairFreeDay = pf_env_int('FAIRUSE_FREE_DAILY', 10, 0, 100000);
-
-        $fairPaidHr  = pf_env_int('FAIRUSE_PAID_HOURLY', 60, 0, 100000);
-        $fairPaidDay = pf_env_int('FAIRUSE_PAID_DAILY', 500, 0, 100000);
-
-        // 1) Free plan hard cap (rolling 28 days)
-        if (!$isPaid && $freeLimit > 0) {
-            [$hit, $nextEpoch] = pf_free_plan_limit_hit($from, $freeLimit);
-            if ($hit) {
-                http_response_code(402);
-                echo json_encode([
-                    'error' => 'Free plan limit reached.',
-                    'plan'  => 'free',
-                    'limit' => $freeLimit,
-                    'rolling_days' => PLAINFULLY_ROLLING_DAYS,
-                    'next_free_epoch' => $nextEpoch,
-                ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-                return;
+            try {
+                [$emailSent, $mailError] = pf_send_limit_upsell_email(
+                    $from,
+                    $mode,
+                    (array)($limit['counts'] ?? []),
+                    is_int($limit['reset_in_seconds'] ?? null) ? (int)$limit['reset_in_seconds'] : null
+                );
+            } catch (Throwable $t) {
+                $emailSent = false;
+                $mailError = 'limit upsell send failed: ' . $t->getMessage();
             }
+
+            // IMPORTANT: return 200 so the bridge deletes the email (GDPR) and doesn’t retry forever
+            http_response_code(200);
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode([
+                'status'           => 'limited',
+                'mode'             => $mode,
+                'tier'             => $isUnlimited ? 'unlimited' : 'free',
+                'email_sent'       => (bool)$emailSent,
+                'mail_error'       => $mailError,
+                'counts'           => $limit['counts'] ?? [],
+                'reset_in_seconds' => $limit['reset_in_seconds'] ?? null,
+                'stored_input'     => false,
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            return;
         }
 
-        // 2) Fair-use caps (always enforced)
-        $hourLimit = $isPaid ? $fairPaidHr : $fairFreeHr;
-        $dayLimit  = $isPaid ? $fairPaidDay : $fairFreeDay;
-
-        if ($hourLimit > 0 || $dayLimit > 0) {
-            [$hit, $hourCount, $dayCount] = pf_sender_fairuse_limit_hit_email($from, $hourLimit, $dayLimit);
-            if ($hit) {
-                http_response_code(429);
-                echo json_encode([
-                    'error'      => 'Fair-use limit reached.',
-                    'plan'       => $isPaid ? 'paid' : 'free',
-                    'hour_usage' => $hourCount,
-                    'day_usage'  => $dayCount,
-                    'hour_limit' => $hourLimit,
-                    'day_limit'  => $dayLimit,
-                ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-                return;
-            }
-        }
-
-        // Normalise HTML -> safe text
+        // Normalise HTML to safe visible text
         $rawContent = plainfully_normalise_email_text($subject, $body, $from);
 
-        // Run engine
         $pdo      = pf_db();
         $aiClient = new DummyAiClient();
         $engine   = new CheckEngine($pdo, $aiClient);
@@ -409,6 +467,9 @@ if (!function_exists('email_inbound_dev_controller')) {
             null,
             null
         );
+
+        // Paid means "unlimited tier" for engine flags
+        $isPaid = $isUnlimited;
 
         try {
             $result = $engine->run($input, $isPaid);
@@ -460,6 +521,7 @@ if (!function_exists('email_inbound_dev_controller')) {
                 $mailError = 'pf_send_email helper not defined.';
             }
 
+            header('Content-Type: application/json; charset=utf-8');
             echo json_encode([
                 'status'        => 'ok',
                 'check_id'      => $checkId,
@@ -470,32 +532,29 @@ if (!function_exists('email_inbound_dev_controller')) {
                 'email_sent'    => $emailSent,
                 'mail_error'    => $mailError,
                 'mode'          => $mode,
-                'plan'          => $isPaid ? 'paid' : 'free',
             ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
         } catch (Throwable $e) {
             error_log('email_inbound_dev_controller error: ' . $e->getMessage());
             http_response_code(500);
+            header('Content-Type: application/json; charset=utf-8');
             echo json_encode(['error' => 'Internal error processing email hook.']);
         }
     }
 }
 
+/**
+ * DEV inbound SMS hook (POST: from, body)
+ * NOTE: SMS is paid-only in your current plan. (No free caps here.)
+ */
 if (!function_exists('sms_inbound_dev_controller')) {
-    /**
-     * DEV inbound SMS hook (POST: from, body)
-     *
-     * Your stated rule: SMS is ALWAYS paid.
-     * So: no free cap + no fair-use cap (unless you later want stability).
-     */
     function sms_inbound_dev_controller(): void
     {
         global $config;
 
-        header('Content-Type: application/json; charset=utf-8');
-
         if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
             http_response_code(405);
+            header('Content-Type: application/json; charset=utf-8');
             echo json_encode(['error' => 'Method not allowed. Use POST.']);
             return;
         }
@@ -509,6 +568,7 @@ if (!function_exists('sms_inbound_dev_controller')) {
 
         if ($from === '' || $body === '') {
             http_response_code(400);
+            header('Content-Type: application/json; charset=utf-8');
             echo json_encode(['error' => 'Fields "from" and "body" are required.']);
             return;
         }
@@ -516,9 +576,6 @@ if (!function_exists('sms_inbound_dev_controller')) {
         $pdo      = pf_db();
         $aiClient = new DummyAiClient();
         $engine   = new CheckEngine($pdo, $aiClient);
-
-        // SMS is always paid (per your rule)
-        $isPaid = true;
 
         $input = new CheckInput(
             'sms',
@@ -529,6 +586,8 @@ if (!function_exists('sms_inbound_dev_controller')) {
             $from,
             null
         );
+
+        $isPaid = true;
 
         try {
             $result = $engine->run($input, $isPaid);
@@ -541,6 +600,8 @@ if (!function_exists('sms_inbound_dev_controller')) {
                 ? 'Plainfully: This text looks like a scam. Don’t click links or share codes. Verify the sender via a trusted source.'
                 : 'Plainfully: No obvious scam signs found, but stay cautious with links and requests for personal or payment details.';
 
+            http_response_code(200);
+            header('Content-Type: application/json; charset=utf-8');
             echo json_encode([
                 'status'             => 'ok',
                 'check_id'           => $checkId,
@@ -549,12 +610,12 @@ if (!function_exists('sms_inbound_dev_controller')) {
                 'is_paid'            => $result->isPaid,
                 'view_url'           => $viewUrl,
                 'sms_reply_template' => $smsReply,
-                'plan'               => 'paid',
             ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
         } catch (Throwable $e) {
             error_log('sms_inbound_dev_controller error: ' . $e->getMessage());
             http_response_code(500);
+            header('Content-Type: application/json; charset=utf-8');
             echo json_encode([
                 'error' => 'Internal error running CheckEngine.',
                 'code'  => 'checkengine_failure',
