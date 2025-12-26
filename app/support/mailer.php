@@ -49,25 +49,31 @@ function pf_email_template(string $title, string $bodyHtml): string
         ">
 
           <!-- Header -->
+          <?php
+            $brand   = getenv('PF_EMAIL_BRAND_NAME') ?: 'Plainfully';
+            $tagline = getenv('PF_EMAIL_TAGLINE') ?: 'Clear answers. Fewer worries.';
+            $logoUrl = trim((string)(getenv('PF_EMAIL_LOGO_URL') ?: ''));
+          ?>
           <tr>
             <td style="padding:24px 28px 12px;">
-              <h1 style="
-                margin:0;
-                font-size:20px;
-                font-weight:700;
-                letter-spacing:-0.02em;
-              ">
-                Plainfully
-              </h1>
-              <p style="
-                margin:4px 0 0;
-                font-size:14px;
-                color:#6b7280;
-              ">
-                Clear answers. Fewer worries.
+              <?php if ($logoUrl !== ''): ?>
+                <img
+                  src="<?= htmlspecialchars($logoUrl, ENT_QUOTES, 'UTF-8') ?>"
+                  alt="<?= htmlspecialchars($brand, ENT_QUOTES, 'UTF-8') ?>"
+                  style="display:block;max-width:180px;height:auto;margin:0 0 10px 0;"
+                >
+              <?php else: ?>
+                <h1 style="margin:0;font-size:20px;font-weight:700;letter-spacing:-0.02em;">
+                  <?= htmlspecialchars($brand, ENT_QUOTES, 'UTF-8') ?>
+                </h1>
+              <?php endif; ?>
+
+              <p style="margin:4px 0 0;font-size:14px;color:#6b7280;">
+                <?= htmlspecialchars($tagline, ENT_QUOTES, 'UTF-8') ?>
               </p>
             </td>
           </tr>
+
 
           <!-- Divider -->
           <tr>
@@ -84,17 +90,23 @@ function pf_email_template(string $title, string $bodyHtml): string
           </tr>
 
           <!-- Footer -->
+          <?php
+            $company = getenv('PF_EMAIL_COMPANY_NAME') ?: 'Hissing Goat Studios';
+            $addr    = getenv('PF_EMAIL_COMPANY_ADDRESS') ?: '';
+          ?>
           <tr>
             <td style="padding:20px 28px 24px;font-size:13px;color:#6b7280;">
               <p style="margin:0;">
-                Sent by <strong>Plainfully</strong><br>
-                Operated by Hissing Goat Studios
+                Sent by <strong><?= htmlspecialchars($brand, ENT_QUOTES, 'UTF-8') ?></strong><br>
+                Operated by <?= htmlspecialchars($company, ENT_QUOTES, 'UTF-8') ?>
+                <?php if ($addr !== ''): ?><br><?= nl2br(htmlspecialchars($addr, ENT_QUOTES, 'UTF-8')) ?><?php endif; ?>
               </p>
               <p style="margin:8px 0 0;">
                 If you didn’t request this, you can safely ignore this email.
               </p>
             </td>
           </tr>
+
 
         </table>
 
