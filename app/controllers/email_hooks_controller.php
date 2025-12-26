@@ -182,10 +182,18 @@ if (!function_exists('pf_email_checks_count_since')) {
 if (!function_exists('pf_is_unlimited_tier_for_email')) {
     function pf_is_unlimited_tier_for_email(string $email): bool
     {
+        $raw = (string)(getenv('PLAINFULLY_UNLIMITED_EMAILS') ?: '');
+        if ($raw !== '') {
+            $list = array_filter(array_map('trim', explode(',', strtolower($raw))));
+            if (in_array(strtolower($email), $list, true)) {
+                return true;
+            }
+        }
+
         if (class_exists('PfBilling') && method_exists('PfBilling', 'planByEmail')) {
             try {
                 $plan = (string)PfBilling::planByEmail($email);
-                return ($plan === 'unlimited');
+                return true;
             } catch (Throwable $e) {
                 error_log('pf_is_unlimited_tier_for_email billing lookup failed (fallback to free): ' . $e->getMessage());
                 return false;
