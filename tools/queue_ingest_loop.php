@@ -1,17 +1,17 @@
 <?php declare(strict_types=1);
 /**
- * tools/email_inbox_poller.php
+ * tools/queue_ingest_loop.php  (aka queue_ingest_loop.php)
  *
  * Plainfully — IMAP poller (fast acknowledgement + queue insert).
  *
- * Intended cron:
- *   * * * * * /usr/bin/php -d detect_unicode=0 /var/www/vhosts/plainfully.com/httpdocs/tools/email_inbox_poller.php >> /var/www/vhosts/plainfully.com/logs/email_inbox_poller.log 2>&1
+ * Intended cron (example):
+ *   * * * * * /usr/bin/php /var/www/vhosts/plainfully.com/httpdocs/tools/queue_ingest_loop.php >> /var/www/vhosts/plainfully.com/logs/email_inbox_poller.log 2>&1
  *
  * What it does:
  * - Loops for up to ~55 seconds (sleeping 5s between polls)
  * - Pulls UNSEEN emails from IMAP
  * - Enforces limits/maintenance quickly (reply & delete email)
- * - Otherwise inserts into `email_queue` then sends an acknowledgement email
+ * - Otherwise inserts into `inbound_queue` then sends an acknowledgement email
  * - Deletes the original email from the mailbox (GDPR + idempotency)
  *
  * ENV required (IMAP):
@@ -36,12 +36,11 @@ if (PHP_SAPI !== 'cli') {
 
 date_default_timezone_set('UTC');
 
-// ------------------------------------------------------------
-// Bootstrap (best-effort)
-// ------------------------------------------------------------
-$ROOT = realpath(__DIR__ . '/..') ?: __DIR__ . '/..';
+$ROOT = realpath(__DIR__ . '/..') ?: (__DIR__ . '/..');
 
-// Load .env if present (minimal parser; does not override existing env)
+/**
+ * Minimal .env loader (does not override existing env).
+ */
 if (!function_exists('pf_load_env_file')) {
     function pf_load_env_file(string $path): void
     {
@@ -59,8 +58,10 @@ if (!function_exists('pf_load_env_file')) {
             $k = trim($k);
             $v = trim($v);
 
-            // Remove surrounding quotes
-            if ((str_starts_with($v, '"') && str_ends_with($v, '"')) || (str_starts_with($v, "'") && str_ends_with($v, "'"))) {
+            if (
+                (str_starts_with($v, '"') && str_ends_with($v, '"')) ||
+                (str_starts_with($v, "'") && str_ends_with($v, "'"))
+            ) {
                 $v = substr($v, 1, -1);
             }
 
@@ -71,10 +72,9 @@ if (!function_exists('pf_load_env_file')) {
         }
     }
 }
-
 pf_load_env_file($ROOT . '/.env');
 
-// Optional app config include (if you have it)
+// Optional app config include
 $config = $GLOBALS['config'] ?? null;
 $appConfigPath = $ROOT . '/config/app.php';
 if ($config === null && is_readable($appConfigPath)) {
@@ -83,26 +83,20 @@ if ($config === null && is_readable($appConfigPath)) {
     $GLOBALS['config'] = $config;
 }
 
-// DB helper (fallback) --------------------------------------------------------
+// DB helper
 require_once __DIR__ . '/../app/support/db.php';
-$pdo = pf_db();
-if (!($pdo instanceof PDO)) {
-    fwrite(STDERR, "ERROR: unable to get DB connection.\n");
-    exit(1);
-}
 
-// Mailer include --------------------------------------------------------------
+// Mailer include
 $mailerPath = $ROOT . '/app/support/mailer.php';
 if (is_readable($mailerPath)) {
     /** @noinspection PhpIncludeInspection */
     require_once $mailerPath;
 } else {
-    // If you move mailer.php, update this path.
     fwrite(STDERR, "ERROR: mailer.php not found at {$mailerPath}\n");
     exit(1);
 }
 
-// Include email hook controller functions so we can reuse limit helpers if present.
+// Reuse limit + normaliser helpers if present
 $hooksControllerPath = $ROOT . '/app/controllers/email_hooks_controller.php';
 if (is_readable($hooksControllerPath)) {
     /** @noinspection PhpIncludeInspection */
@@ -110,7 +104,7 @@ if (is_readable($hooksControllerPath)) {
 }
 
 // ------------------------------------------------------------
-// Small helpers
+// Helpers
 // ------------------------------------------------------------
 if (!function_exists('pf_env_int')) {
     function pf_env_int(string $k, int $default): int
@@ -131,13 +125,12 @@ if (!function_exists('pf_env_bool')) {
 }
 
 if (!function_exists('pf_extract_email')) {
-    function pf_extract_email(string $fromHeader): string
+    function pf_extract_email(string $header): string
     {
-        // Handles "Name <email@domain>" or plain email
-        if (preg_match('/<([^>]+)>/', $fromHeader, $m)) {
+        if (preg_match('/<([^>]+)>/', $header, $m)) {
             return strtolower(trim($m[1]));
         }
-        return strtolower(trim($fromHeader));
+        return strtolower(trim($header));
     }
 }
 
@@ -145,20 +138,34 @@ if (!function_exists('pf_mail_channel_for_to')) {
     function pf_mail_channel_for_to(string $to): array
     {
         $toLower = strtolower($to);
-        if (str_contains($toLower, 'scamcheck@')) { return ['mode' => 'scamcheck', 'check_channel' => 'email-scamcheck', 'email_channel' => 'scamcheck']; }
-        if (str_contains($toLower, 'clarify@'))   { return ['mode' => 'clarify',   'check_channel' => 'email-clarify',   'email_channel' => 'clarify']; }
-        return ['mode' => 'generic', 'check_channel' => 'email', 'email_channel' => 'noreply'];
+        if (str_contains($toLower, 'scamcheck@')) { return ['mode' => 'scamcheck', 'email_channel' => 'scamcheck']; }
+        if (str_contains($toLower, 'clarify@'))   { return ['mode' => 'clarify',   'email_channel' => 'clarify']; }
+        return ['mode' => 'generic', 'email_channel' => 'noreply'];
+    }
+}
+
+if (!function_exists('pf_parse_mailbox_name')) {
+    /**
+     * Extracts the mailbox name (e.g. "INBOX") from an IMAP mailbox string like "{host:993/imap/ssl}INBOX".
+     */
+    function pf_parse_mailbox_name(string $mailbox): string
+    {
+        $pos = strrpos($mailbox, '}');
+        if ($pos === false) { return $mailbox !== '' ? $mailbox : 'INBOX'; }
+        $name = substr($mailbox, $pos + 1);
+        $name = trim($name);
+        return $name !== '' ? $name : 'INBOX';
     }
 }
 
 if (!function_exists('pf_queue_position')) {
     function pf_queue_position(PDO $pdo, int $newId): int
     {
-        // Number of queued/processing items ahead of this one (strict FIFO)
+        // Items ahead = rows not finished yet, with lower id.
         $stmt = $pdo->prepare('
             SELECT COUNT(*) AS c
             FROM inbound_queue
-            WHERE status IN ("queued","processing")
+            WHERE status IN ("queued","prepped","ai_done","sending")
               AND id < :id
         ');
         $stmt->execute([':id' => $newId]);
@@ -184,9 +191,7 @@ if (!function_exists('pf_send_ack_email')) {
             '<p>We’ve received your message and added it to the queue.</p>' .
             '<p><strong>Position:</strong> #' . htmlspecialchars((string)$position, ENT_QUOTES, 'UTF-8') . '</p>' .
             '<p><strong>Estimated time:</strong> ~' . htmlspecialchars((string)$mins, ENT_QUOTES, 'UTF-8') . ' minute' . ($mins === 1 ? '' : 's') . '</p>' .
-            '<p style="color:#6b7280;font-size:13px;margin:16px 0 0;">' .
-            'We’ll email you again as soon as your result is ready.' .
-            '</p>';
+            '<p style="color:#6b7280;font-size:13px;margin:16px 0 0;">We’ll email you again as soon as your result is ready.</p>';
 
         $html = function_exists('pf_email_template')
             ? pf_email_template($subject, $inner)
@@ -217,9 +222,7 @@ if (!function_exists('pf_send_maintenance_email')) {
         $inner =
             '<p>Hello,</p>' .
             '<p>' . htmlspecialchars($message, ENT_QUOTES, 'UTF-8') . '</p>' .
-            '<p style="color:#6b7280;font-size:13px;margin:16px 0 0;">' .
-            'Please resend your message a little later.' .
-            '</p>';
+            '<p style="color:#6b7280;font-size:13px;margin:16px 0 0;">Please resend your message a little later.</p>';
 
         $html = function_exists('pf_email_template')
             ? pf_email_template($subject, $inner)
@@ -232,6 +235,22 @@ if (!function_exists('pf_send_maintenance_email')) {
 
         $channel = ($mode === 'scamcheck') ? 'scamcheck' : (($mode === 'clarify') ? 'clarify' : 'noreply');
         pf_send_email($toEmail, $subject, $html, $channel, $text);
+    }
+}
+
+if (!function_exists('pf_extract_message_id')) {
+    /**
+     * Extract RFC Message-ID header if present.
+     */
+    function pf_extract_message_id(string $rawHeaders): ?string
+    {
+        if (preg_match('/^Message-ID:\s*(.+)$/im', $rawHeaders, $m)) {
+            $v = trim($m[1]);
+            // strip < >
+            $v = trim($v, " \t\r\n<>");
+            return $v !== '' ? $v : null;
+        }
+        return null;
     }
 }
 
@@ -260,14 +279,14 @@ $throughput  = max(1, pf_env_int('EMAIL_QUEUE_THROUGHPUT_PER_MIN', 250));
 $maintenance = pf_env_bool('PLAINFULLY_MAINTENANCE', false);
 $maintMsg    = (string)(getenv('PLAINFULLY_MAINTENANCE_MESSAGE') ?: 'We’re doing a quick maintenance update right now.');
 
+$mailboxName = pf_parse_mailbox_name($mailbox);
+
 $start = time();
 $loops = 0;
 
 while (true) {
     $loops++;
-    if ((time() - $start) >= $maxRuntime) {
-        break;
-    }
+    if ((time() - $start) >= $maxRuntime) { break; }
 
     $inbox = @imap_open($mailbox, $user, $pass, 0, 1);
     if ($inbox === false) {
@@ -276,22 +295,25 @@ while (true) {
         continue;
     }
 
-    // Search UNSEEN messages
     $emails = imap_search($inbox, 'UNSEEN');
     if ($emails === false) {
-        // nothing
         imap_close($inbox);
         sleep($pollSeconds);
         continue;
     }
 
-    // Ensure oldest-first
     sort($emails);
 
-    $pdo = null;
-    try { $pdo = pf_db(); } catch (Throwable $e) { $pdo = null; }
+    try {
+        $pdo = pf_db();
+    } catch (Throwable $e) {
+        $pdo = null;
+    }
 
     foreach ($emails as $msgno) {
+        // IMPORTANT: IMAP functions expect int message numbers.
+        $msgno = (int)$msgno;
+
         try {
             $overview = imap_fetch_overview($inbox, (string)$msgno, 0);
             $ov = is_array($overview) && isset($overview[0]) ? $overview[0] : null;
@@ -299,21 +321,20 @@ while (true) {
             $fromHeader = is_object($ov) && isset($ov->from) ? (string)$ov->from : '';
             $toHeader   = is_object($ov) && isset($ov->to) ? (string)$ov->to : '';
             $subject    = is_object($ov) && isset($ov->subject) ? (string)$ov->subject : '';
+            $dateStr    = is_object($ov) && isset($ov->date) ? (string)$ov->date : '';
 
             $fromEmail  = pf_extract_email($fromHeader);
             $toEmail    = pf_extract_email($toHeader);
 
             $chan = pf_mail_channel_for_to($toEmail);
-            $mode = $chan['mode'];
+            $mode = (string)$chan['mode'];
 
-            // Maintenance: reply + delete without storing
             if ($maintenance) {
                 pf_send_maintenance_email($fromEmail, $mode, $maintMsg);
                 imap_delete($inbox, (string)$msgno);
                 continue;
             }
 
-            // Limit check (reuse helpers if present). If not present, fail-open.
             $isUnlimited = false;
             if (function_exists('pf_is_unlimited_tier_for_email')) {
                 $isUnlimited = (bool)pf_is_unlimited_tier_for_email($fromEmail);
@@ -333,34 +354,69 @@ while (true) {
                 }
             }
 
-            // Fetch best-effort body (plain first; fallback to full body)
-            $body = (string)imap_body($inbox, (string)$msgno, FT_PEEK);
-            if ($body === '') {
-                $body = (string)imap_fetchbody($inbox, (string)$msgno, '1', FT_PEEK);
+            // UID (stable within mailbox) for dedupe
+            $imapUid = @imap_uid($inbox, $msgno);
+            $imapUid = is_int($imapUid) ? $imapUid : null;
+
+            // Raw headers (for Message-ID + content-type hints)
+            $rawHeaders = (string)@imap_fetchheader($inbox, $msgno, FT_PREFETCHTEXT);
+            $messageId  = pf_extract_message_id($rawHeaders);
+
+            // Body (PEEK: don't set \Seen)
+            $rawBody = (string)@imap_body($inbox, $msgno, FT_PEEK);
+            if ($rawBody === '') {
+                // Common fallback: first part
+                $rawBody = (string)@imap_fetchbody($inbox, $msgno, '1', FT_PEEK);
             }
 
-            if (strlen($body) > $maxBytes) {
-                $body = substr($body, 0, $maxBytes);
+            if (strlen($rawBody) > $maxBytes) {
+                $rawBody = substr($rawBody, 0, $maxBytes);
             }
+
+            // Cheap HTML detection
+            $rawIsHtml = (
+                stripos($rawHeaders, 'Content-Type: text/html') !== false ||
+                stripos($rawBody, '<html') !== false ||
+                stripos($rawBody, '<body') !== false
+            ) ? 1 : 0;
 
             if (!$pdo instanceof PDO) {
                 throw new RuntimeException('DB unavailable (pf_db failed).');
             }
 
-            // Insert into queue
+            // Insert into inbound_queue (schema-aligned)
             $stmt = $pdo->prepare('
                 INSERT INTO inbound_queue
-                    (mode, from_email, to_email, subject, body, status, attempts, last_error, available_at, created_at)
+                    (source, mailbox, imap_uid, message_id, from_email, to_email, subject, received_at, mode,
+                     raw_body, raw_is_html, status,
+                     attempts, last_error)
                 VALUES
-                    (:mode, :from_email, :to_email, :subject, :body, "queued", 0, NULL, NOW(), NOW())
+                    ("email", :mailbox, :imap_uid, :message_id, :from_email, :to_email, :subject, :received_at, :mode,
+                     :raw_body, :raw_is_html, "queued",
+                     0, NULL)
             ');
 
+            $receivedAt = null;
+            if ($dateStr !== '') {
+                try {
+                    $dt = new DateTimeImmutable($dateStr);
+                    $receivedAt = $dt->format('Y-m-d H:i:s');
+                } catch (Throwable $t) {
+                    $receivedAt = null;
+                }
+            }
+
             $stmt->execute([
-                ':mode'       => $mode,
-                ':from_email' => $fromEmail,
-                ':to_email'   => $toEmail,
-                ':subject'    => $subject,
-                ':body'       => $body,
+                ':mailbox'     => $mailboxName,
+                ':imap_uid'    => $imapUid,
+                ':message_id'  => $messageId,
+                ':from_email'  => $fromEmail,
+                ':to_email'    => $toEmail !== '' ? $toEmail : null,
+                ':subject'     => $subject !== '' ? $subject : null,
+                ':received_at' => $receivedAt,
+                ':mode'        => $mode,
+                ':raw_body'    => $rawBody,
+                ':raw_is_html' => $rawIsHtml,
             ]);
 
             $newId = (int)$pdo->lastInsertId();
@@ -369,12 +425,29 @@ while (true) {
             // Ack email (best-effort)
             pf_send_ack_email($fromEmail, $mode, $ahead, $throughput);
 
+            // Store ack metadata (best-effort)
+            try {
+                $position = $ahead + 1;
+                $mins = max(1, (int)ceil($position / max(1, $throughput)));
+
+                $upd = $pdo->prepare('
+                    UPDATE inbound_queue
+                    SET ack_sent_at = NOW(),
+                        ack_message = "queued",
+                        queue_position_at_ack = :pos,
+                        eta_minutes_at_ack = :eta
+                    WHERE id = :id
+                ');
+                $upd->execute([':pos' => $position, ':eta' => $mins, ':id' => $newId]);
+            } catch (Throwable $t) {
+                // ignore
+            }
+
             // Delete original email
             imap_delete($inbox, (string)$msgno);
 
         } catch (Throwable $e) {
             error_log('Poller message failed: ' . $e->getMessage());
-            // Mark seen to prevent infinite loops if body parsing is broken
             @imap_setflag_full($inbox, (string)$msgno, "\\Seen");
         }
     }
