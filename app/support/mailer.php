@@ -325,4 +325,3 @@ if (!function_exists('pf_send_magic_link_email')) {
         return pf_mail_noreply($to, $subject, $html, $text);
     }
 }
-d
