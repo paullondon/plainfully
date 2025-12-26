@@ -22,109 +22,119 @@ require_once __DIR__ . '/email_templates.php';
 
 function pf_email_template(string $title, string $bodyHtml): string
 {
+    // Brand/env (safe defaults)
+    $brand   = getenv('PF_EMAIL_BRAND_NAME') ?: 'Plainfully';
+    $tagline = getenv('PF_EMAIL_TAGLINE') ?: 'Clear answers. Fewer worries.';
+    $logoUrl = trim((string)(getenv('PF_EMAIL_LOGO_URL') ?: ''));
+    $company = getenv('PF_EMAIL_COMPANY_NAME') ?: 'Hissing Goat Studios';
+    $address = getenv('PF_EMAIL_COMPANY_ADDRESS') ?: '';
+
+    // Pre-escape everything that may be user/env influenced (email-safe)
+    $escTitle   = htmlspecialchars($title, ENT_QUOTES, 'UTF-8');
+    $escBrand   = htmlspecialchars($brand, ENT_QUOTES, 'UTF-8');
+    $escTagline = htmlspecialchars($tagline, ENT_QUOTES, 'UTF-8');
+    $escCompany = htmlspecialchars($company, ENT_QUOTES, 'UTF-8');
+
+    // Optional blocks built as strings (NO PHP tags inside)
+    $logoBlock = '';
+    if ($logoUrl !== '') {
+        $escLogoUrl = htmlspecialchars($logoUrl, ENT_QUOTES, 'UTF-8');
+        $logoBlock =
+            '<img src="' . $escLogoUrl . '" ' .
+            'alt="' . $escBrand . '" ' .
+            'style="display:block;max-width:180px;height:auto;margin:0 0 10px 0;">';
+    } else {
+        $logoBlock =
+            '<h1 style="margin:0;font-size:20px;font-weight:700;letter-spacing:-0.02em;">' .
+            $escBrand .
+            '</h1>';
+    }
+
+    $addressBlock = '';
+    if ($address !== '') {
+        $escAddr = nl2br(htmlspecialchars($address, ENT_QUOTES, 'UTF-8'));
+        $addressBlock = '<br>' . $escAddr;
+    }
+
+    $year = date('Y');
+
     return '
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>' . htmlspecialchars($title, ENT_QUOTES, "UTF-8") . '</title>
-</head>
-<body style="
-  margin:0;
-  padding:0;
-  background:#f5f7fa;
-  font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
-  color:#111827;
-">
+  <!doctype html>
+  <html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>' . $escTitle . '</title>
+  </head>
+  <body style="
+    margin:0;
+    padding:0;
+    background:#f5f7fa;
+    font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+    color:#111827;
+  ">
 
-  <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
-    <tr>
-      <td align="center" style="padding:24px;">
-        <table width="100%" cellpadding="0" cellspacing="0" style="
-          max-width:560px;
-          background:#ffffff;
-          border-radius:12px;
-          box-shadow:0 10px 25px rgba(0,0,0,0.06);
-        ">
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+      <tr>
+        <td align="center" style="padding:24px;">
+          <table width="100%" cellpadding="0" cellspacing="0" style="
+            max-width:560px;
+            background:#ffffff;
+            border-radius:12px;
+            box-shadow:0 10px 25px rgba(0,0,0,0.06);
+          ">
 
-          <!-- Header -->
-          <?php
-            $brand   = getenv('PF_EMAIL_BRAND_NAME') ?: 'Plainfully';
-            $tagline = getenv('PF_EMAIL_TAGLINE') ?: 'Clear answers. Fewer worries.';
-            $logoUrl = trim((string)(getenv('PF_EMAIL_LOGO_URL') ?: ''));
-          ?>
-          <tr>
-            <td style="padding:24px 28px 12px;">
-              <?php if ($logoUrl !== ''): ?>
-                <img
-                  src="<?= htmlspecialchars($logoUrl, ENT_QUOTES, 'UTF-8') ?>"
-                  alt="<?= htmlspecialchars($brand, ENT_QUOTES, 'UTF-8') ?>"
-                  style="display:block;max-width:180px;height:auto;margin:0 0 10px 0;"
-                >
-              <?php else: ?>
-                <h1 style="margin:0;font-size:20px;font-weight:700;letter-spacing:-0.02em;">
-                  <?= htmlspecialchars($brand, ENT_QUOTES, 'UTF-8') ?>
-                </h1>
-              <?php endif; ?>
+            <!-- Header -->
+            <tr>
+              <td style="padding:24px 28px 12px;">
+                ' . $logoBlock . '
+                <p style="margin:4px 0 0;font-size:14px;color:#6b7280;">
+                  ' . $escTagline . '
+                </p>
+              </td>
+            </tr>
 
-              <p style="margin:4px 0 0;font-size:14px;color:#6b7280;">
-                <?= htmlspecialchars($tagline, ENT_QUOTES, 'UTF-8') ?>
-              </p>
-            </td>
-          </tr>
+            <!-- Divider -->
+            <tr>
+              <td style="padding:0 28px;">
+                <hr style="border:none;border-top:1px solid #e5e7eb;">
+              </td>
+            </tr>
 
+            <!-- Content -->
+            <tr>
+              <td style="padding:24px 28px;font-size:15px;line-height:1.6;">
+                ' . $bodyHtml . '
+              </td>
+            </tr>
 
-          <!-- Divider -->
-          <tr>
-            <td style="padding:0 28px;">
-              <hr style="border:none;border-top:1px solid #e5e7eb;">
-            </td>
-          </tr>
+            <!-- Footer -->
+            <tr>
+              <td style="padding:20px 28px 24px;font-size:13px;color:#6b7280;">
+                <p style="margin:0;">
+                  Sent by <strong>' . $escBrand . '</strong><br>
+                  Operated by ' . $escCompany . $addressBlock . '
+                </p>
+                <p style="margin:8px 0 0;">
+                  If you didn’t request this, you can safely ignore this email.
+                </p>
+              </td>
+            </tr>
 
-          <!-- Content -->
-          <tr>
-            <td style="padding:24px 28px;font-size:15px;line-height:1.6;">
-              ' . $bodyHtml . '
-            </td>
-          </tr>
+          </table>
 
-          <!-- Footer -->
-          <?php
-            $company = getenv('PF_EMAIL_COMPANY_NAME') ?: 'Hissing Goat Studios';
-            $addr    = getenv('PF_EMAIL_COMPANY_ADDRESS') ?: '';
-          ?>
-          <tr>
-            <td style="padding:20px 28px 24px;font-size:13px;color:#6b7280;">
-              <p style="margin:0;">
-                Sent by <strong><?= htmlspecialchars($brand, ENT_QUOTES, 'UTF-8') ?></strong><br>
-                Operated by <?= htmlspecialchars($company, ENT_QUOTES, 'UTF-8') ?>
-                <?php if ($addr !== ''): ?><br><?= nl2br(htmlspecialchars($addr, ENT_QUOTES, 'UTF-8')) ?><?php endif; ?>
-              </p>
-              <p style="margin:8px 0 0;">
-                If you didn’t request this, you can safely ignore this email.
-              </p>
-            </td>
-          </tr>
+          <!-- Legal -->
+          <p style="margin:16px 0 0;font-size:12px;color:#9ca3af;">
+            © ' . $year . ' ' . $escCompany . ' · plainfully.com
+          </p>
+        </td>
+      </tr>
+    </table>
 
-
-        </table>
-
-        <!-- Legal -->
-        <p style="
-          margin:16px 0 0;
-          font-size:12px;
-          color:#9ca3af;
-        ">
-          © ' . date('Y') . ' Hissing Goat Studios · plainfully.com
-        </p>
-      </td>
-    </tr>
-  </table>
-
-</body>
-</html>';
+  </body>
+  </html>';
 }
+
 
 // ---------------------------------------------------------
 // Load PHPMailer classes without Composer
