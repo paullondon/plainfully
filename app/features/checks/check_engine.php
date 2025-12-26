@@ -56,14 +56,14 @@ final class CheckEngine
             ');
 
             $stmt->execute([
-                ':channel'          => $input->channel,
-                ':source_identifier'=> $input->sourceIdentifier,
-                ':content_type'     => $input->contentType,
-                ':content'          => $input->content,
-                ':is_scam'          => $isScam ? 1 : 0,
-                ':is_paid'          => $isPaid ? 1 : 0,
-                ':short_verdict'    => $shortVerdict,
-                ':input_capsule'    => $capsule,
+                ':channel'           => $input->channel,
+                ':source_identifier' => $input->sourceIdentifier,
+                ':content_type'      => $input->contentType,
+                ':content'           => $input->content,
+                ':is_scam'           => $isScam ? 1 : 0,
+                ':is_paid'           => $isPaid ? 1 : 0,
+                ':short_verdict'     => $shortVerdict,
+                ':input_capsule'     => $capsule,
             ]);
 
             $id = (int)$this->pdo->lastInsertId();

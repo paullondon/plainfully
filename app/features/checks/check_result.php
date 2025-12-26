@@ -35,11 +35,11 @@ final class CheckResult
         bool $isPaid,
         array $meta = []
     ) {
-        $this->id          = $id;
+        $this->id           = $id;
         $this->shortVerdict = $shortVerdict;
         $this->inputCapsule = $inputCapsule;
-        $this->isScam       = $isScam;
-        $this->isPaid       = $isPaid;
-        $this->meta         = $meta;
+        $this->isScam        = $isScam;
+        $this->isPaid        = $isPaid;
+        $this->meta          = $meta;
     }
 }

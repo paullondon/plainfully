@@ -15,22 +15,12 @@ namespace App\Features\Checks;
  */
 final class CheckInput
 {
-    /** @var string */
     public string $channel;
-
-    /** @var string */
     public string $sourceIdentifier;
-
-    /** @var string */
     public string $contentType;
-
-    /** @var string */
     public string $content;
 
-    /** @var string|null */
     public ?string $email;
-
-    /** @var string|null */
     public ?string $phone;
 
     /** @var array<string,mixed>|null */
@@ -54,9 +44,6 @@ final class CheckInput
         $this->meta             = $meta;
     }
 
-    /**
-     * Convenience helper used by some engines / loggers.
-     */
     public function toArray(): array
     {
         return [
