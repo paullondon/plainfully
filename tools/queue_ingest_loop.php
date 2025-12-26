@@ -84,36 +84,11 @@ if ($config === null && is_readable($appConfigPath)) {
 }
 
 // DB helper (fallback) --------------------------------------------------------
-if (!function_exists('pf_db')) {
-    function pf_db(): PDO
-    {
-        static $pdo = null;
-        if ($pdo instanceof PDO) {
-            return $pdo;
-        }
-
-        $dsn  = getenv('DB_DSN') ?: '';
-        $user = getenv('DB_USER') ?: '';
-        $pass = getenv('DB_PASS') ?: '';
-
-        if ($dsn === '') {
-            $host = getenv('DB_HOST') ?: '127.0.0.1';
-            $name = getenv('DB_NAME') ?: '';
-            $charset = getenv('DB_CHARSET') ?: 'utf8mb4';
-            if ($name === '') {
-                throw new RuntimeException('DB_DSN or DB_NAME must be set.');
-            }
-            $dsn = "mysql:host={$host};dbname={$name};charset={$charset}";
-        }
-
-        $pdo = new PDO($dsn, $user, $pass, [
-            PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
-            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-            PDO::ATTR_EMULATE_PREPARES   => false,
-        ]);
-
-        return $pdo;
-    }
+require_once __DIR__ . '/../app/support/db.php';
+$pdo = pf_db();
+if (!($pdo instanceof PDO)) {
+    fwrite(STDERR, "ERROR: unable to get DB connection.\n");
+    exit(1);
 }
 
 // Mailer include --------------------------------------------------------------
@@ -182,7 +157,7 @@ if (!function_exists('pf_queue_position')) {
         // Number of queued/processing items ahead of this one (strict FIFO)
         $stmt = $pdo->prepare('
             SELECT COUNT(*) AS c
-            FROM email_queue
+            FROM inbound_queue
             WHERE status IN ("queued","processing")
               AND id < :id
         ');
@@ -374,7 +349,7 @@ while (true) {
 
             // Insert into queue
             $stmt = $pdo->prepare('
-                INSERT INTO email_queue
+                INSERT INTO inbound_queue
                     (mode, from_email, to_email, subject, body, status, attempts, last_error, available_at, created_at)
                 VALUES
                     (:mode, :from_email, :to_email, :subject, :body, "queued", 0, NULL, NOW(), NOW())

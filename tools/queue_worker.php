@@ -69,34 +69,11 @@ if ($config === null && is_readable($appConfigPath)) {
 }
 
 // DB helper (fallback)
-if (!function_exists('pf_db')) {
-    function pf_db(): PDO
-    {
-        static $pdo = null;
-        if ($pdo instanceof PDO) { return $pdo; }
-
-        $dsn  = getenv('DB_DSN') ?: '';
-        $user = getenv('DB_USER') ?: '';
-        $pass = getenv('DB_PASS') ?: '';
-
-        if ($dsn === '') {
-            $host = getenv('DB_HOST') ?: '127.0.0.1';
-            $name = getenv('DB_NAME') ?: '';
-            $charset = getenv('DB_CHARSET') ?: 'utf8mb4';
-            if ($name === '') {
-                throw new RuntimeException('DB_DSN or DB_NAME must be set.');
-            }
-            $dsn = "mysql:host={$host};dbname={$name};charset={$charset}";
-        }
-
-        $pdo = new PDO($dsn, $user, $pass, [
-            PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
-            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-            PDO::ATTR_EMULATE_PREPARES   => false,
-        ]);
-
-        return $pdo;
-    }
+require_once __DIR__ . '/../app/support/db.php';
+$pdo = pf_db();
+if (!($pdo instanceof PDO)) {
+    fwrite(STDERR, "ERROR: unable to get DB connection.\n");
+    exit(1);
 }
 
 // Mailer + engine includes
@@ -159,12 +136,10 @@ if (!function_exists('pf_mode_to_channels')) {
 $batch       = max(1, pf_env_int('EMAIL_QUEUE_BATCH', 200));
 $maxAttempts = max(1, pf_env_int('EMAIL_QUEUE_MAX_ATTEMPTS', 3));
 
-$pdo = pf_db();
-
 // Claim work (FIFO). We keep it simple: select then update each row to "processing".
 $stmt = $pdo->prepare('
     SELECT *
-    FROM email_queue
+    FROM inbound_queue
     WHERE status = "queued"
       AND available_at <= NOW()
       AND attempts < :max_attempts
@@ -209,7 +184,7 @@ foreach ($rows as $row) {
     try {
         // Mark as processing + increment attempts
         $upd = $pdo->prepare('
-            UPDATE email_queue
+            UPDATE inbound_queue
             SET status="processing",
                 attempts = attempts + 1,
                 last_error = NULL
@@ -293,7 +268,7 @@ foreach ($rows as $row) {
 
         // Update row status
         $upd2 = $pdo->prepare('
-            UPDATE email_queue
+            UPDATE inbound_queue
             SET status = :status,
                 last_error = :err
             WHERE id = :id
@@ -308,7 +283,7 @@ foreach ($rows as $row) {
 
     } catch (Throwable $e) {
         $updE = $pdo->prepare('
-            UPDATE email_queue
+            UPDATE inbound_queue
             SET status="error",
                 last_error = :err
             WHERE id = :id
