@@ -256,7 +256,7 @@ foreach ($rows as $row) {
         );
 
         /** Paid flag: wire billing later; default false */
-        $isPaid  = false;
+        $isPaid  = pf_is_unlimited_tier_for_email($fromEmail);
         $result  = $engine->run($input, $isPaid);
         $checkId = (int)($result->id ?? 0);
 
