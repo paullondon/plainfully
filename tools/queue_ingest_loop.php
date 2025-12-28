@@ -183,15 +183,14 @@ if (!function_exists('pf_send_ack_email')) {
             error_log('pf_send_email not available; cannot send ack.');
             return;
         }
-
-        $subject = 'Plainfully — received';
+        $subject = 'Plainfully — received (we’ve got it)';
 
         $inner =
             '<p>Hello,</p>' .
-            '<p>We’ve received your message.</p>' .
-            '<p>We’ll email your Plainfully result to this address.</p>' .
+            '<p>Thanks — we’ve received your message and it’s in our system.</p>' .
+            '<p>We’ll email your Plainfully result to this address as soon as it’s ready.</p>' .
             '<p style="color:#6b7280;font-size:13px;margin:16px 0 0;">' .
-                'When you open your result link, we’ll ask you to confirm your email address before you can view it.' .
+                'When you open the result link, we’ll ask you to confirm your email address before you can view it.' .
             '</p>' .
             '<p style="color:#6b7280;font-size:13px;margin:12px 0 0;">No action needed right now.</p>';
 
@@ -201,11 +200,11 @@ if (!function_exists('pf_send_ack_email')) {
 
         $text =
             "Hello,\n\n" .
-            "We’ve received your message.\n" .
-            "We’ll email your Plainfully result to this address.\n\n" .
-            "When you open your result link, we’ll ask you to confirm your email address before you can view it.\n\n" .
+            "Thanks — we’ve received your message and it’s in our system.\n" .
+            "We’ll email your Plainfully result to this address as soon as it’s ready.\n\n" .
+            "When you open the result link, we’ll ask you to confirm your email address before you can view it.\n\n" .
             "No action needed right now.\n";
-
+            
         $channel = ($mode === 'scamcheck') ? 'scamcheck' : (($mode === 'clarify') ? 'clarify' : 'noreply');
         pf_send_email($toEmail, $subject, $html, $channel, $text);
     }
