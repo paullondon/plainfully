@@ -1,18 +1,35 @@
 <?php declare(strict_types=1);
-
-// app/controllers/dashboard.php
-
 /**
- * Plainfully – Dashboard controller
+ * ============================================================
+ * Plainfully File Info
+ * ============================================================
+ * File: app/controllers/dashboard.php
+ * Purpose:
+ *   Logged-in landing page (dashboard).
  *
- * Logged-in landing page.
- * Shows:
- *  - Primary CTA to start a new consultation
- *  - Current subscription plan + upgrade CTA
- *  - Recent consultations (Plainfully's results only)
+ * What this version adds:
+ *   - Flow B support: if a result-link flow sets $_SESSION['pf_return_to'],
+ *     the dashboard immediately redirects there (one-time) and exits.
+ *
+ * Change history:
+ *   - 2025-12-28: Add pf_return_to redirect guard + standard file info header
+ * ============================================================
  */
+
 function handle_dashboard(): void
 {
+    // Flow B: if a result-link flow set a one-time return target, honour it.
+    if (!empty($_SESSION['pf_return_to'])) {
+        $to = (string)$_SESSION['pf_return_to'];
+        unset($_SESSION['pf_return_to']);
+
+        // Basic hardening: only allow internal paths to prevent open-redirects.
+        if ($to !== '' && str_starts_with($to, '/')) {
+            pf_redirect($to);
+            exit;
+        }
+    }
+
     // We assume require_login() has already run in routes/web.php
     $userName  = $_SESSION['user_name']         ?? 'there';
     $planKey   = $_SESSION['subscription_plan'] ?? 'basic';
@@ -48,10 +65,10 @@ function handle_dashboard(): void
     $recentConsultations = []; // TODO: replace with real DB lookup later
 
     // Prepare safe variables for the view
-    $userNameSafe     = htmlspecialchars($userName, ENT_QUOTES, 'UTF-8');
-    $planLabelSafe    = htmlspecialchars($planLabel, ENT_QUOTES, 'UTF-8');
-    $planKeySafe      = htmlspecialchars($planKey, ENT_QUOTES, 'UTF-8');
-    $planTaglineSafe  = htmlspecialchars($planTagline, ENT_QUOTES, 'UTF-8');
+    $userNameSafe     = htmlspecialchars((string)$userName, ENT_QUOTES, 'UTF-8');
+    $planLabelSafe    = htmlspecialchars((string)$planLabel, ENT_QUOTES, 'UTF-8');
+    $planKeySafe      = htmlspecialchars((string)$planKey, ENT_QUOTES, 'UTF-8');
+    $planTaglineSafe  = htmlspecialchars((string)$planTagline, ENT_QUOTES, 'UTF-8');
 
     // Render the view into a buffer
     ob_start();
