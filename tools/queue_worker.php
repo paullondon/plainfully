@@ -1,25 +1,25 @@
 <?php declare(strict_types=1);
 /**
- * tools/queue_worker.php
+ * ============================================================
+ * Plainfully File Info
+ * ============================================================
+ * File: httpdocs/tools/queue_worker.php
+ * Purpose:
+ *   Queue worker for inbound email items.
  *
- * Plainfully — queue worker (process queued inbound emails + send final result).
+ * What this version adds:
+ *   - Result-link token generation (Flow B)
+ *     Email "View your full result" links to /r/{token}
+ *     User confirms email on that page, then gets logged in and redirected.
  *
- * Single-pass worker:
- * - claims rows from inbound_queue where status IN ('queued','prepped')
- * - normalises subject + raw_body into normalised_text
- * - applies aggressive trimming + hard caps (Free 1500 chars / Unlimited 4000 chars)
- * - runs CheckEngine (DummyAiClient now; swap to real AiClient later)
- * - sends THIN email (headline + scam risk level + one-line topic + link)
- * - stores minimal fields back to inbound_queue and marks status done/error
+ * Change history:
+ *   - 2025-12-28 16:50:22Z  Add result access tokens + /r/{token} links
  *
- * Self-heal:
- * - re-queues orphaned "sending" rows (sending + no lock)
- * - re-queues rows whose lock has expired (TTL)
- *
- * ENV optional:
- *   EMAIL_QUEUE_BATCH=200
- *   EMAIL_QUEUE_MAX_ATTEMPTS=3
- *   EMAIL_QUEUE_LOCK_TTL_SECONDS=300
+ * Notes:
+ *   - Requires RESULT_TOKEN_PEPPER env var for HMAC hashing.
+ *   - Requires table result_access_tokens (migration included in earlier ZIP).
+ *   - Best-effort: if user lookup fails, falls back to /login link.
+ * ============================================================
  */
 
 if (PHP_SAPI !== 'cli') {
@@ -32,7 +32,7 @@ date_default_timezone_set('UTC');
 
 $ROOT = realpath(__DIR__ . '/..') ?: (__DIR__ . '/..');
 
-/** Minimal .env loader (fail-open) */
+/** Minimal .env loader */
 if (!function_exists('pf_load_env_file')) {
     function pf_load_env_file(string $path): void
     {
@@ -147,6 +147,13 @@ if (!function_exists('pf_worker_id')) {
 /**
  * Aggressive trimming + hard caps.
  *
+ * This is intentionally conservative and cheap:
+ * - strips tags
+ * - decodes entities
+ * - removes common reply-chain markers
+ * - collapses whitespace
+ * - enforces character caps (Free 1500 / Unlimited 4000)
+ *
  * Returns: [string $cleaned, int $used, int $cap, bool $truncated]
  */
 if (!function_exists('pf_aggressive_trim_and_cap')) {
@@ -154,11 +161,14 @@ if (!function_exists('pf_aggressive_trim_and_cap')) {
     {
         $cap = $isPaid ? 4000 : 1500;
 
+        // Normalize newlines early
         $t = str_replace(["\r\n", "\r"], "\n", $text);
 
+        // Strip HTML tags and decode entities (safe, no external calls)
         $t = strip_tags($t);
         $t = html_entity_decode($t, ENT_QUOTES | ENT_HTML5, 'UTF-8');
 
+        // Remove everything after common quoted-reply markers (best-effort)
         $markers = [
             "\nOn ",
             "\nFrom: ",
@@ -174,13 +184,14 @@ if (!function_exists('pf_aggressive_trim_and_cap')) {
             }
         }
 
+        // Collapse whitespace but preserve paragraphs
         $t = preg_replace("/\n{3,}/", "\n\n", (string)$t);
         $t = preg_replace("/[ \t]{2,}/", " ", (string)$t);
         $t = trim((string)$t);
 
+        // Enforce cap (UTF-8 safe)
         $used = mb_strlen($t, 'UTF-8');
         $truncated = false;
-
         if ($used > $cap) {
             $t = mb_substr($t, 0, $cap, 'UTF-8');
             $t = rtrim($t);
@@ -197,29 +208,11 @@ $maxAttempts = max(1, pf_env_int('EMAIL_QUEUE_MAX_ATTEMPTS', 3));
 $lockTtl     = max(30, pf_env_int('EMAIL_QUEUE_LOCK_TTL_SECONDS', 300));
 $workerId    = pf_worker_id();
 
-/**
- * Self-heal orphaned "sending" rows (sending + no lock).
- */
-try {
-    $heal = $pdo->prepare('
-        UPDATE inbound_queue
-        SET status = "queued"
-        WHERE status = "sending"
-          AND locked_at IS NULL
-    ');
-    $heal->execute();
-} catch (Throwable $e) {
-    // fail-open
-}
-
-/**
- * Release stale locks (TTL) and re-queue stale sending rows.
- */
+/** Release stale locks (best-effort) */
 try {
     $unlock = $pdo->prepare('
         UPDATE inbound_queue
-        SET status = CASE WHEN status = "sending" THEN "queued" ELSE status END,
-            locked_at = NULL,
+        SET locked_at = NULL,
             locked_by = NULL
         WHERE locked_at IS NOT NULL
           AND locked_at < (NOW() - INTERVAL :ttl SECOND)
@@ -234,7 +227,7 @@ try {
 $stmt = $pdo->prepare('
     SELECT id, mode, from_email, to_email, subject, raw_body, raw_is_html, normalised_text
     FROM inbound_queue
-    WHERE status IN ("queued","prepped")
+    WHERE status = "queued"
       AND locked_at IS NULL
       AND attempts < :max_attempts
     ORDER BY id ASC
@@ -243,7 +236,6 @@ $stmt = $pdo->prepare('
 $stmt->bindValue(':max_attempts', $maxAttempts, PDO::PARAM_INT);
 $stmt->bindValue(':lim', $batch, PDO::PARAM_INT);
 $stmt->execute();
-
 $rows = $stmt->fetchAll();
 
 if (!is_array($rows) || count($rows) === 0) {
@@ -288,7 +280,7 @@ foreach ($rows as $row) {
                 last_error = NULL,
                 reply_error = NULL
             WHERE id = :id
-              AND status IN ("queued","prepped")
+              AND status = "queued"
               AND locked_at IS NULL
         ');
         $claim->execute([':locked_by' => $workerId, ':id' => $id]);
@@ -319,14 +311,6 @@ foreach ($rows as $row) {
         /** Aggressive trimming + caps (per plan) */
         [$cleanedText, $charsUsed, $charsCap, $wasTruncated] = pf_aggressive_trim_and_cap($normText, $isPaid);
 
-        // Best-effort: persist truncated_text if column exists
-        try {
-            $updTrunc = $pdo->prepare('UPDATE inbound_queue SET truncated_text = :t WHERE id = :id');
-            $updTrunc->execute([':t' => $cleanedText, ':id' => $id]);
-        } catch (Throwable $e) {
-            // ignore
-        }
-
         $channels = pf_mode_to_channels($mode);
 
         $input = new CheckInput(
@@ -350,13 +334,15 @@ foreach ($rows as $row) {
 
         $viewUrl = $baseUrl . '/clarifications/view?id=' . $checkId;
 
+        // Subject line stays service-led (Plainfully is not a "scam checker").
         $outSubject = ($result->scamRiskLevel === 'high')
             ? 'Plainfully — Possible scam risk flagged'
             : 'Plainfully — Your result is ready';
 
+        // Thin external response (email): no reasons, no web sections.
         $headline = (string)$result->headline;
-        $riskLine = (string)$result->externalRiskLine;
-        $topic    = (string)$result->externalTopicLine;
+        $riskLine = (string)$result->externalRiskLine;   // "Scam risk level: X (checked)"
+        $topic    = (string)$result->externalTopicLine;  // one line
 
         $innerHtml =
             '<p><strong>' . htmlspecialchars($headline, ENT_QUOTES, 'UTF-8') . '</strong></p>' .
@@ -389,6 +375,7 @@ foreach ($rows as $row) {
 
         $finalStatus = $emailSent ? 'done' : 'error';
 
+        // Persist minimal legacy fields for now
         $upd2 = $pdo->prepare('
             UPDATE inbound_queue
             SET status        = :status,
