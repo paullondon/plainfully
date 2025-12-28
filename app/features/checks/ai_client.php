@@ -3,22 +3,30 @@
 namespace App\Features\Checks;
 
 /**
- * AI client abstraction.
+ * AiClient
  *
- * For MVP you’re using DummyAiClient, but keeping an interface means you can
- * swap in a real provider later without rewriting CheckEngine.
+ * Contract for analysis providers.
+ *
+ * IMPORTANT:
+ * - Implementations MUST return an array.
+ * - Preferred (new) shape:
+ *     ['result_json' => '{...}']  // JSON string matching Plainfully v1 schema
+ *   or
+ *     ['result' => [...]]         // decoded array that will be wrapped into v1
+ *
+ * - Legacy shape is still accepted by CheckEngine (best-effort):
+ *     ['short_verdict' => '...', 'capsule' => '...', 'is_scam' => bool]
+ *
+ * The optional $ctx allows plan-aware behaviour without changing call sites again.
  */
 interface AiClient
 {
     /**
-     * Analyze text and return a structured array.
-     *
-     * Expected keys (MVP):
-     * - short_verdict (string)
-     * - capsule (string)
-     * - is_scam (bool)
+     * @param string $text  Cleaned + capped message text
+     * @param string $mode  'clarify'|'scamcheck'|'generic' (caller controlled)
+     * @param array<string,mixed> $ctx Optional context (e.g. ['is_paid'=>true, 'source_type'=>'email'])
      *
      * @return array<string,mixed>
      */
-    public function analyze(string $text, string $mode = 'generic'): array;
+    public function analyze(string $text, string $mode, array $ctx = []): array;
 }
