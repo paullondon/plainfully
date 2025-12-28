@@ -5,23 +5,31 @@
  * ============================================================
  * File: httpdocs/tools/queue_worker.php
  * Purpose:
- *   Queue worker for inbound email items.
+ *   Queue worker (process queued inbound emails + send the THIN result email).
  *
- * What this version adds:
- *   - Result-link token generation (Flow B)
- *     Email "View your full result" links to /r/{token}
- *     User confirms email on that page, then gets logged in and redirected.
+ * Key behaviours:
+ *   - Aggressive trim + hard caps (Free 1500 / Unlimited 4000)
+ *   - Runs CheckEngine
+ *   - Sends a short email with:
+ *       * headline
+ *       * scam risk line
+ *       * topic line
+ *       * "View your full result" link
+ *
+ * Flow B (result link confirmation):
+ *   - Generates a result-scoped token stored hashed in result_access_tokens
+ *   - Email link points to: /r/{token}
+ *   - User confirms the email address the link was sent to
+ *   - System logs them in and redirects to /clarifications/view?id=...
+ *
+ * ENV:
+ *   - RESULT_TOKEN_PEPPER (required)
+ *   - RESULT_LINK_TTL_DAYS (optional; default 28)
  *
  * Change history:
- *   - 2025-12-28 16:50:22Z  Add result access tokens + /r/{token} links
- *
- * Notes:
- *   - Requires RESULT_TOKEN_PEPPER env var for HMAC hashing.
- *   - Requires table result_access_tokens (migration included in earlier ZIP).
- *   - Best-effort: if user lookup fails, falls back to /login link.
+ *   - 2025-12-28 17:28:14Z  Add Flow B result-link tokens in outbound email
  * ============================================================
  */
-
 if (PHP_SAPI !== 'cli') {
     http_response_code(403);
     echo "CLI only.\n";
@@ -32,7 +40,7 @@ date_default_timezone_set('UTC');
 
 $ROOT = realpath(__DIR__ . '/..') ?: (__DIR__ . '/..');
 
-/** Minimal .env loader */
+/** Minimal .env loader (fail-open) */
 if (!function_exists('pf_load_env_file')) {
     function pf_load_env_file(string $path): void
     {
@@ -147,13 +155,6 @@ if (!function_exists('pf_worker_id')) {
 /**
  * Aggressive trimming + hard caps.
  *
- * This is intentionally conservative and cheap:
- * - strips tags
- * - decodes entities
- * - removes common reply-chain markers
- * - collapses whitespace
- * - enforces character caps (Free 1500 / Unlimited 4000)
- *
  * Returns: [string $cleaned, int $used, int $cap, bool $truncated]
  */
 if (!function_exists('pf_aggressive_trim_and_cap')) {
@@ -161,14 +162,11 @@ if (!function_exists('pf_aggressive_trim_and_cap')) {
     {
         $cap = $isPaid ? 4000 : 1500;
 
-        // Normalize newlines early
         $t = str_replace(["\r\n", "\r"], "\n", $text);
 
-        // Strip HTML tags and decode entities (safe, no external calls)
         $t = strip_tags($t);
         $t = html_entity_decode($t, ENT_QUOTES | ENT_HTML5, 'UTF-8');
 
-        // Remove everything after common quoted-reply markers (best-effort)
         $markers = [
             "\nOn ",
             "\nFrom: ",
@@ -184,14 +182,13 @@ if (!function_exists('pf_aggressive_trim_and_cap')) {
             }
         }
 
-        // Collapse whitespace but preserve paragraphs
         $t = preg_replace("/\n{3,}/", "\n\n", (string)$t);
         $t = preg_replace("/[ \t]{2,}/", " ", (string)$t);
         $t = trim((string)$t);
 
-        // Enforce cap (UTF-8 safe)
         $used = mb_strlen($t, 'UTF-8');
         $truncated = false;
+
         if ($used > $cap) {
             $t = mb_substr($t, 0, $cap, 'UTF-8');
             $t = rtrim($t);
@@ -208,11 +205,99 @@ $maxAttempts = max(1, pf_env_int('EMAIL_QUEUE_MAX_ATTEMPTS', 3));
 $lockTtl     = max(30, pf_env_int('EMAIL_QUEUE_LOCK_TTL_SECONDS', 300));
 $workerId    = pf_worker_id();
 
-/** Release stale locks (best-effort) */
+
+/**
+ * Create a result-access token for Flow B and store ONLY hashed values.
+ *
+ * Returns the raw token for embedding in the email link, or null on failure.
+ *
+ * Security:
+ * - Token is random_bytes-based
+ * - token_hash = HMAC-SHA256(token, RESULT_TOKEN_PEPPER)
+ * - recipient_email_hash = HMAC-SHA256(lower(trim(email)), RESULT_TOKEN_PEPPER)
+ * - No plaintext email stored in result_access_tokens
+ */
+if (!function_exists('pf_create_result_access_token')) {
+    function pf_create_result_access_token(PDO $pdo, int $checkId, string $recipientEmail): ?string
+    {
+        $pepper = (string)(getenv('RESULT_TOKEN_PEPPER') ?: '');
+        if ($pepper === '') {
+            error_log('RESULT_TOKEN_PEPPER missing; cannot create result token');
+            return null;
+        }
+
+        $ttlDays = (int)(getenv('RESULT_LINK_TTL_DAYS') ?: 28);
+        if ($ttlDays < 1) { $ttlDays = 1; }
+        if ($ttlDays > 90) { $ttlDays = 90; } // fair-use cap
+
+        $emailNorm = strtolower(trim($recipientEmail));
+        if ($emailNorm === '' || !filter_var($emailNorm, FILTER_VALIDATE_EMAIL)) {
+            return null;
+        }
+
+        // Lookup user_id from users.email (required by FK)
+        $uStmt = $pdo->prepare('SELECT id FROM users WHERE email = :e LIMIT 1');
+        $uStmt->execute([':e' => $emailNorm]);
+        $userId = (int)($uStmt->fetchColumn() ?: 0);
+        if ($userId <= 0) {
+            // Fail-closed: without a user we cannot satisfy FK, so no token
+            return null;
+        }
+
+        // Raw token used only in the link (never stored)
+        $raw = random_bytes(32);
+        $token = rtrim(strtr(base64_encode($raw), '+/', '-_'), '=');
+
+        $tokenHash = hash_hmac('sha256', $token, $pepper);
+        $recipientHash = hash_hmac('sha256', $emailNorm, $pepper);
+
+        $expiresAt = (new DateTimeImmutable('now', new DateTimeZone('UTC')))
+            ->modify('+' . $ttlDays . ' days')
+            ->format('Y-m-d H:i:s');
+
+        try {
+            $ins = $pdo->prepare('
+                INSERT INTO result_access_tokens (check_id, user_id, token_hash, recipient_email_hash, expires_at)
+                VALUES (:check_id, :user_id, :token_hash, :recipient_email_hash, :expires_at)
+            ');
+            $ins->execute([
+                ':check_id' => $checkId,
+                ':user_id' => $userId,
+                ':token_hash' => $tokenHash,
+                ':recipient_email_hash' => $recipientHash,
+                ':expires_at' => $expiresAt,
+            ]);
+            return $token;
+        } catch (Throwable $e) {
+            error_log('Failed to insert result_access_token: ' . $e->getMessage());
+            return null;
+        }
+    }
+}
+
+/**
+ * Self-heal orphaned "sending" rows (sending + no lock).
+ */
+try {
+    $heal = $pdo->prepare('
+        UPDATE inbound_queue
+        SET status = "queued"
+        WHERE status = "sending"
+          AND locked_at IS NULL
+    ');
+    $heal->execute();
+} catch (Throwable $e) {
+    // fail-open
+}
+
+/**
+ * Release stale locks (TTL) and re-queue stale sending rows.
+ */
 try {
     $unlock = $pdo->prepare('
         UPDATE inbound_queue
-        SET locked_at = NULL,
+        SET status = CASE WHEN status = "sending" THEN "queued" ELSE status END,
+            locked_at = NULL,
             locked_by = NULL
         WHERE locked_at IS NOT NULL
           AND locked_at < (NOW() - INTERVAL :ttl SECOND)
@@ -227,7 +312,7 @@ try {
 $stmt = $pdo->prepare('
     SELECT id, mode, from_email, to_email, subject, raw_body, raw_is_html, normalised_text
     FROM inbound_queue
-    WHERE status = "queued"
+    WHERE status IN ("queued","prepped")
       AND locked_at IS NULL
       AND attempts < :max_attempts
     ORDER BY id ASC
@@ -236,6 +321,7 @@ $stmt = $pdo->prepare('
 $stmt->bindValue(':max_attempts', $maxAttempts, PDO::PARAM_INT);
 $stmt->bindValue(':lim', $batch, PDO::PARAM_INT);
 $stmt->execute();
+
 $rows = $stmt->fetchAll();
 
 if (!is_array($rows) || count($rows) === 0) {
@@ -280,7 +366,7 @@ foreach ($rows as $row) {
                 last_error = NULL,
                 reply_error = NULL
             WHERE id = :id
-              AND status = "queued"
+              AND status IN ("queued","prepped")
               AND locked_at IS NULL
         ');
         $claim->execute([':locked_by' => $workerId, ':id' => $id]);
@@ -311,6 +397,14 @@ foreach ($rows as $row) {
         /** Aggressive trimming + caps (per plan) */
         [$cleanedText, $charsUsed, $charsCap, $wasTruncated] = pf_aggressive_trim_and_cap($normText, $isPaid);
 
+        // Best-effort: persist truncated_text if column exists
+        try {
+            $updTrunc = $pdo->prepare('UPDATE inbound_queue SET truncated_text = :t WHERE id = :id');
+            $updTrunc->execute([':t' => $cleanedText, ':id' => $id]);
+        } catch (Throwable $e) {
+            // ignore
+        }
+
         $channels = pf_mode_to_channels($mode);
 
         $input = new CheckInput(
@@ -332,17 +426,18 @@ foreach ($rows as $row) {
         $result  = $engine->run($input, $isPaid);
         $checkId = (int)($result->id ?? 0);
 
-        $viewUrl = $baseUrl . '/clarifications/view?id=' . $checkId;
+        $token = pf_create_result_access_token($pdo, $checkId, $fromEmail);
+        $viewUrl = ($token !== null)
+            ? ($baseUrl . '/r/' . rawurlencode($token))
+            : ($baseUrl . '/login');
 
-        // Subject line stays service-led (Plainfully is not a "scam checker").
         $outSubject = ($result->scamRiskLevel === 'high')
             ? 'Plainfully — Possible scam risk flagged'
             : 'Plainfully — Your result is ready';
 
-        // Thin external response (email): no reasons, no web sections.
         $headline = (string)$result->headline;
-        $riskLine = (string)$result->externalRiskLine;   // "Scam risk level: X (checked)"
-        $topic    = (string)$result->externalTopicLine;  // one line
+        $riskLine = (string)$result->externalRiskLine;
+        $topic    = (string)$result->externalTopicLine;
 
         $innerHtml =
             '<p><strong>' . htmlspecialchars($headline, ENT_QUOTES, 'UTF-8') . '</strong></p>' .
@@ -375,7 +470,6 @@ foreach ($rows as $row) {
 
         $finalStatus = $emailSent ? 'done' : 'error';
 
-        // Persist minimal legacy fields for now
         $upd2 = $pdo->prepare('
             UPDATE inbound_queue
             SET status        = :status,
