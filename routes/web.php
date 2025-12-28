@@ -1,16 +1,21 @@
 <?php declare(strict_types=1);
 
 /**
- * Plainfully – main router
+ * ============================================================
+ * Plainfully File Info
+ * ============================================================
+ * File: routes/web.php
+ * Purpose:
+ *   Main router for Plainfully web app.
  *
- * Handles:
- *  - GET  /            → redirect to /dashboard (if logged in)
- *  - GET  /login       → magic-link login form
- *  - POST /login       → request magic link
- *  - GET  /magic/verify→ verify magic link
- *  - POST /logout      → logout
- *  - GET  /dashboard   → main app dashboard
- *  - GET  /health      → health check
+ * Change history:
+ *   - 2025-12-28 16:44:40Z  Add guest route GET/POST /r/{token} (result link confirmation)
+ * ============================================================
+ *
+ * Notes:
+ *   - /r/{token} is a guest route:
+ *       - asks the user to confirm the email address the result was sent to
+ *       - then logs them in and redirects to /clarifications/view?id=...
  */
 
 // HTTP method + path
@@ -38,22 +43,16 @@ switch (true) {
         pf_redirect('/dashboard');
         break;
 
-        // -------------------------------------------------
+    // -------------------------------------------------
     // Clarifications – new
     // -------------------------------------------------
-
-    case $path === '/clarifications/new' && $method === 'GET':
-        clarifications_new_controller();
-        break;
-
-    case $path === '/clarifications/new' && $method === 'POST':
+    case $path === '/clarifications/new' && ($method === 'GET' || $method === 'POST'):
         clarifications_new_controller();
         break;
 
     // -------------------------------------------------
     // Clarifications – list + view
     // -------------------------------------------------
-
     case $path === '/clarifications' && $method === 'GET':
         clarifications_index_controller();
         break;
@@ -69,7 +68,7 @@ switch (true) {
         require_login();
         handle_dashboard();
         break;
-    
+
     // -------------------------------------------------
     // Logout
     // -------------------------------------------------
@@ -81,6 +80,22 @@ switch (true) {
 // ======================
 // !! GUEST ROUTES     !!
 // ======================
+
+    // -------------------------------------------------
+    // Result link confirmation (guest)
+    //   GET  /r/{token}
+    //   POST /r/{token}
+    // -------------------------------------------------
+    case str_starts_with($path, '/r/') && ($method === 'GET' || $method === 'POST'):
+        require_guest();
+
+        $token = substr($path, 3); // everything after "/r/"
+        $token = trim($token);
+
+        require_once __DIR__ . '/../app/controllers/result_access_controller.php';
+
+        result_access_controller($token);
+        break;
 
     // -------------------------------------------------
     // Login (GET + POST) – unified handler
@@ -147,28 +162,22 @@ switch (true) {
     case $path === '/hooks/email/inbound-dev' && $method === 'POST':
         email_inbound_dev_controller();
         return;
-    
+
     case $path === '/debug/email-bridge' && $method === 'GET':
         ensureDebugAccess();
         admin_debug_email_bridge();
         break;
 
-    require_once __DIR__ . '/../app/controllers/email_inbound.php';
-
-    $router->post('/api/email/inbound', function () {
-        handle_email_inbound();
-    });
-
     // -------------------------------------------------
     // 404 fallback – nicer page
     // -------------------------------------------------
     default:
-    http_response_code(404);
+        http_response_code(404);
 
-    ob_start();
-    require dirname(__DIR__) . '/app/views/errors/404.php';
-    $inner = ob_get_clean();
+        ob_start();
+        require dirname(__DIR__) . '/app/views/errors/404.php';
+        $inner = ob_get_clean();
 
-    pf_render_shell('Not found', $inner);
-    return;
+        pf_render_shell('Not found', $inner);
+        return;
 }
