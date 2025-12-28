@@ -1,8 +1,5 @@
 <?php declare(strict_types=1);
 
-use PDO;
-use Throwable;
-
 /**
  * ============================================================
  * Plainfully File Info
@@ -24,11 +21,12 @@ use Throwable;
  *     - user_id, check_id, expires_at, validated_at
  *
  * Change history:
+ *   - 2025-12-28 17:05:00Z  Remove global-namespace use warnings; rely on pf_db(); tighten fail-closed checks
  *   - 2025-12-28 16:44:40Z  Initial MVP implementation (result token + email confirm + login)
  *
  * Notes:
  *   - Stores NO plaintext email; hashes only.
- *   - Token hashing uses RESULT_TOKEN_PEPPER env var (recommended).
+ *   - Token hashing uses RESULT_TOKEN_PEPPER env var (required).
  *   - Fail-closed: invalid/expired token returns 404-like page.
  * ============================================================
  */
@@ -45,14 +43,22 @@ if (!function_exists('result_access_controller')) {
             return;
         }
 
+        $pepper = (string)(getenv('RESULT_TOKEN_PEPPER') ?: '');
+        if ($pepper === '') {
+            // Fail-closed: without pepper we cannot safely validate tokens
+            http_response_code(404);
+            pf_render_shell('Not found', '<p>This link has expired or is not valid.</p>');
+            return;
+        }
+
+        // Always use the app DB helper (controllers should not manage PDO construction)
         $pdo = pf_db();
-        if (!($pdo instanceof PDO)) {
+        if (!is_object($pdo) || !method_exists($pdo, 'prepare')) {
             http_response_code(500);
             pf_render_shell('Error', '<p>Something went wrong. Please try again.</p>');
             return;
         }
 
-        $pepper = (string)(getenv('RESULT_TOKEN_PEPPER') ?: '');
         $tokenHash = hash_hmac('sha256', $token, $pepper);
 
         $stmt = $pdo->prepare("
@@ -63,7 +69,7 @@ if (!function_exists('result_access_controller')) {
             LIMIT 1
         ");
         $stmt->execute([':th' => $tokenHash]);
-        $rec = $stmt->fetch(PDO::FETCH_ASSOC);
+        $rec = $stmt->fetch(\PDO::FETCH_ASSOC);
 
         if (!$rec) {
             http_response_code(404);
@@ -71,8 +77,8 @@ if (!function_exists('result_access_controller')) {
             return;
         }
 
-        $userId  = (int)($rec['user_id'] ?? 0);
-        $checkId = (int)($rec['check_id'] ?? 0);
+        $userId        = (int)($rec['user_id'] ?? 0);
+        $checkId       = (int)($rec['check_id'] ?? 0);
         $recipientHash = (string)($rec['recipient_email_hash'] ?? '');
         $validatedAt   = $rec['validated_at'] ?? null;
 
@@ -122,7 +128,7 @@ if (!function_exists('result_access_controller')) {
                         }
 
                         $errors[] = 'Something went wrong. Please try again.';
-                    } catch (Throwable $e) {
+                    } catch (\Throwable $e) {
                         error_log('result_access_controller: validation update failed: ' . $e->getMessage());
                         $errors[] = 'Something went wrong. Please try again.';
                     }
@@ -148,12 +154,12 @@ if (!function_exists('result_access_controller')) {
 }
 
 if (!function_exists('pf_result_access_login_user')) {
-    function pf_result_access_login_user(PDO $pdo, int $userId): bool
+    function pf_result_access_login_user($pdo, int $userId): bool
     {
         try {
             $stmt = $pdo->prepare("SELECT id, email FROM users WHERE id = :id LIMIT 1");
             $stmt->execute([':id' => $userId]);
-            $u = $stmt->fetch(PDO::FETCH_ASSOC);
+            $u = $stmt->fetch(\PDO::FETCH_ASSOC);
 
             if (!$u) { return false; }
 
@@ -174,7 +180,7 @@ if (!function_exists('pf_result_access_login_user')) {
             $_SESSION['user_email'] = $email;
 
             return true;
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             error_log('pf_result_access_login_user failed: ' . $e->getMessage());
             return false;
         }
