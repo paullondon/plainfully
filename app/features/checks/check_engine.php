@@ -6,13 +6,14 @@ use PDO;
 use Throwable;
 
 /**
- * CheckEngine
+ * CheckEngine (Plainfully)
  *
- * - Takes a CheckInput
  * - Calls AiClient
- * - Ensures a matching `users` row exists (by email) and gets user_id
- * - Writes a row to `checks`
- * - Returns CheckResult
+ * - Ensures a matching `users` row exists (by users.email) and gets user_id
+ * - Inserts into `checks` using the ACTUAL live schema:
+ *     ai_result_json, channel, content_type, created_at, id, is_paid, is_scam,
+ *     short_summary, source_identifier, updated_at, user_id
+ * - Returns CheckResult (matches CheckResult v1 signature in your repo)
  *
  * Security:
  * - Prepared statements only
@@ -40,36 +41,33 @@ final class CheckEngine
             $mode = 'clarify';
         }
 
+        // AiClient returns an array (DummyAiClient should too)
         $analysis = $this->ai->analyze($input->content, $mode);
+        if (!is_array($analysis)) { $analysis = []; }
 
-        // Defensive parsing (Dummy client may return strings)
-        $shortVerdict = (string)($analysis['short_verdict'] ?? 'Unknown');
-        $capsule      = (string)($analysis['capsule'] ?? '');
-        $isScamRaw    = $analysis['is_scam'] ?? false;
-        $isScam       = is_bool($isScamRaw) ? $isScamRaw : (strtolower((string)$isScamRaw) === 'true' || (string)$isScamRaw === '1');
+        // ---------
+        // Normalise analysis fields (safe defaults; no jargon)
+        // ---------
+        $status             = (string)($analysis['status'] ?? 'ok');
+        $headline           = (string)($analysis['headline'] ?? 'Your result is ready');
+        $externalRiskLine   = (string)($analysis['external_risk_line'] ?? 'Scam risk level: unknown (we always check)');
+        $externalTopicLine  = (string)($analysis['external_topic_line'] ?? 'This message appears to be about: unknown');
 
-        // Always write valid JSON into ai_result_json (constraint-safe)
-        // - If upstream already provides an array/object, encode it.
-        // - If upstream provides a string, try to treat it as JSON; fallback to {}.
-        $aiJson = '{}';
-        try {
-            if (is_array($analysis)) {
-                $tmp = json_encode($analysis, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-                if (is_string($tmp) && $tmp !== '' && json_last_error() === JSON_ERROR_NONE) {
-                    $aiJson = $tmp;
-                }
-            } elseif (is_string($analysis)) {
-                $decoded = json_decode($analysis, true);
-                if (json_last_error() === JSON_ERROR_NONE) {
-                    $tmp = json_encode($decoded, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-                    if (is_string($tmp) && $tmp !== '' && json_last_error() === JSON_ERROR_NONE) {
-                        $aiJson = $tmp;
-                    }
-                }
-            }
-        } catch (Throwable $e) {
-            // keep {}
-        }
+        $scamRiskLevelRaw = $analysis['scam_risk_level'] ?? ($analysis['scamRiskLevel'] ?? null);
+        $scamRiskLevel    = $this->normaliseRiskLevel($scamRiskLevelRaw, $analysis['is_scam'] ?? null);
+
+        // Web fields (these are for the website view, not the thin email)
+        $webWhatTheMessageSays = (string)($analysis['web_what_the_message_says'] ?? '');
+        $webWhatItsAskingFor   = (string)($analysis['web_what_its_asking_for'] ?? '');
+        $webScamLevelLine      = (string)($analysis['web_scam_level_line'] ?? '');
+        $webLowRiskNote        = (string)($analysis['web_low_risk_note'] ?? '');
+        $webScamExplanation    = (string)($analysis['web_scam_explanation'] ?? '');
+
+        // Boolean is_scam stored in DB (conservative: only "high" = scam)
+        $isScam = ($scamRiskLevel === 'high');
+
+        // Build JSON for DB (must be valid JSON to satisfy your constraint)
+        $rawJson = $this->safeJsonEncode($analysis);
 
         // Store (best effort). If DB write fails, still return result so UX works.
         $id = null;
@@ -77,14 +75,16 @@ final class CheckEngine
         try {
             $userId = $this->getOrCreateUserIdByEmail($input->sourceIdentifier);
 
-            // IMPORTANT:
-            // Your schema enforces fk_checks_user_id -> users.id, so user_id must exist.
-            // Your schema enforces a constraint on checks.ai_result_json, so it must be valid JSON.
+            // short_summary must fit varchar; keep it tight.
+            $shortSummary = trim($headline . ' — ' . $externalTopicLine);
+            if ($shortSummary === '') { $shortSummary = 'Plainfully result'; }
+            $shortSummary = $this->mbTrimTo($shortSummary, 240);
+
             $stmt = $this->pdo->prepare('
                 INSERT INTO checks
-                    (user_id, channel, source_identifier, content_type, is_scam, is_paid, short_verdict, input_capsule, ai_result_json, created_at)
+                    (user_id, channel, source_identifier, content_type, is_scam, is_paid, short_summary, ai_result_json, created_at)
                 VALUES
-                    (:user_id, :channel, :source_identifier, :content_type, :is_scam, :is_paid, :short_verdict, :input_capsule, :ai_result_json, NOW())
+                    (:user_id, :channel, :source_identifier, :content_type, :is_scam, :is_paid, :short_summary, :ai_result_json, NOW())
             ');
 
             $stmt->execute([
@@ -94,9 +94,8 @@ final class CheckEngine
                 ':content_type'      => $input->contentType,
                 ':is_scam'           => $isScam ? 1 : 0,
                 ':is_paid'           => $isPaid ? 1 : 0,
-                ':short_verdict'     => $shortVerdict,
-                ':input_capsule'     => $capsule,
-                ':ai_result_json'    => $aiJson,
+                ':short_summary'     => $shortSummary,
+                ':ai_result_json'    => $rawJson,
             ]);
 
             $id = (int)$this->pdo->lastInsertId();
@@ -104,21 +103,69 @@ final class CheckEngine
             error_log('CheckEngine DB insert failed (fail-open): ' . $e->getMessage());
         }
 
+        // IMPORTANT: This matches the constructor in /app/features/checks/check_result.php (v1)
         return new CheckResult(
             $id,
-            $shortVerdict,
-            $capsule,
-            $isScam,
+            $status,
+            $headline,
+            $scamRiskLevel,
+            $externalRiskLine,
+            $externalTopicLine,
+            $webWhatTheMessageSays,
+            $webWhatItsAskingFor,
+            $webScamLevelLine,
+            $webLowRiskNote,
+            $webScamExplanation,
             $isPaid,
-            ['mode' => $mode]
+            ['mode' => $mode],
+            $rawJson
         );
+    }
+
+    /**
+     * Normalise risk level into 'low'|'medium'|'high'.
+     * If not provided, fall back to is_scam boolean if present.
+     */
+    private function normaliseRiskLevel(mixed $risk, mixed $isScamFallback): string
+    {
+        $r = strtolower(trim((string)($risk ?? '')));
+        if (in_array($r, ['low', 'medium', 'high'], true)) {
+            return $r;
+        }
+
+        // Fallback: if upstream only provides is_scam as boolish
+        if (is_bool($isScamFallback)) {
+            return $isScamFallback ? 'high' : 'low';
+        }
+
+        $s = strtolower(trim((string)($isScamFallback ?? '')));
+        if ($s === '1' || $s === 'true' || $s === 'yes') { return 'high'; }
+        if ($s === '0' || $s === 'false' || $s === 'no') { return 'low'; }
+
+        return 'low';
+    }
+
+    /**
+     * Always returns valid JSON.
+     */
+    private function safeJsonEncode(array $data): string
+    {
+        try {
+            $json = json_encode($data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            if (is_string($json) && $json !== '' && json_last_error() === JSON_ERROR_NONE) {
+                return $json;
+            }
+        } catch (Throwable $e) {
+            // ignore
+        }
+        return '{}';
     }
 
     /**
      * Ensures a user exists for the given email address and returns users.id.
      *
      * - Uses users.email (UNIQUE) as the natural key.
-     * - Inserts plan='free' for new users (matches your users.plan enum default).
+     * - Inserts plan='free' for new users.
      * - Race-safe: if two processes insert at once, handle duplicate then re-select.
      */
     private function getOrCreateUserIdByEmail(string $email): int
@@ -126,7 +173,6 @@ final class CheckEngine
         $email = trim(strtolower($email));
 
         if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            // Fail-closed: do not invent a user_id. This avoids FK errors masking bad input.
             throw new \RuntimeException('Invalid user email for user lookup.');
         }
 
@@ -138,7 +184,7 @@ final class CheckEngine
             return (int)$found;
         }
 
-        // 2) Insert (best effort)
+        // 2) Insert
         try {
             $ins = $this->pdo->prepare('
                 INSERT INTO users (email, plan, created_at)
@@ -148,18 +194,28 @@ final class CheckEngine
                 ':email' => $email,
                 ':plan'  => 'free',
             ]);
-
             return (int)$this->pdo->lastInsertId();
         } catch (Throwable $e) {
-            // Duplicate insert or other transient issue; re-select
+            // Duplicate insert or transient issue; re-select
             $sel2 = $this->pdo->prepare('SELECT id FROM users WHERE email = :email LIMIT 1');
             $sel2->execute([':email' => $email]);
             $found2 = $sel2->fetchColumn();
             if ($found2 !== false && $found2 !== null) {
                 return (int)$found2;
             }
-
             throw $e;
         }
+    }
+
+    /**
+     * UTF-8 safe trim to max chars.
+     */
+    private function mbTrimTo(string $s, int $maxChars): string
+    {
+        $s = trim($s);
+        if ($s === '') { return $s; }
+        $len = mb_strlen($s, 'UTF-8');
+        if ($len <= $maxChars) { return $s; }
+        return rtrim(mb_substr($s, 0, $maxChars, 'UTF-8'));
     }
 }
