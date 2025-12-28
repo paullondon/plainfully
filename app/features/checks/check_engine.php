@@ -143,6 +143,25 @@ final class CheckEngine
         // New JSON field if you add it later
         $add('output_json', ':output_json', $rawJson);
 
+/*
+ * Some DB versions use `ai_result_json` with a JSON validity constraint.
+ * If present, always populate it with valid JSON (never empty string).
+ */
+$aiJson = $rawJson;
+if ($aiJson === null || $aiJson === '') {
+    $aiJson = '{}';
+} else {
+    $decoded = json_decode($aiJson, true);
+    if (!is_array($decoded) && $decoded !== null) {
+        // If it's valid JSON but not an object/array (e.g. a string/number), wrap it.
+        $aiJson = json_encode(['value' => $decoded], JSON_UNESCAPED_UNICODE);
+    } elseif ($decoded === null && trim($aiJson) !== 'null') {
+        // Invalid JSON string — replace with empty object to satisfy DB constraint.
+        $aiJson = '{}';
+    }
+}
+$add('ai_result_json', ':ai_result_json', $aiJson);
+
         // created_at is sometimes present, sometimes auto. Only include if exists.
         if (isset($cols['created_at']) && $cols['created_at'] === true) {
             $insertCols[] = 'created_at';
