@@ -1,4 +1,3 @@
-\
 <?php declare(strict_types=1);
 /**
  * tools/email_queue_worker.php
