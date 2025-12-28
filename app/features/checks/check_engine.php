@@ -6,26 +6,24 @@ use PDO;
 use Throwable;
 
 /**
- * CheckEngine (Plainfully v1)
+ * CheckEngine (Plainfully v1, DB-column tolerant)
  *
  * - Takes a CheckInput
  * - Calls AiClient
  * - Writes a row to `checks` (best-effort, fail-open)
  * - Returns CheckResult
  *
- * Security:
- * - Uses prepared statements only
- * - No dynamic SQL
- *
- * Storage strategy (MVP):
- * - Always stores the input content in `checks.content`
- * - Attempts to store the AI JSON in `checks.output_json` if the column exists.
- *   If it doesn't exist yet, it will silently fall back to the older insert shape.
+ * IMPORTANT:
+ * - This version detects which columns exist in `checks` and only inserts those.
+ *   This avoids fatal errors when your DB schema differs during MVP.
  */
 final class CheckEngine
 {
     private PDO $pdo;
     private AiClient $ai;
+
+    /** @var array<string,bool>|null */
+    private ?array $checksCols = null;
 
     public function __construct(PDO $pdo, AiClient $ai)
     {
@@ -64,59 +62,24 @@ final class CheckEngine
         $webLowNote     = (string)($structured['result']['web']['scam_risk']['low_level_note'] ?? 'We always scan for potential risks. The details below explain why this risk level was given.');
         $webExplain     = (string)($structured['result']['web']['scam_risk']['explanation'] ?? 'We always check for potential risks, but there wasn’t enough readable content to assess this one.');
 
+        // Legacy boolean for older columns
+        $isScam = ($riskLevel === 'high');
+
         // Store (best effort). If DB write fails, still return result so UX works.
         $id = null;
 
-        // Map a boolean "is_scam" for legacy columns
-        $isScam = ($riskLevel === 'high');
-
         try {
-            // Try new insert shape (includes output_json) first.
-            $stmt = $this->pdo->prepare('
-                INSERT INTO checks
-                    (channel, source_identifier, content_type, content, is_scam, is_paid, short_verdict, input_capsule, output_json, created_at)
-                VALUES
-                    (:channel, :source_identifier, :content_type, :content, :is_scam, :is_paid, :short_verdict, :input_capsule, :output_json, NOW())
-            ');
-
-            $stmt->execute([
-                ':channel'           => $input->channel,
-                ':source_identifier' => $input->sourceIdentifier,
-                ':content_type'      => $input->contentType,
-                ':content'           => $input->content,
-                ':is_scam'           => $isScam ? 1 : 0,
-                ':is_paid'           => $isPaid ? 1 : 0,
-                ':short_verdict'     => $headline,
-                ':input_capsule'     => $extTopicLine,
-                ':output_json'       => $rawJson,
-            ]);
-
-            $id = (int)$this->pdo->lastInsertId();
+            $id = $this->insertChecksRowBestEffort(
+                $input,
+                $isPaid,
+                $isScam,
+                $headline,
+                $extTopicLine,
+                $rawJson
+            );
         } catch (Throwable $e) {
-            // If output_json column doesn't exist yet, fall back to the old insert shape.
-            try {
-                $stmt = $this->pdo->prepare('
-                    INSERT INTO checks
-                        (channel, source_identifier, content_type, content, is_scam, is_paid, short_verdict, input_capsule, created_at)
-                    VALUES
-                        (:channel, :source_identifier, :content_type, :content, :is_scam, :is_paid, :short_verdict, :input_capsule, NOW())
-                ');
-
-                $stmt->execute([
-                    ':channel'           => $input->channel,
-                    ':source_identifier' => $input->sourceIdentifier,
-                    ':content_type'      => $input->contentType,
-                    ':content'           => $input->content,
-                    ':is_scam'           => $isScam ? 1 : 0,
-                    ':is_paid'           => $isPaid ? 1 : 0,
-                    ':short_verdict'     => $headline,
-                    ':input_capsule'     => $extTopicLine,
-                ]);
-
-                $id = (int)$this->pdo->lastInsertId();
-            } catch (Throwable $e2) {
-                error_log('CheckEngine DB insert failed (fail-open): ' . $e2->getMessage());
-            }
+            // fail-open, but log
+            error_log('CheckEngine DB insert failed (fail-open): ' . $e->getMessage());
         }
 
         return new CheckResult(
@@ -135,6 +98,96 @@ final class CheckEngine
             ['mode' => $mode],
             $rawJson
         );
+    }
+
+    /**
+     * Insert into `checks` using only columns that exist.
+     * Returns inserted id or null.
+     */
+    private function insertChecksRowBestEffort(
+        CheckInput $input,
+        bool $isPaid,
+        bool $isScam,
+        string $headline,
+        string $topicLine,
+        ?string $rawJson
+    ): ?int {
+        $cols = $this->getChecksColumns();
+
+        $insertCols = [];
+        $params     = [];
+        $values     = [];
+
+        // Helper closure to add a column if it exists
+        $add = function(string $col, string $param, $value) use (&$insertCols, &$params, &$values, $cols): void {
+            if (!isset($cols[$col]) || $cols[$col] !== true) { return; }
+            $insertCols[] = $col;
+            $values[]     = $param;
+            $params[$param] = $value;
+        };
+
+        $add('channel', ':channel', $input->channel);
+        $add('source_identifier', ':source_identifier', $input->sourceIdentifier);
+        $add('content_type', ':content_type', $input->contentType);
+
+        // Your DB currently does NOT have `content` (per your error). Only add it if present.
+        $add('content', ':content', $input->content);
+
+        $add('is_scam', ':is_scam', $isScam ? 1 : 0);
+        $add('is_paid', ':is_paid', $isPaid ? 1 : 0);
+
+        // Legacy summary fields (worker UI uses these too)
+        $add('short_verdict', ':short_verdict', $headline);
+        $add('input_capsule', ':input_capsule', $topicLine);
+
+        // New JSON field if you add it later
+        $add('output_json', ':output_json', $rawJson);
+
+        // created_at is sometimes present, sometimes auto. Only include if exists.
+        if (isset($cols['created_at']) && $cols['created_at'] === true) {
+            $insertCols[] = 'created_at';
+            $values[] = 'NOW()';
+        }
+
+        if (count($insertCols) === 0) {
+            return null;
+        }
+
+        $sql = 'INSERT INTO checks (' . implode(', ', $insertCols) . ') VALUES (' . implode(', ', $values) . ')';
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($params);
+
+        $last = $this->pdo->lastInsertId();
+        return is_string($last) && $last !== '' ? (int)$last : null;
+    }
+
+    /**
+     * Cache the checks table columns (per process run).
+     *
+     * @return array<string,bool>
+     */
+    private function getChecksColumns(): array
+    {
+        if (is_array($this->checksCols)) {
+            return $this->checksCols;
+        }
+
+        $cols = [];
+        try {
+            $stmt = $this->pdo->query('DESCRIBE checks');
+            $rows = $stmt ? $stmt->fetchAll() : [];
+            if (is_array($rows)) {
+                foreach ($rows as $r) {
+                    $name = (string)($r['Field'] ?? '');
+                    if ($name !== '') { $cols[$name] = true; }
+                }
+            }
+        } catch (Throwable $e) {
+            // fail-open, but keep empty
+        }
+
+        $this->checksCols = $cols;
+        return $cols;
     }
 
     /**
