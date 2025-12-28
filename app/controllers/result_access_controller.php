@@ -6,28 +6,34 @@
  * ============================================================
  * File: app/controllers/result_access_controller.php
  * Purpose:
- *   Handles guest access to a single clarification result via a
- *   result-scoped token + email confirmation, then logs the user
- *   in (Flow B) and redirects to /clarifications/view?id=...
+ *   Guest or logged-in access to a single clarification result via a
+ *   result-scoped token + email confirmation (Flow B).
+ *
+ *   Behaviour:
+ *     - If NOT logged in: user confirms the email address the link was sent to.
+ *     - If logged in as the SAME user: skip confirm and go straight to the result.
+ *     - If logged in as a DIFFERENT user: show a "different account" page with:
+ *         - "Sign out and continue" (logs out, then returns to /r/{token})
+ *         - "Go to dashboard"
  *
  * Endpoints:
- *   GET  /r/{token}  -> show confirm page (or auto-redirect if validated)
+ *   GET  /r/{token}  -> show confirm page (or auto-redirect)
  *   POST /r/{token}  -> verify email matches token recipient, then login
  *
  * Data:
  *   Uses table: result_access_tokens
- *     - token_hash (HMAC-SHA256)
+ *     - token_hash (HMAC-SHA256 of token)
  *     - recipient_email_hash (HMAC-SHA256 of lower(trim(email)))
  *     - user_id, check_id, expires_at, validated_at
  *
  * Change history:
- *   - 2025-12-28 17:05:00Z  Remove global-namespace use warnings; rely on pf_db(); tighten fail-closed checks
- *   - 2025-12-28 16:44:40Z  Initial MVP implementation (result token + email confirm + login)
+ *   - 2025-12-28 16:44:40Z  Initial MVP implementation
+ *   - 2025-12-28           Option B: logged-in mismatch => sign out + continue
  *
- * Notes:
+ * Security notes:
  *   - Stores NO plaintext email; hashes only.
- *   - Token hashing uses RESULT_TOKEN_PEPPER env var (required).
- *   - Fail-closed: invalid/expired token returns 404-like page.
+ *   - Token hashing uses RESULT_TOKEN_PEPPER env var.
+ *   - Fail-closed for invalid/expired tokens.
  * ============================================================
  */
 
@@ -43,22 +49,14 @@ if (!function_exists('result_access_controller')) {
             return;
         }
 
-        $pepper = (string)(getenv('RESULT_TOKEN_PEPPER') ?: '');
-        if ($pepper === '') {
-            // Fail-closed: without pepper we cannot safely validate tokens
-            http_response_code(404);
-            pf_render_shell('Not found', '<p>This link has expired or is not valid.</p>');
-            return;
-        }
-
-        // Always use the app DB helper (controllers should not manage PDO construction)
         $pdo = pf_db();
-        if (!is_object($pdo) || !method_exists($pdo, 'prepare')) {
+        if (!($pdo instanceof PDO)) {
             http_response_code(500);
             pf_render_shell('Error', '<p>Something went wrong. Please try again.</p>');
             return;
         }
 
+        $pepper = (string)(getenv('RESULT_TOKEN_PEPPER') ?: '');
         $tokenHash = hash_hmac('sha256', $token, $pepper);
 
         $stmt = $pdo->prepare("
@@ -69,7 +67,7 @@ if (!function_exists('result_access_controller')) {
             LIMIT 1
         ");
         $stmt->execute([':th' => $tokenHash]);
-        $rec = $stmt->fetch(\PDO::FETCH_ASSOC);
+        $rec = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$rec) {
             http_response_code(404);
@@ -88,7 +86,39 @@ if (!function_exists('result_access_controller')) {
             return;
         }
 
-        // Already validated => login + redirect
+        // ------------------------------------------------------------
+        // Logged-in user handling (Option B)
+        // ------------------------------------------------------------
+        $sessionUserId = isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : 0;
+
+        // If already logged in as SAME user: go straight to the result.
+        if ($sessionUserId > 0 && $sessionUserId === $userId) {
+            pf_redirect('/clarifications/view?id=' . $checkId);
+            return;
+        }
+
+        // If logged in as DIFFERENT user: show account mismatch screen.
+        if ($sessionUserId > 0 && $sessionUserId !== $userId) {
+            $csrf = isset($_SESSION['csrf_token']) ? (string)$_SESSION['csrf_token'] : '';
+
+            $html =
+                '<p><strong>This link is for a different account.</strong></p>' .
+                '<p>You are currently signed in. To open this result, sign out first, then continue.</p>' .
+                '<form method="post" action="/logout" style="margin-top:16px;">' .
+                '  <input type="hidden" name="return" value="' . htmlspecialchars('/r/' . $token, ENT_QUOTES, 'UTF-8') . '">' .
+                '  <input type="hidden" name="csrf_token" value="' . htmlspecialchars($csrf, ENT_QUOTES, 'UTF-8') . '">' .
+                '  <button type="submit">Sign out and continue</button>' .
+                '</form>' .
+                '<p style="margin-top:12px;"><a href="/dashboard">Go to dashboard</a></p>';
+
+            pf_render_shell('Confirm email address', $html);
+            return;
+        }
+
+        // ------------------------------------------------------------
+        // Token validated already => login + redirect
+        // (Only applies when NOT already logged in)
+        // ------------------------------------------------------------
         if ($validatedAt !== null && $validatedAt !== '') {
             if (pf_result_access_login_user($pdo, $userId) === true) {
                 pf_redirect('/clarifications/view?id=' . $checkId);
@@ -100,6 +130,9 @@ if (!function_exists('result_access_controller')) {
             return;
         }
 
+        // ------------------------------------------------------------
+        // Email confirmation form (not logged in)
+        // ------------------------------------------------------------
         $errors = [];
         $oldEmail = '';
 
@@ -128,7 +161,7 @@ if (!function_exists('result_access_controller')) {
                         }
 
                         $errors[] = 'Something went wrong. Please try again.';
-                    } catch (\Throwable $e) {
+                    } catch (Throwable $e) {
                         error_log('result_access_controller: validation update failed: ' . $e->getMessage());
                         $errors[] = 'Something went wrong. Please try again.';
                     }
@@ -154,12 +187,12 @@ if (!function_exists('result_access_controller')) {
 }
 
 if (!function_exists('pf_result_access_login_user')) {
-    function pf_result_access_login_user($pdo, int $userId): bool
+    function pf_result_access_login_user(PDO $pdo, int $userId): bool
     {
         try {
             $stmt = $pdo->prepare("SELECT id, email FROM users WHERE id = :id LIMIT 1");
             $stmt->execute([':id' => $userId]);
-            $u = $stmt->fetch(\PDO::FETCH_ASSOC);
+            $u = $stmt->fetch(PDO::FETCH_ASSOC);
 
             if (!$u) { return false; }
 
@@ -180,7 +213,7 @@ if (!function_exists('pf_result_access_login_user')) {
             $_SESSION['user_email'] = $email;
 
             return true;
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             error_log('pf_result_access_login_user failed: ' . $e->getMessage());
             return false;
         }

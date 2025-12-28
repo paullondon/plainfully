@@ -1,31 +1,25 @@
 <?php declare(strict_types=1);
 /**
- * tools/queue_ingest_loop.php  (aka queue_ingest_loop.php)
+ * ============================================================
+ * Plainfully File Info
+ * ============================================================
+ * File: httpdocs/tools/queue_ingest_loop.php
+ * Purpose:
+ *   IMAP poller that:
+ *    - pulls UNSEEN emails
+ *    - enforces maintenance/limits
+ *    - inserts into inbound_queue
+ *    - sends a fast acknowledgement email
+ *    - deletes the original email (GDPR + idempotency)
  *
- * Plainfully — IMAP poller (fast acknowledgement + queue insert).
+ * Key UX rule (ACK email):
+ *   - Confirm receipt and next step WITHOUT queue numbers or ETAs.
+ *   - We avoid “Position/ETA” because it becomes a trust test and
+ *     often backfires when timings vary.
  *
- * Intended cron (example):
- *   * * * * * /usr/bin/php /var/www/vhosts/plainfully.com/httpdocs/tools/queue_ingest_loop.php >> /var/www/vhosts/plainfully.com/logs/email_inbox_poller.log 2>&1
- *
- * What it does:
- * - Loops for up to ~55 seconds (sleeping 5s between polls)
- * - Pulls UNSEEN emails from IMAP
- * - Enforces limits/maintenance quickly (reply & delete email)
- * - Otherwise inserts into `inbound_queue` then sends an acknowledgement email
- * - Deletes the original email from the mailbox (GDPR + idempotency)
- *
- * ENV required (IMAP):
- *   EMAIL_IMAP_MAILBOX   e.g. "{imap.ionos.co.uk:993/imap/ssl}INBOX"
- *   EMAIL_IMAP_USER
- *   EMAIL_IMAP_PASS
- *
- * Optional ENV:
- *   EMAIL_POLL_SECONDS=5
- *   EMAIL_POLL_MAX_RUNTIME_SECONDS=55
- *   EMAIL_QUEUE_MAX_BYTES=200000
- *   EMAIL_QUEUE_THROUGHPUT_PER_MIN=250
- *   PLAINFULLY_MAINTENANCE=0|1
- *   PLAINFULLY_MAINTENANCE_MESSAGE="..."
+ * Change history:
+ *   - 2025-12-28 17:xx:xxZ  ACK email: remove position/ETA, add email-confirm note (Flow B)
+ * ============================================================
  */
 
 if (PHP_SAPI !== 'cli') {
@@ -174,6 +168,15 @@ if (!function_exists('pf_queue_position')) {
 }
 
 if (!function_exists('pf_send_ack_email')) {
+    /**
+     * ACK email: confidence > metrics.
+     *
+     * We intentionally do NOT show:
+     *  - queue position
+     *  - ETA
+     *
+     * But we keep the signature stable so callers don’t break.
+     */
     function pf_send_ack_email(string $toEmail, string $mode, int $posAhead, int $throughputPerMin): void
     {
         if (!function_exists('pf_send_email')) {
@@ -181,17 +184,16 @@ if (!function_exists('pf_send_ack_email')) {
             return;
         }
 
-        $position = $posAhead + 1;
-        $mins = max(1, (int)ceil($position / max(1, $throughputPerMin)));
-
-        $subject = 'Plainfully: received — we’re on it';
+        $subject = 'Plainfully — received';
 
         $inner =
             '<p>Hello,</p>' .
-            '<p>We’ve received your message and added it to the queue.</p>' .
-            '<p><strong>Position:</strong> #' . htmlspecialchars((string)$position, ENT_QUOTES, 'UTF-8') . '</p>' .
-            '<p><strong>Estimated time:</strong> ~' . htmlspecialchars((string)$mins, ENT_QUOTES, 'UTF-8') . ' minute' . ($mins === 1 ? '' : 's') . '</p>' .
-            '<p style="color:#6b7280;font-size:13px;margin:16px 0 0;">We’ll email you again as soon as your result is ready.</p>';
+            '<p>We’ve received your message.</p>' .
+            '<p>We’ll email your Plainfully result to this address.</p>' .
+            '<p style="color:#6b7280;font-size:13px;margin:16px 0 0;">' .
+                'When you open your result link, we’ll ask you to confirm your email address before you can view it.' .
+            '</p>' .
+            '<p style="color:#6b7280;font-size:13px;margin:12px 0 0;">No action needed right now.</p>';
 
         $html = function_exists('pf_email_template')
             ? pf_email_template($subject, $inner)
@@ -199,10 +201,10 @@ if (!function_exists('pf_send_ack_email')) {
 
         $text =
             "Hello,\n\n" .
-            "We've received your message and added it to the queue.\n" .
-            "Position: #{$position}\n" .
-            "Estimated time: ~{$mins} minute" . ($mins === 1 ? '' : 's') . "\n\n" .
-            "We'll email you again as soon as your result is ready.\n";
+            "We’ve received your message.\n" .
+            "We’ll email your Plainfully result to this address.\n\n" .
+            "When you open your result link, we’ll ask you to confirm your email address before you can view it.\n\n" .
+            "No action needed right now.\n";
 
         $channel = ($mode === 'scamcheck') ? 'scamcheck' : (($mode === 'clarify') ? 'clarify' : 'noreply');
         pf_send_email($toEmail, $subject, $html, $channel, $text);
@@ -246,7 +248,6 @@ if (!function_exists('pf_extract_message_id')) {
     {
         if (preg_match('/^Message-ID:\s*(.+)$/im', $rawHeaders, $m)) {
             $v = trim($m[1]);
-            // strip < >
             $v = trim($v, " \t\r\n<>");
             return $v !== '' ? $v : null;
         }
@@ -311,7 +312,6 @@ while (true) {
     }
 
     foreach ($emails as $msgno) {
-        // IMPORTANT: IMAP functions expect int message numbers.
         $msgno = (int)$msgno;
 
         try {
@@ -354,18 +354,14 @@ while (true) {
                 }
             }
 
-            // UID (stable within mailbox) for dedupe
             $imapUid = @imap_uid($inbox, $msgno);
             $imapUid = is_int($imapUid) ? $imapUid : null;
 
-            // Raw headers (for Message-ID + content-type hints)
             $rawHeaders = (string)@imap_fetchheader($inbox, $msgno, FT_PREFETCHTEXT);
             $messageId  = pf_extract_message_id($rawHeaders);
 
-            // Body (PEEK: don't set \Seen)
             $rawBody = (string)@imap_body($inbox, $msgno, FT_PEEK);
             if ($rawBody === '') {
-                // Common fallback: first part
                 $rawBody = (string)@imap_fetchbody($inbox, $msgno, '1', FT_PEEK);
             }
 
@@ -373,7 +369,6 @@ while (true) {
                 $rawBody = substr($rawBody, 0, $maxBytes);
             }
 
-            // Cheap HTML detection
             $rawIsHtml = (
                 stripos($rawHeaders, 'Content-Type: text/html') !== false ||
                 stripos($rawBody, '<html') !== false ||
@@ -384,7 +379,6 @@ while (true) {
                 throw new RuntimeException('DB unavailable (pf_db failed).');
             }
 
-            // Insert into inbound_queue (schema-aligned)
             $stmt = $pdo->prepare('
                 INSERT INTO inbound_queue
                     (source, mailbox, imap_uid, message_id, from_email, to_email, subject, received_at, mode,
@@ -422,10 +416,10 @@ while (true) {
             $newId = (int)$pdo->lastInsertId();
             $ahead = pf_queue_position($pdo, $newId);
 
-            // Ack email (best-effort)
+            // ACK email (best-effort)
             pf_send_ack_email($fromEmail, $mode, $ahead, $throughput);
 
-            // Store ack metadata (best-effort)
+            // Store ack metadata (best-effort) — kept for internal analytics only
             try {
                 $position = $ahead + 1;
                 $mins = max(1, (int)ceil($position / max(1, $throughput)));
@@ -443,7 +437,6 @@ while (true) {
                 // ignore
             }
 
-            // Delete original email
             imap_delete($inbox, (string)$msgno);
 
         } catch (Throwable $e) {
