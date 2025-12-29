@@ -38,7 +38,7 @@ function pf_email_template(string $subject, string $innerHtml): string
 {
     $safeSubject = htmlspecialchars($subject, ENT_QUOTES, 'UTF-8');
 
-    // PNG URL (used as the canonical marker for CID replacement inside pf_mail_send()).
+    // PNG for email reliability
     $logoUrl = 'https://plainfully.com/assets/img/logo-icon.png';
 
     return '<!doctype html>
@@ -48,27 +48,62 @@ function pf_email_template(string $subject, string $innerHtml): string
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>' . $safeSubject . '</title>
 </head>
-<body style="margin:0;padding:0;background:#f7f9fa;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#111827;">
-  <div style="max-width:640px;margin:0 auto;padding:24px;">
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+<body style="
+  margin:0;
+  padding:0;
+  background:#0b0f14;
+  font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+  color:#e5e7eb;
+">
+  <div style="max-width:640px;margin:0 auto;padding:28px 20px;">
+
+    <!-- Header -->
+    <div style="
+      display:flex;
+      align-items:center;
+      gap:12px;
+      margin-bottom:18px;
+    ">
       <img src="' . htmlspecialchars($logoUrl, ENT_QUOTES, 'UTF-8') . '"
            width="36" height="36"
            alt="Plainfully"
-           style="display:block;border:0;outline:none;text-decoration:none;">
-      <div style="font-weight:700;font-size:16px;line-height:1;color:#111827;">Plainfully</div>
+           style="display:block;border:0;">
+      <div>
+        <div style="font-weight:700;font-size:16px;line-height:1;color:#ffffff;">
+          Plainfully
+        </div>
+        <div style="font-size:13px;color:#9ca3af;">
+          Clear answers. Fewer worries.
+        </div>
+      </div>
     </div>
 
-    <div style="background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;padding:22px;">
+    <!-- Card -->
+    <div style="
+      background:#111827;
+      border:1px solid #1f2937;
+      border-radius:16px;
+      padding:22px;
+      color:#e5e7eb;
+    ">
       ' . $innerHtml . '
     </div>
 
-    <div style="color:#6b7280;font-size:12px;margin-top:14px;">
-      You’re receiving this because you used Plainfully via email.
+    <!-- Footer -->
+    <div style="
+      color:#9ca3af;
+      font-size:12px;
+      margin-top:16px;
+    ">
+      You’re receiving this because you used Plainfully via email.<br>
+      Operated by Hissing Goat Studios.
     </div>
+
   </div>
 </body>
 </html>';
 }
+
 
 // ---------------------------------------------------------
 // Load PHPMailer classes without Composer
