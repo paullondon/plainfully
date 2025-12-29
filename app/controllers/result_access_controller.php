@@ -166,7 +166,7 @@ if (!function_exists('result_access_controller')) {
         $inner = ob_get_clean();
 
         pf_render_shell('Confirm email address', $inner);
-    }7
+    }
 }
 
 if (!function_exists('pf_result_link_error')) {
