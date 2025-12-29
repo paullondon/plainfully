@@ -10,6 +10,7 @@
  *
  * Change history:
  *   - 2025-12-28 16:44:40Z  Add guest route GET/POST /r/{token} (result link confirmation)
+ *   - 2025-12-29 10:11:00Z  Removed require_guest() to /r/{token} route (temporarily disabled)
  * ============================================================
  *
  * Notes:
@@ -87,7 +88,7 @@ switch (true) {
     //   POST /r/{token}
     // -------------------------------------------------
     case str_starts_with($path, '/r/') && ($method === 'GET' || $method === 'POST'):
-        require_guest();
+        //require_guest(); // Removed temporarily to allow access to consultation results while logged in.
 
         $token = substr($path, 3); // everything after "/r/"
         $token = trim($token);
