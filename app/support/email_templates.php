@@ -5,6 +5,20 @@
  * Keep logic here so controllers stay clean.
  */
 
+function pf_email_logo_html(): string
+{
+    $logoUrl = 'https://plainfully.com/assets/img/logo-icon.png';
+
+    return
+        '<div style="margin:0 0 16px 0;text-align:left;">'
+        . '<img src="' . htmlspecialchars($logoUrl, ENT_QUOTES, 'UTF-8') . '" '
+        . 'alt="Plainfully" '
+        . 'width="48" height="48" '
+        . 'style="display:block;border:0;outline:none;text-decoration:none;">'
+        . '</div>';
+}
+
+
 function pf_email_badge_html(string $label): string
 {
     $safe = htmlspecialchars($label, ENT_QUOTES, 'UTF-8');
@@ -53,7 +67,10 @@ function pf_email_check_inner_html(
         . '</a></p>';
 
     return
-        '<h2 style="margin:0 0 10px;font-size:18px;letter-spacing:-0.01em;">' . htmlspecialchars($headline, ENT_QUOTES, 'UTF-8') . '</h2>'
+        pf_email_logo_html()
+        . '<h2 style="margin:0 0 10px;font-size:18px;letter-spacing:-0.01em;">'
+        . htmlspecialchars($headline, ENT_QUOTES, 'UTF-8')
+        . '</h2>'
         . '<p style="margin:0 0 14px;">' . htmlspecialchars($intro, ENT_QUOTES, 'UTF-8') . '</p>'
         . pf_email_badge_html($safeVerdict)
         . $metaHtml
