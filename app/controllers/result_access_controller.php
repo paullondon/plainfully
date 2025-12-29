@@ -1,5 +1,4 @@
 <?php declare(strict_types=1);
-
 /**
  * ============================================================
  * Plainfully File Info
@@ -26,11 +25,12 @@
  * Change history:
  *   - 2025-12-28 16:44:40Z  Initial MVP implementation
  *   - 2025-12-29 17:15:00Z  Remove validated_expires_at dependency; enforce 30m via validated_at
+ *   - 2025-12-29           Use adaptive errors/404.php payload (single error view)
  *
  * Notes:
  *   - Stores NO plaintext email; hashes only.
- *   - Token hashing uses RESULT_TOKEN_PEPPER env var (required).
- *   - Fail-closed (friendly): invalid/expired token shows an error page + login button.
+ *   - RESULT_TOKEN_PEPPER env var is required.
+ *   - Friendly fail-closed: shows adaptive error page (404.php) with a login button.
  * ============================================================
  */
 
@@ -41,26 +41,25 @@ if (!function_exists('result_access_controller')) {
 
         $token = trim($token);
         if ($token === '' || strlen($token) < 16) {
-            pf_result_link_error('That link is not valid.', 404);
+            pf_result_link_error('invalid_link', 404);
             return;
         }
 
         $pepper = (string)(getenv('RESULT_TOKEN_PEPPER') ?: '');
         if ($pepper === '') {
             error_log('RESULT_TOKEN_PEPPER missing (Flow B).');
-            pf_result_link_error('Something went wrong (server configuration).', 500);
+            pf_result_link_error('server_config', 500);
             return;
         }
 
         $pdo = pf_db();
         if (!($pdo instanceof PDO)) {
-            pf_result_link_error('Something went wrong. Please try again.', 500);
+            pf_result_link_error('server_error', 500);
             return;
         }
 
         $tokenHash = hash_hmac('sha256', $token, $pepper);
 
-        // NOTE: Do NOT reference validated_expires_at (not present in your schema).
         $stmt = $pdo->prepare("
             SELECT id, user_id, check_id, recipient_email_hash, expires_at, validated_at
             FROM result_access_tokens
@@ -72,7 +71,7 @@ if (!function_exists('result_access_controller')) {
         $rec = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$rec) {
-            pf_result_link_error('This link has expired or is not valid.', 404);
+            pf_result_link_error('expired_or_invalid', 404);
             return;
         }
 
@@ -83,38 +82,31 @@ if (!function_exists('result_access_controller')) {
         $validatedAt   = (string)($rec['validated_at'] ?? '');
 
         if ($tokenRowId <= 0 || $userId <= 0 || $checkId <= 0 || $recipientHash === '') {
-            pf_result_link_error('Something went wrong. Please try again.', 500);
+            pf_result_link_error('server_error', 500);
             return;
         }
 
         // If already validated, allow only for 30 minutes since validated_at.
         if ($validatedAt !== '') {
-            try {
-                $validatedTs = strtotime($validatedAt . ' UTC');
-                if ($validatedTs === false) {
-                    pf_result_link_error('This link has expired. Please log in to view your results.', 403);
-                    return;
-                }
-
-                $ageSeconds = time() - $validatedTs;
-                if ($ageSeconds > (30 * 60)) {
-                    pf_result_link_error('This link has expired. Please log in to view your results.', 403);
-                    return;
-                }
-
-                if (pf_result_access_login_user($pdo, $userId) === true) {
-                    pf_redirect('/clarifications/view?id=' . $checkId);
-                    return;
-                }
-
-                pf_result_link_error('Something went wrong. Please log in again.', 500);
-                return;
-
-            } catch (Throwable $e) {
-                error_log('result_access_controller: validated check failed: ' . $e->getMessage());
-                pf_result_link_error('Something went wrong. Please log in again.', 500);
+            $validatedTs = strtotime($validatedAt . ' UTC');
+            if ($validatedTs === false) {
+                pf_result_link_error('expired_validated', 403);
                 return;
             }
+
+            $ageSeconds = time() - $validatedTs;
+            if ($ageSeconds > (30 * 60)) {
+                pf_result_link_error('expired_validated', 403);
+                return;
+            }
+
+            if (pf_result_access_login_user($pdo, $userId) === true) {
+                pf_redirect('/clarifications/view?id=' . $checkId);
+                return;
+            }
+
+            pf_result_link_error('server_error', 500);
+            return;
         }
 
         // Not validated yet -> ask to confirm email, then validate+login.
@@ -145,18 +137,18 @@ if (!function_exists('result_access_controller')) {
                             return;
                         }
 
-                        pf_result_link_error('Something went wrong. Please log in and try again.', 500);
+                        pf_result_link_error('server_error', 500);
                         return;
 
                     } catch (Throwable $e) {
                         error_log('result_access_controller: validation update failed: ' . $e->getMessage());
-                        pf_result_link_error('Something went wrong. Please log in and try again.', 500);
+                        pf_result_link_error('server_error', 500);
                         return;
                     }
                 }
 
-                // Wrong email -> friendly error page (reduces brute-force loops)
-                pf_result_link_error('That email address does not match this link.', 403);
+                // Wrong email -> stop the loop and show a single friendly page.
+                pf_result_link_error('wrong_email', 403);
                 return;
             }
         }
@@ -174,27 +166,100 @@ if (!function_exists('result_access_controller')) {
         $inner = ob_get_clean();
 
         pf_render_shell('Confirm email address', $inner);
-    }
+    }7
 }
 
 if (!function_exists('pf_result_link_error')) {
     /**
-     * Friendly error page for Flow B failures.
+     * Friendly Flow B error page using the single adaptive view: app/views/errors/404.php
+     *
+     * @param string $codeKey One of:
+     *   invalid_link | expired_or_invalid | expired_validated | wrong_email | server_config | server_error
      */
-    function pf_result_link_error(string $message, int $code = 400): void
+    function pf_result_link_error(string $codeKey, int $httpCode = 400): void
     {
-        http_response_code($code);
+        http_response_code($httpCode);
 
-        $vm = [
-            'message' => $message,
-            'code'    => $code,
+        $isLoggedIn = isset($_SESSION['user_id']) && (int)$_SESSION['user_id'] > 0;
+
+        // Default payload
+        $payload = [
+            'emoji' => '🤔',
+            'title' => 'Oops — something went wrong',
+            'subtitle' => 'We couldn’t open that result link.',
+            'list' => [
+                'If this link is old, it may have expired.',
+                'If you typed an email address, make sure it matches the one this link was sent to.',
+            ],
+            'actions' => [
+                ['href' => '/login', 'label' => 'Return to login', 'class' => 'pf-btn pf-btn-primary'],
+            ],
         ];
 
+        // Logged-in users: dashboard is useful
+        if ($isLoggedIn) {
+            $payload['actions'][] = ['href' => '/dashboard', 'label' => 'Go to dashboard', 'class' => 'pf-btn pf-btn-secondary'];
+        }
+
+        switch ($codeKey) {
+            case 'invalid_link':
+                $payload['emoji'] = '🔗';
+                $payload['title'] = 'That link isn’t valid';
+                $payload['subtitle'] = 'Please use the exact link from your email.';
+                break;
+
+            case 'expired_or_invalid':
+                $payload['emoji'] = '⏳';
+                $payload['title'] = 'That link has expired';
+                $payload['subtitle'] = 'For safety, result links only work for a limited time.';
+                $payload['list'] = [
+                    'Log in to view your past clarifications.',
+                    'Or resend your message to receive a fresh link.',
+                ];
+                break;
+
+            case 'expired_validated':
+                $payload['emoji'] = '⏱️';
+                $payload['title'] = 'That link has timed out';
+                $payload['subtitle'] = 'After you confirm your email, the link only stays active for 30 minutes.';
+                $payload['list'] = [
+                    'Log in to view your past clarifications.',
+                    'Or use a fresh link from your inbox.',
+                ];
+                break;
+
+            case 'wrong_email':
+                $payload['emoji'] = '✉️';
+                $payload['title'] = 'Email address didn’t match';
+                $payload['subtitle'] = 'For security, we can only open this result for the email it was sent to.';
+                $payload['list'] = [
+                    'Double-check the spelling.',
+                    'Use the same email address that received the link.',
+                ];
+                break;
+
+            case 'server_config':
+                $payload['emoji'] = '🛠️';
+                $payload['title'] = 'Server configuration issue';
+                $payload['subtitle'] = 'This link flow isn’t configured correctly yet.';
+                $payload['list'] = [
+                    'Try again later.',
+                    'If you’re the admin: check RESULT_TOKEN_PEPPER is set.',
+                ];
+                break;
+
+            case 'server_error':
+            default:
+                // Keep defaults
+                break;
+        }
+
         ob_start();
-        require dirname(__DIR__) . '/views/results/link_error.php';
+        $vm = $payload;
+        require dirname(__DIR__) . '/views/errors/404.php';
         $inner = ob_get_clean();
 
-        pf_render_shell('Oops!', $inner);
+        pf_render_shell('Oops', $inner);
     }
 }
 
