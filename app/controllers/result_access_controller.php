@@ -1,18 +1,35 @@
 <?php declare(strict_types=1);
+
 /**
  * ============================================================
  * Plainfully File Info
  * ============================================================
  * File: app/controllers/result_access_controller.php
  * Purpose:
- *   Flow B: /r/{token} -> confirm email -> (optionally switch user) -> redirect to the *specific* clarification.
+ *   Handles guest OR logged-in access to a single clarification
+ *   result via a result-scoped token + email confirmation (Flow B).
  *
- * Key behaviour:
- *   - Always prefers redirecting to /clarifications/view?id={check_id} after validation.
- *   - Sets a session "return_to" flag as a fallback if something else forces dashboard.
+ * Endpoints:
+ *   GET  /r/{token}  -> show confirm page (or auto-redirect if validated)
+ *   POST /r/{token}  -> verify email matches token recipient, then login
+ *
+ * Failure UX:
+ *   Any failure renders a friendly error page with a "Return to login" button.
+ *
+ * Data:
+ *   Table: result_access_tokens
+ *     - token_hash (HMAC-SHA256)
+ *     - recipient_email_hash (HMAC-SHA256 of lower(trim(email)))
+ *     - user_id, check_id, expires_at, validated_at, validated_expires_at
+ *
+ * Security notes:
+ *   - Stores NO plaintext email; hashes only.
+ *   - Token hashing uses RESULT_TOKEN_PEPPER env var.
+ *   - Uses hash_equals for timing-safe compares.
  *
  * Change history:
  *   - 2025-12-28: Force result redirect + add session return_to fallback + remove noisy use statements
+ *   - 2025-12-29  Add friendly failure page (invalid/expired/mismatch).
  * ============================================================
  */
 
@@ -23,45 +40,39 @@ if (!function_exists('result_access_controller')) {
 
         $token = trim($token);
         if ($token === '' || strlen($token) < 16) {
-            http_response_code(404);
-            pf_render_shell('Not found', '<p>That link is not valid.</p>');
+            pf_result_access_fail('That link is not valid.', 'The link looks malformed or incomplete.');
             return;
         }
 
-        // Always have a session for Flow B.
-        if (session_status() !== PHP_SESSION_ACTIVE) {
-            @session_start();
-        }
-
+        // DB helper (project standard)
         $pdo = pf_db();
-        if (!($pdo instanceof \PDO)) {
-            http_response_code(500);
-            pf_render_shell('Error', '<p>Something went wrong. Please try again.</p>');
+        if (!($pdo instanceof PDO)) {
+            pf_result_access_fail('Oops! Something went wrong.', 'We could not connect to the database. Please try again.');
             return;
         }
 
         $pepper = (string)(getenv('RESULT_TOKEN_PEPPER') ?: '');
         if ($pepper === '') {
-            http_response_code(500);
-            pf_render_shell('Error', '<p>Server configuration issue. Please try again later.</p>');
+            // Fail-closed (misconfigured server)
+            pf_result_access_fail('Oops! Something went wrong.', 'Result-token security is not configured on the server.');
             return;
         }
 
         $tokenHash = hash_hmac('sha256', $token, $pepper);
 
+        // NOTE: expires_at is the 24h "claim window"
         $stmt = $pdo->prepare("
-            SELECT id, user_id, check_id, recipient_email_hash, expires_at, validated_at
+            SELECT id, user_id, check_id, recipient_email_hash, expires_at, validated_at, validated_expires_at
             FROM result_access_tokens
             WHERE token_hash = :th
               AND expires_at > NOW()
             LIMIT 1
         ");
         $stmt->execute([':th' => $tokenHash]);
-        $rec = $stmt->fetch(\PDO::FETCH_ASSOC);
+        $rec = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$rec) {
-            http_response_code(404);
-            pf_render_shell('Not found', '<p>This link has expired or is not valid.</p>');
+            pf_result_access_fail('Link expired.', 'This link has expired or is not valid anymore.');
             return;
         }
 
@@ -69,36 +80,41 @@ if (!function_exists('result_access_controller')) {
         $userId        = (int)($rec['user_id'] ?? 0);
         $checkId       = (int)($rec['check_id'] ?? 0);
         $recipientHash = (string)($rec['recipient_email_hash'] ?? '');
-        $validatedAt   = $rec['validated_at'] ?? null;
+        $validatedAt   = (string)($rec['validated_at'] ?? '');
+        $validatedExp  = (string)($rec['validated_expires_at'] ?? '');
 
         if ($rowId <= 0 || $userId <= 0 || $checkId <= 0 || $recipientHash === '') {
-            http_response_code(500);
-            pf_render_shell('Error', '<p>Something went wrong. Please try again.</p>');
+            pf_result_access_fail('Oops! Something went wrong.', 'This link is missing required data. Please request a fresh link.');
             return;
         }
 
-        $targetUrl = '/clarifications/view?id=' . $checkId;
+        // If already validated: treat as a short-lived "magic session grant"
+        if ($validatedAt !== '') {
+            // validated_expires_at must exist and be in the future
+            if ($validatedExp === '') {
+                pf_result_access_fail('Link expired.', 'This link has already been used and is no longer valid. Please log in.');
+                return;
+            }
 
-        // Fallback if something later forces dashboard:
-        $_SESSION['pf_return_to'] = $targetUrl;
+            $expStmt = $pdo->prepare("SELECT (validated_expires_at > NOW()) AS ok FROM result_access_tokens WHERE id = :id LIMIT 1");
+            $expStmt->execute([':id' => $rowId]);
+            $ok = (int)($expStmt->fetchColumn() ?: 0);
 
-        // If token already validated, just ensure correct user is logged in then go to result.
-        if ($validatedAt !== null && $validatedAt !== '') {
-            // If someone else is logged in, clear session (no CSRF here – this is a safe “switch user” flow).
-            if (!empty($_SESSION['user_id']) && (int)$_SESSION['user_id'] !== $userId) {
-                pf_result_access_soft_logout();
+            if ($ok !== 1) {
+                pf_result_access_fail('Link expired.', 'This link has timed out. Please log in to view your clarifications.');
+                return;
             }
 
             if (pf_result_access_login_user($pdo, $userId) === true) {
-                pf_redirect($targetUrl);
-                exit;
+                pf_redirect('/clarifications/view?id=' . $checkId);
+                return;
             }
 
-            http_response_code(500);
-            pf_render_shell('Error', '<p>Something went wrong. Please try again.</p>');
+            pf_result_access_fail('Oops! Something went wrong.', 'We could not sign you in. Please try logging in normally.');
             return;
         }
 
+        // Not validated yet: show confirm form, or process POST
         $errors   = [];
         $oldEmail = '';
 
@@ -106,91 +122,94 @@ if (!function_exists('result_access_controller')) {
             $oldEmail = strtolower(trim((string)($_POST['email'] ?? '')));
 
             if ($oldEmail === '' || !filter_var($oldEmail, FILTER_VALIDATE_EMAIL)) {
+                // Invalid format is user-fixable
                 $errors[] = 'Please enter a valid email address.';
             } else {
                 $enteredHash = hash_hmac('sha256', $oldEmail, $pepper);
 
                 if (hash_equals($recipientHash, $enteredHash)) {
+                    // Mark validated and start the 30 minute window
                     try {
                         $upd = $pdo->prepare("
                             UPDATE result_access_tokens
-                            SET validated_at = NOW()
+                            SET validated_at = NOW(),
+                                validated_expires_at = (NOW() + INTERVAL 30 MINUTE)
                             WHERE id = :id
                               AND validated_at IS NULL
                             LIMIT 1
                         ");
                         $upd->execute([':id' => $rowId]);
 
-                        // If a different user is currently logged in, switch them out.
-                        if (!empty($_SESSION['user_id']) && (int)$_SESSION['user_id'] !== $userId) {
-                            pf_result_access_soft_logout();
-                        }
-
                         if (pf_result_access_login_user($pdo, $userId) === true) {
-                            pf_redirect($targetUrl);
-                            exit; // critical: stop any “default redirect to dashboard” later
+                            pf_redirect('/clarifications/view?id=' . $checkId);
+                            return;
                         }
 
-                        $errors[] = 'Something went wrong. Please try again.';
-                    } catch (\Throwable $e) {
+                        pf_result_access_fail('Oops! Something went wrong.', 'We could not sign you in. Please try logging in normally.');
+                        return;
+
+                    } catch (Throwable $e) {
                         error_log('result_access_controller: validation update failed: ' . $e->getMessage());
-                        $errors[] = 'Something went wrong. Please try again.';
+                        pf_result_access_fail('Oops! Something went wrong.', 'We could not validate this link. Please try again.');
+                        return;
                     }
-                } else {
-                    $errors[] = 'That email address does not match this link.';
                 }
+
+                // Mismatch email -> login page (avoid endless guessing)
+                pf_result_access_fail('Email does not match.', 'That email address does not match this link. Please log in.');
+                return;
             }
         }
 
-        $vm = [
+        $viewData = [
             'token'    => $token,
             'errors'   => $errors,
             'oldEmail' => $oldEmail,
         ];
 
         ob_start();
+        $vm = $viewData;
         require dirname(__DIR__) . '/views/results/confirm_email.php';
-        $inner = ob_get_clean();
+        $inner = (string)ob_get_clean();
 
         pf_render_shell('Confirm email address', $inner);
     }
 }
 
-if (!function_exists('pf_result_access_soft_logout')) {
-    function pf_result_access_soft_logout(): void
+if (!function_exists('pf_result_access_fail')) {
+    /**
+     * Friendly failure page used by /r/{token}.
+     * Always includes a "Return to login" button.
+     */
+    function pf_result_access_fail(string $title, string $message): void
     {
-        // No CSRF here on purpose: this is a controlled “switch user” flow inside /r/{token}.
-        $_SESSION = [];
+        http_response_code(200);
 
-        if (ini_get('session.use_cookies')) {
-            $params = session_get_cookie_params();
-            setcookie(
-                session_name(),
-                '',
-                time() - 42000,
-                $params['path'],
-                $params['domain'],
-                $params['secure'],
-                $params['httponly']
-            );
-        }
+        $data = [
+            'title'    => $title,
+            'message'  => $message,
+            'loginUrl' => '/login',
+        ];
 
-        if (session_status() === PHP_SESSION_ACTIVE) {
-            @session_destroy();
-        }
+        ob_start();
+        require dirname(__DIR__) . '/views/results/link_error.php';
+        $inner = (string)ob_get_clean();
 
-        @session_start();
-        @session_regenerate_id(true);
+        pf_render_shell('Result link', $inner);
     }
 }
 
 if (!function_exists('pf_result_access_login_user')) {
-    function pf_result_access_login_user(\PDO $pdo, int $userId): bool
+    /**
+     * Logs a user into the session by user id (Flow B).
+     * Uses DB lookup to fetch canonical email.
+     */
+    function pf_result_access_login_user(PDO $pdo, int $userId): bool
     {
         try {
             $stmt = $pdo->prepare("SELECT id, email FROM users WHERE id = :id LIMIT 1");
             $stmt->execute([':id' => $userId]);
-            $u = $stmt->fetch(\PDO::FETCH_ASSOC);
+            $u = $stmt->fetch(PDO::FETCH_ASSOC);
 
             if (!$u) { return false; }
 
@@ -203,13 +222,15 @@ if (!function_exists('pf_result_access_login_user')) {
                 @session_start();
             }
 
-            @session_regenerate_id(true);
+            if (function_exists('session_regenerate_id')) {
+                @session_regenerate_id(true);
+            }
 
-            $_SESSION['user_id']    = $id;
+            $_SESSION['user_id'] = $id;
             $_SESSION['user_email'] = $email;
 
             return true;
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             error_log('pf_result_access_login_user failed: ' . $e->getMessage());
             return false;
         }
