@@ -5,143 +5,76 @@
  *
  * PHPMailer wrapper for Plainfully.
  *
- * Expects:
- *  - PHPMailer source files to exist under app/support/phpmailer/
- *    (PHPMailer.php, SMTP.php, Exception.php)
- *  - SMTP config is read from global $config['smtp'] (loaded via config/app.php)
+ * Purpose:
+ *  - Centralizes email sending + HTML shell rendering.
+ *  - Provides consistent deliverability headers.
+ *  - Adds robust logo support:
+ *      * Template uses a public HTTPS PNG URL
+ *      * If the PNG exists locally, we embed it as a CID image so it renders
+ *        even when remote images are blocked by the email client.
  *
- * Notes:
- *  - `use` statements MUST appear before executable code in PHP files.
+ * Expects:
+ *  - PHPMailer source files under app/support/phpmailer/
+ *    (PHPMailer.php, SMTP.php, Exception.php)
+ *  - SMTP config from global $config['smtp'] (loaded via config/app.php)
  */
 
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
 
-// Local templates (kept as you had it)
+// Local builders (inner HTML/text builders)
 require_once __DIR__ . '/email_templates.php';
 
-function pf_email_template(string $title, string $bodyHtml): string
+/**
+ * Global email shell.
+ *
+ * IMPORTANT:
+ * - Keep this as “dumb HTML” (no external CSS).
+ * - Logo uses PNG URL because SVG is unreliable in email clients.
+ * - CID embedding (if available) is handled later inside pf_mail_send()
+ *   by rewriting the logo URL to cid:plainfully-logo.
+ */
+function pf_email_template(string $subject, string $innerHtml): string
 {
-    // Brand/env (safe defaults)
-    $brand   = getenv('PF_EMAIL_BRAND_NAME') ?: 'Plainfully';
-    $tagline = getenv('PF_EMAIL_TAGLINE') ?: 'Clear answers. Fewer worries.';
-    $logoUrl = trim((string)(getenv('PF_EMAIL_LOGO_URL') ?: ''));
-    $company = getenv('PF_EMAIL_COMPANY_NAME') ?: 'Hissing Goat Studios';
-    $address = getenv('PF_EMAIL_COMPANY_ADDRESS') ?: '';
+    $safeSubject = htmlspecialchars($subject, ENT_QUOTES, 'UTF-8');
 
-    // Pre-escape everything that may be user/env influenced (email-safe)
-    $escTitle   = htmlspecialchars($title, ENT_QUOTES, 'UTF-8');
-    $escBrand   = htmlspecialchars($brand, ENT_QUOTES, 'UTF-8');
-    $escTagline = htmlspecialchars($tagline, ENT_QUOTES, 'UTF-8');
-    $escCompany = htmlspecialchars($company, ENT_QUOTES, 'UTF-8');
+    // PNG URL (used as the canonical marker for CID replacement inside pf_mail_send()).
+    $logoUrl = 'https://plainfully.com/assets/img/logo-icon.png';
 
-    // Optional blocks built as strings (NO PHP tags inside)
-    $logoBlock = '';
-    if ($logoUrl !== '') {
-        $escLogoUrl = htmlspecialchars($logoUrl, ENT_QUOTES, 'UTF-8');
-        $logoBlock =
-            '<img src="' . $escLogoUrl . '" ' .
-            'alt="' . $escBrand . '" ' .
-            'style="display:block;max-width:180px;height:auto;margin:0 0 10px 0;">';
-    } else {
-        $logoBlock =
-            '<h1 style="margin:0;font-size:20px;font-weight:700;letter-spacing:-0.02em;">' .
-            $escBrand .
-            '</h1>';
-    }
+    return '<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>' . $safeSubject . '</title>
+</head>
+<body style="margin:0;padding:0;background:#f7f9fa;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#111827;">
+  <div style="max-width:640px;margin:0 auto;padding:24px;">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+      <img src="' . htmlspecialchars($logoUrl, ENT_QUOTES, 'UTF-8') . '"
+           width="36" height="36"
+           alt="Plainfully"
+           style="display:block;border:0;outline:none;text-decoration:none;">
+      <div style="font-weight:700;font-size:16px;line-height:1;color:#111827;">Plainfully</div>
+    </div>
 
-    $addressBlock = '';
-    if ($address !== '') {
-        $escAddr = nl2br(htmlspecialchars($address, ENT_QUOTES, 'UTF-8'));
-        $addressBlock = '<br>' . $escAddr;
-    }
+    <div style="background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;padding:22px;">
+      ' . $innerHtml . '
+    </div>
 
-    $year = date('Y');
-
-    return '
-  <!doctype html>
-  <html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>' . $escTitle . '</title>
-  </head>
-  <body style="
-    margin:0;
-    padding:0;
-    background:#f5f7fa;
-    font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
-    color:#111827;
-  ">
-
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
-      <tr>
-        <td align="center" style="padding:24px;">
-          <table width="100%" cellpadding="0" cellspacing="0" style="
-            max-width:560px;
-            background:#ffffff;
-            border-radius:12px;
-            box-shadow:0 10px 25px rgba(0,0,0,0.06);
-          ">
-
-            <!-- Header -->
-            <tr>
-              <td style="padding:24px 28px 12px;">
-                ' . $logoBlock . '
-                <p style="margin:4px 0 0;font-size:14px;color:#6b7280;">
-                  ' . $escTagline . '
-                </p>
-              </td>
-            </tr>
-
-            <!-- Divider -->
-            <tr>
-              <td style="padding:0 28px;">
-                <hr style="border:none;border-top:1px solid #e5e7eb;">
-              </td>
-            </tr>
-
-            <!-- Content -->
-            <tr>
-              <td style="padding:24px 28px;font-size:15px;line-height:1.6;">
-                ' . $bodyHtml . '
-              </td>
-            </tr>
-
-            <!-- Footer -->
-            <tr>
-              <td style="padding:20px 28px 24px;font-size:13px;color:#6b7280;">
-                <p style="margin:0;">
-                  Sent by <strong>' . $escBrand . '</strong><br>
-                  Operated by ' . $escCompany . $addressBlock . '
-                </p>
-                <p style="margin:8px 0 0;">
-                  If you didn’t request this, you can safely ignore this email.
-                </p>
-              </td>
-            </tr>
-
-          </table>
-
-          <!-- Legal -->
-          <p style="margin:16px 0 0;font-size:12px;color:#9ca3af;">
-            © ' . $year . ' ' . $escCompany . ' · plainfully.com
-          </p>
-        </td>
-      </tr>
-    </table>
-
-  </body>
-  </html>';
+    <div style="color:#6b7280;font-size:12px;margin-top:14px;">
+      You’re receiving this because you used Plainfully via email.
+    </div>
+  </div>
+</body>
+</html>';
 }
-
 
 // ---------------------------------------------------------
 // Load PHPMailer classes without Composer
 // ---------------------------------------------------------
 
 if (!class_exists(PHPMailer::class)) {
-    // Your structure: app/support/phpmailer/{PHPMailer,SMTP,Exception}.php
     $base = __DIR__ . '/phpmailer';
 
     $files = [
@@ -158,14 +91,38 @@ if (!class_exists(PHPMailer::class)) {
 }
 
 if (!class_exists(PHPMailer::class)) {
-    $msg = 'PHPMailer is not available. '
-         . 'Ensure PHPMailer.php, SMTP.php and Exception.php '
-         . 'exist in app/support/phpmailer on the server.';
+    $msg = 'PHPMailer is not available. Ensure PHPMailer.php, SMTP.php and Exception.php exist in app/support/phpmailer.';
     throw new RuntimeException($msg);
 }
 
 /**
+ * Attempt to find the local logo PNG on disk for CID embedding.
+ *
+ * Expected location on your server:
+ *   httpdocs/assets/img/logo-icon.png
+ *
+ * This file lives at:
+ *   httpdocs/app/support/mailer.php
+ *
+ * So the logo path is:
+ *   __DIR__ (app/support) -> ../../.. -> httpdocs -> assets/img/logo-icon.png
+ */
+function pf_local_logo_path(): ?string
+{
+    $candidate = realpath(__DIR__ . '/../../..' . '/assets/img/logo-icon.png');
+    if ($candidate !== false && is_file($candidate) && is_readable($candidate)) {
+        return $candidate;
+    }
+    return null;
+}
+
+/**
  * Send an email via PHPMailer, using global $config['smtp'].
+ *
+ * Security:
+ * - Validates recipient email (fail-closed).
+ * - No dynamic headers from user input.
+ * - Best-effort CID embedding using a local PNG (prevents “blocked images” issue).
  *
  * @return bool True on success, false on failure.
  */
@@ -214,11 +171,33 @@ function pf_mail_send(
             $text = trim(strip_tags($html));
         }
 
+        // -----------------------------------------------------
+        // Logo support (CID embedding)
+        // -----------------------------------------------------
+        // Many email clients block remote images by default.
+        // If we can embed the logo as a CID, it renders immediately.
+        //
+        // We do this safely by:
+        //  1) Checking for a local file on disk (controlled by you)
+        //  2) addEmbeddedImage(...)
+        //  3) Rewriting the known HTTPS logo URL to cid:plainfully-logo
+        //
+        // If the local file is missing, we simply leave the HTTPS URL in place.
+        $logoUrlMarker = 'https://plainfully.com/assets/img/logo-icon.png';
+        $logoPath = pf_local_logo_path();
+        if ($logoPath !== null) {
+            $cid = 'plainfully-logo';
+            $mail->addEmbeddedImage($logoPath, $cid, 'logo-icon.png', 'base64', 'image/png');
+
+            // Replace ONLY the known marker URL to avoid unintended replacements.
+            $html = str_replace($logoUrlMarker, 'cid:' . $cid, $html);
+        }
+
         $mail->Subject = $subject;
         $mail->Body    = $html;
         $mail->AltBody = $text;
 
-        // Deliverability hints
+        // Deliverability hints (safe static headers)
         $mail->addCustomHeader('X-Mailer', 'Plainfully');
         $mail->addCustomHeader('List-Unsubscribe', '<mailto:unsubscribe@plainfully.com>');
 
