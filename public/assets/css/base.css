@@ -1,0 +1,28 @@
+/* base.css — accessibility + scaling */
+
+html {
+  font-size: 100%; /* user controls zoom */
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  background: var(--pf-bg);
+  color: var(--pf-text);
+  line-height: 1.6;
+}
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* Images & SVGs scale safely */
+img, svg {
+  max-width: 100%;
+  height: auto;
+}
+/* End of base.css */

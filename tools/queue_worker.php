@@ -38,6 +38,8 @@ if (PHP_SAPI !== 'cli') {
 
 date_default_timezone_set('UTC');
 
+require_once dirname(__DIR__) . '/email_templates.php';
+
 $ROOT = realpath(__DIR__ . '/..') ?: (__DIR__ . '/..');
 
 /** Minimal .env loader (fail-open) */

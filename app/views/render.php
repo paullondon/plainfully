@@ -19,8 +19,10 @@ function pf_render_shell(string $title, string $innerHtml, array $data = []): vo
         <meta charset="utf-8">
         <title><?= htmlspecialchars($title) ?> | Plainfully</title>
         <meta name="viewport" content="width=device-width, initial-scale=1">
-        <link rel="stylesheet"
-              href="/assets/css/app.css?v=<?= $cssVersion ?>">
+        <link rel="stylesheet" href="/assets/css/theme.css">
+        <link rel="stylesheet" href="/assets/css/base.css">
+        <link rel="stylesheet" href="/assets/css/components/card.css">
+        <link rel="stylesheet"href="/assets/css/app.css?v=<?= $cssVersion ?>">
     </head>
     <body class="<?= $bodyClass ?>">
         <main class="<?= $mainClass ?>">

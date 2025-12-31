@@ -1,0 +1,29 @@
+/* theme.css — SINGLE SOURCE OF TRUTH */
+
+:root {
+  /* Brand */
+  --pf-brand: #2C6F63;
+  --pf-brand-soft: #5ABFA8;
+  --pf-accent: #CE9F77;
+
+  /* Neutrals (light) */
+  --pf-bg: #F7F9FA;
+  --pf-surface: #FFFFFF;
+  --pf-border: #E5E7EB;
+
+  --pf-text: #111827;
+  --pf-text-muted: #6B7280;
+}
+
+/* Dark mode */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --pf-bg: #0B0F14;
+    --pf-surface: #111827;
+    --pf-border: #1F2937;
+
+    --pf-text: #E5E7EB;
+    --pf-text-muted: #9CA3AF;
+  }
+}
+/* End of theme.css */
