@@ -34,75 +34,79 @@ require_once __DIR__ . '/email_templates.php';
  * - CID embedding (if available) is handled later inside pf_mail_send()
  *   by rewriting the logo URL to cid:plainfully-logo.
  */
+
 function pf_email_template(string $subject, string $innerHtml): string
 {
     $safeSubject = htmlspecialchars($subject, ENT_QUOTES, 'UTF-8');
 
     // PNG for email reliability
     $logoUrl = 'https://plainfully.com/assets/img/plainfully-logo-light.256.png';
+    $safeLogoUrl = htmlspecialchars($logoUrl, ENT_QUOTES, 'UTF-8');
+
+    // Light, calm palette (WCAG-friendly contrasts)
+    $bg     = '#F7F9FA';  // page background
+    $card   = '#FFFFFF';  // card background
+    $border = '#E5E7EB';  // card border
+    $text   = '#111827';  // main text
+    $muted  = '#6B7280';  // muted text
+    $brand  = '#2C6F63';  // plainfully teal
 
     return '<!doctype html>
 <html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="supported-color-schemes" content="light">
   <title>' . $safeSubject . '</title>
 </head>
-<body style="
-  margin:0;
-  padding:0;
-  background:#0b0f14;
-  font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
-  color:#e5e7eb;
-">
-  <div style="max-width:640px;margin:0 auto;padding:28px 20px;">
+<body style="margin:0;padding:0;background:' . $bg . ';">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:' . $bg . ';margin:0;padding:0;">
+    <tr>
+      <td align="center" style="padding:28px 16px;">
 
-    <!-- Header -->
-    <div style="
-      display:flex;
-      align-items:center;
-      gap:12px;
-      margin-bottom:18px;
-    ">
-      <img src="' . htmlspecialchars($logoUrl, ENT_QUOTES, 'UTF-8') . '"
-           width="36" height="36"
-           alt="Plainfully"
-           style="display:block;border:0;">
-      <div>
-        <div style="font-weight:700;font-size:16px;line-height:1;color:#ffffff;">
-          Plainfully
-        </div>
-        <div style="font-size:13px;color:#9ca3af;">
-          Clear answers. Fewer worries.
-        </div>
-      </div>
-    </div>
+        <table role="presentation" width="640" cellspacing="0" cellpadding="0" border="0" style="max-width:640px;width:100%;">
+          <!-- Header -->
+          <tr>
+            <td style="padding:0 0 14px 0;">
+              <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="width:100%;">
+                <tr>
+                  <td style="width:44px;vertical-align:middle;">
+                    <img src="' . $safeLogoUrl . '" width="36" height="36" alt="Plainfully" style="display:block;border:0;outline:none;text-decoration:none;">
+                  </td>
+                  <td style="vertical-align:middle;">
+                    <div style="font-weight:700;font-size:16px;line-height:1.2;color:' . $text . ';">Plainfully</div>
+                    <div style="font-size:13px;line-height:1.3;color:' . $muted . ';">Clear answers. Fewer worries.</div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
 
-    <!-- Card -->
-    <div style="
-      background:#111827;
-      border:1px solid #1f2937;
-      border-radius:16px;
-      padding:22px;
-      color:#e5e7eb;
-    ">
-      ' . $innerHtml . '
-    </div>
+          <!-- Card -->
+          <tr>
+            <td style="background:' . $card . ';border:1px solid ' . $border . ';border-radius:16px;padding:22px;color:' . $text . ';">
+              ' . $innerHtml . '
+            </td>
+          </tr>
 
-    <!-- Footer -->
-    <div style="
-      color:#9ca3af;
-      font-size:12px;
-      margin-top:16px;
-    ">
-      You’re receiving this because you used Plainfully via email.<br>
-      Operated by Hissing Goat Studios.
-    </div>
+          <!-- Footer -->
+          <tr>
+            <td style="padding:14px 2px 0 2px;color:' . $muted . ';font-size:12px;line-height:1.4;">
+              You’re receiving this because you used Plainfully via email.<br>
+              Operated by Hissing Goat Studios.
+            </td>
+          </tr>
 
-  </div>
+        </table>
+
+      </td>
+    </tr>
+  </table>
 </body>
 </html>';
 }
+
 
 
 // ---------------------------------------------------------
