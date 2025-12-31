@@ -166,8 +166,11 @@ function pf_email_template(string $subject, string $innerHtml): string
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
+
+  <!-- Tell clients we support both schemes -->
   <meta name="color-scheme" content="light dark">
   <meta name="supported-color-schemes" content="light dark">
+
   <title>' . $safeSubject . '</title>
 
   <style>
@@ -185,6 +188,13 @@ function pf_email_template(string $subject, string $innerHtml): string
       --pf-accent:#CE9F77;
     }
 
+    /*
+      Apple Mail / iOS:
+      Prevents "smart" auto darkening that can wreck contrast.
+      Supported widely enough to be worth it; ignored elsewhere.
+    */
+    body, .pf-body, .pf-card { -webkit-text-size-adjust:100%; }
+
     /* ---- Dark-mode pairing (supported by Apple Mail / iOS, some others) ---- */
     @media (prefers-color-scheme: dark){
       :root{
@@ -199,25 +209,21 @@ function pf_email_template(string $subject, string $innerHtml): string
         --pf-brand:#5ABFA8;
       }
 
-      .pf-card{ background:var(--pf-surface) !important; border-color:var(--pf-border) !important; }
+      /* Force the key surfaces/text so iOS Mail doesn’t “guess” */
+      body, .pf-body{
+        background:var(--pf-bg) !important;
+        color:var(--pf-text) !important;
+      }
+
+      .pf-card{
+        background:var(--pf-surface) !important;
+        border-color:var(--pf-border) !important;
+        color:var(--pf-text) !important;
+      }
+
       .pf-title{ color:#FFFFFF !important; }
       .pf-tagline{ color:var(--pf-muted) !important; }
-      .pf-h2,.pf-h3,.pf-p{ color:var(--pf-text) !important; }
       .pf-muted{ color:var(--pf-muted) !important; }
-      .pf-hr{ border-top-color:var(--pf-border) !important; }
-
-      .pf-badge{
-        background:rgba(90,191,168,0.18) !important;
-        border-color:rgba(90,191,168,0.30) !important;
-        color:var(--pf-brand) !important;
-      }
-
-      .pf-btn{
-        background:var(--pf-brand) !important;
-        color:#0B0F14 !important;
-      }
-
-      body{ background:var(--pf-bg) !important; color:var(--pf-text) !important; }
     }
   </style>
 </head>
@@ -236,7 +242,7 @@ function pf_email_template(string $subject, string $innerHtml): string
       <img src="' . htmlspecialchars($logoUrl, ENT_QUOTES, 'UTF-8') . '"
            width="36" height="36"
            alt="Plainfully"
-           style="display:block;border:0;">
+           style="display:block;border:0;outline:none;text-decoration:none;">
       <div>
         <div class="pf-title" style="font-weight:700;font-size:16px;line-height:1;color:#111827;">
           Plainfully
@@ -268,3 +274,4 @@ function pf_email_template(string $subject, string $innerHtml): string
 </body>
 </html>';
 }
+
