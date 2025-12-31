@@ -39,7 +39,7 @@ function pf_email_template(string $subject, string $innerHtml): string
     $safeSubject = htmlspecialchars($subject, ENT_QUOTES, 'UTF-8');
 
     // PNG for email reliability
-    $logoUrl = 'https://plainfully.com/assets/img/logo-icon.png';
+    $logoUrl = 'https://plainfully.com/assets/img/plainfully-logo-bimi.png';
 
     return '<!doctype html>
 <html>
@@ -134,17 +134,17 @@ if (!class_exists(PHPMailer::class)) {
  * Attempt to find the local logo PNG on disk for CID embedding.
  *
  * Expected location on your server:
- *   httpdocs/assets/img/logo-icon.png
+ *   httpdocs/assets/img/plainfully-logo-bimi.png
  *
  * This file lives at:
  *   httpdocs/app/support/mailer.php
  *
  * So the logo path is:
- *   __DIR__ (app/support) -> ../../.. -> httpdocs -> assets/img/logo-icon.png
+ *   __DIR__ (app/support) -> ../../.. -> httpdocs -> assets/img/plainfully-logo-bimi.png
  */
 function pf_local_logo_path(): ?string
 {
-    $candidate = realpath(__DIR__ . '/../../..' . '/assets/img/logo-icon.png');
+    $candidate = realpath(__DIR__ . '/../../..' . '/assets/img/plainfully-logo-bimi.png');
     if ($candidate !== false && is_file($candidate) && is_readable($candidate)) {
         return $candidate;
     }
@@ -218,11 +218,11 @@ function pf_mail_send(
         //  3) Rewriting the known HTTPS logo URL to cid:plainfully-logo
         //
         // If the local file is missing, we simply leave the HTTPS URL in place.
-        $logoUrlMarker = 'https://plainfully.com/assets/img/logo-icon.png';
+        $logoUrlMarker = 'https://plainfully.com/assets/img/plainfully-logo-bimi.png';
         $logoPath = pf_local_logo_path();
         if ($logoPath !== null) {
             $cid = 'plainfully-logo';
-            $mail->addEmbeddedImage($logoPath, $cid, 'logo-icon.png', 'base64', 'image/png');
+            $mail->addEmbeddedImage($logoPath, $cid, 'plainfully-logo-bimi.png', 'base64', 'image/png');
 
             // Replace ONLY the known marker URL to avoid unintended replacements.
             $html = str_replace($logoUrlMarker, 'cid:' . $cid, $html);

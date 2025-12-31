@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg"
+     viewBox="0 0 256 256"
+     role="img"
+     aria-label="Plainfully logo (light)"
+     version="1.2"
+     baseProfile="tiny-ps">
+
+  <!-- ============================================================
+       Plainfully Logo — LIGHT
+       Guidance through contained confusion
+       Source of truth: Paul's locked layout (colors can evolve)
+       ============================================================ -->
+
+  <!-- Background -->
+  <rect x="0" y="0" width="256" height="256" rx="56" fill="#F7F9FA"/>
+
+  <!-- Confusion worlds (kept INSIDE border by geometry, no clipPath) -->
+  <circle cx="128" cy="92"  r="74" fill="#5ABFA8" opacity="0.22"/>
+  <circle cx="128" cy="164" r="74" fill="#CE9F77" opacity="0.22"/>
+
+  <!-- Protective boundary -->
+  <rect x="18" y="18" width="220" height="220" rx="50"
+        fill="none" stroke="#4F7F76" stroke-width="18"/>
+
+  <!-- Calm guidance line -->
+  <rect x="110" y="56" width="36" height="150" rx="18" fill="#2C6F63"/>
+
+  <!-- Framed clarity opening (circle wider than line) -->
+  <circle cx="128" cy="128" r="22"
+          fill="#F7F9FA"
+          stroke="#2C6F63"
+          stroke-width="6"/>
+</svg>

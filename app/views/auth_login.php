@@ -34,7 +34,7 @@ $cssVersion = htmlspecialchars((string)($config['css'] ?? '1'), ENT_QUOTES, 'UTF
         <header class="pf-auth-header">
             <div class="pf-logo pf-logo--large">
                 <img
-                    src="/assets/img/logo-icon.svg"
+                    src="/assets/img/plainfully-logo-bimi.svg"
                     alt="Plainfully logo"
                     class="pf-logo-img">
             </div>
