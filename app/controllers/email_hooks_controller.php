@@ -12,7 +12,7 @@ require_once dirname(__DIR__) . '/features/checks/check_engine.php';
 // Dummy AI client
 require_once dirname(__DIR__) . '/features/checks/dummy_ai_client.php';
 // Email templates
-require_once dirname(__DIR__) . '/email_templates.php';
+require_once __DIR__ . '/../support/email_templates.php';
 
 
 // Billing (plan + limits) – safe to include even if you haven’t deployed yet
