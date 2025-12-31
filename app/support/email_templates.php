@@ -7,7 +7,7 @@
 
 function pf_email_logo_html(): string
 {
-    $logoUrl = 'https://plainfully.com/assets/img/plainfully-logo-bimi.png';
+    $logoUrl = 'https://plainfully.com/assets/img/plainfully-logo-light.256.png';
 
     return
         '<div style="margin:0 0 16px 0;text-align:left;">'
