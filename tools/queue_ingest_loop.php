@@ -28,12 +28,12 @@ if (PHP_SAPI !== 'cli') {
     exit(1);
 }
 
-require_once dirname(__DIR__) . '/email_templates.php';
-
 
 date_default_timezone_set('UTC');
 
 $ROOT = realpath(__DIR__ . '/..') ?: (__DIR__ . '/..');
+require_once $ROOT . '/app/support/email_templates.php';
+
 
 /**
  * Minimal .env loader (does not override existing env).
