@@ -23,7 +23,7 @@ use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
 
 // Local builders (inner HTML/text builders)
-require_once dirname(__DIR__) . '/email_templates.php';
+require_once __DIR__ . '/email_templates.php';
 
 /**
  * Global email shell.
