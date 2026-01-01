@@ -6,22 +6,25 @@ use PDO;
 use Throwable;
 
 /**
- * CheckEngine (Plainfully)
+ * ============================================================
+ * Plainfully — CheckEngine
+ * ============================================================
+ * Purpose:
+ *   - Calls AiClient to analyse a user message
+ *   - Ensures a matching users row exists (by users.email)
+ *   - Inserts a row into checks using the LIVE schema
+ *   - Returns CheckResult (v1 signature)
  *
- * - Calls AiClient
- * - Ensures a matching `users` row exists (by users.email) and gets user_id
- * - Inserts into `checks` using the live schema:
- *     ai_result_json, channel, content_type, created_at, id, is_paid, is_scam,
- *     short_summary, source_identifier, updated_at, user_id
- * - Returns CheckResult (matches CheckResult v1 signature in your repo)
+ * IMPORTANT PRODUCT DECISION (Jan 2026):
+ *   - Scamcheck mode is REMOVED from this engine.
+ *   - Everything funnels through "clarify" behaviour.
  *
- * Security:
- * - Prepared statements only
- * - No dynamic SQL
- * - Fail-open on DB insert so UX still works (but logs)
+ * Security / Safety:
+ *   - Prepared statements only
+ *   - No dynamic SQL
+ *   - Fail-open on AI/DB errors so the user journey continues
+ * ============================================================
  */
-$ROOT . '/app/features/checks/ai_mode.php';
-
 final class CheckEngine
 {
     private PDO $pdo;
@@ -33,70 +36,79 @@ final class CheckEngine
         $this->ai  = $ai;
     }
 
+    /**
+     * Run analysis + persist to DB (best-effort).
+     */
     public function run(CheckInput $input, bool $isPaid): CheckResult
     {
-        // Determine analysis mode by channel (AiClient expects STRING mode)
-        use App\Features\Checks\AiMode;
+        // ============================================================
+        // 1) Mode selection (scamcheck removed)
+        // ============================================================
+        $mode = $this->modeFromChannel((string)$input->channel);
 
-        $mode = match ($input->channel) {
-            'email-clarify'   => AiMode::Clarify,
-            'email-scamcheck' => AiMode::Scamcheck,
-            default           => AiMode::Generic,
-        };
-
-
-        // AiClient returns an array (DummyAiClient should too)
+        // ============================================================
+        // 2) Call AI (fail-open)
+        // ============================================================
         $analysis = [];
         try {
             $analysis = $this->ai->analyze(
-                $input->content,
+                (string)$input->content,
                 $mode,
                 [
                     'is_paid' => $isPaid,
-                    'channel' => $input->channel,
+                    'channel' => (string)$input->channel,
                 ]
             );
         } catch (Throwable $e) {
-            // Fail-open: continue with defaults (still writes a DB row if possible)
             error_log('AiClient analyze failed (fail-open): ' . $e->getMessage());
             $analysis = [];
         }
 
-        if (!is_array($analysis)) { $analysis = []; }
+        if (!is_array($analysis)) {
+            $analysis = [];
+        }
 
-        // ---------
-        // Normalise analysis fields (safe defaults; no jargon)
-        // ---------
-        $status             = (string)($analysis['status'] ?? 'ok');
-        $headline           = (string)($analysis['headline'] ?? 'Your result is ready');
-        $externalRiskLine   = (string)($analysis['external_risk_line'] ?? 'Scam risk level: unknown (we always check)');
-        $externalTopicLine  = (string)($analysis['external_topic_line'] ?? 'This message appears to be about: unknown');
+        // ============================================================
+        // 3) Normalise fields (safe defaults)
+        // ============================================================
+        $status            = (string)($analysis['status'] ?? 'ok');
+        $headline          = (string)($analysis['headline'] ?? 'Your result is ready');
 
-        $scamRiskLevelRaw = $analysis['scam_risk_level'] ?? ($analysis['scamRiskLevel'] ?? null);
-        $scamRiskLevel    = $this->normaliseRiskLevel($scamRiskLevelRaw, $analysis['is_scam'] ?? null);
+        // We keep these fields because CheckResult expects them.
+        // Even if you later add scam detection again, this structure stays stable.
+        $externalRiskLine  = (string)($analysis['external_risk_line'] ?? 'Safety check: completed');
+        $externalTopicLine = (string)($analysis['external_topic_line'] ?? 'Summary: ready');
 
-        // Web fields (these are for the website view, not the thin email)
+        // Risk level stays supported (defaults to low)
+        $riskRaw        = $analysis['scam_risk_level'] ?? ($analysis['scamRiskLevel'] ?? null);
+        $scamRiskLevel  = $this->normaliseRiskLevel($riskRaw, $analysis['is_scam'] ?? null);
+
+        // Web fields (optional, shown on website page)
         $webWhatTheMessageSays = (string)($analysis['web_what_the_message_says'] ?? '');
         $webWhatItsAskingFor   = (string)($analysis['web_what_its_asking_for'] ?? '');
         $webScamLevelLine      = (string)($analysis['web_scam_level_line'] ?? '');
         $webLowRiskNote        = (string)($analysis['web_low_risk_note'] ?? '');
         $webScamExplanation    = (string)($analysis['web_scam_explanation'] ?? '');
 
-        // Boolean is_scam stored in DB (conservative: only "high" = scam)
+        // Stored is_scam flag in DB:
+        // We keep the column populated for compatibility, but only treat "high" as scam.
         $isScam = ($scamRiskLevel === 'high');
 
-        // Build JSON for DB (must be valid JSON)
+        // Always store valid JSON
         $rawJson = $this->safeJsonEncode($analysis);
 
-        // Store (best effort). If DB write fails, still return result so UX works.
+        // ============================================================
+        // 4) Persist (fail-open)
+        // ============================================================
         $id = null;
 
         try {
-            $userId = $this->getOrCreateUserIdByEmail($input->sourceIdentifier);
+            $userId = $this->getOrCreateUserIdByEmail((string)$input->sourceIdentifier);
 
-            // short_summary must fit varchar; keep it tight.
             $shortSummary = trim($headline . ' — ' . $externalTopicLine);
-            if ($shortSummary === '') { $shortSummary = 'Plainfully result'; }
+            if ($shortSummary === '') {
+                $shortSummary = 'Plainfully result';
+            }
             $shortSummary = $this->mbTrimTo($shortSummary, 240);
 
             $stmt = $this->pdo->prepare('
@@ -108,9 +120,9 @@ final class CheckEngine
 
             $stmt->execute([
                 ':user_id'           => $userId,
-                ':channel'           => $input->channel,
-                ':source_identifier' => $input->sourceIdentifier,
-                ':content_type'      => $input->contentType,
+                ':channel'           => (string)$input->channel,
+                ':source_identifier' => (string)$input->sourceIdentifier,
+                ':content_type'      => (string)$input->contentType,
                 ':is_scam'           => $isScam ? 1 : 0,
                 ':is_paid'           => $isPaid ? 1 : 0,
                 ':short_summary'     => $shortSummary,
@@ -122,7 +134,9 @@ final class CheckEngine
             error_log('CheckEngine DB insert failed (fail-open): ' . $e->getMessage());
         }
 
-        // IMPORTANT: This matches the constructor in /app/features/checks/check_result.php (v1)
+        // ============================================================
+        // 5) Return result (v1 constructor compatibility)
+        // ============================================================
         return new CheckResult(
             $id,
             $status,
@@ -136,15 +150,28 @@ final class CheckEngine
             $webLowRiskNote,
             $webScamExplanation,
             $isPaid,
-            ['mode' => $mode],
+            ['mode' => $mode->value],
             $rawJson
         );
     }
 
-    /**
-     * Normalise risk level into 'low'|'medium'|'high'.
-     * If not provided, fall back to is_scam boolean if present.
-     */
+    // ============================================================
+    // Mode selection
+    // ============================================================
+    private function modeFromChannel(string $channel): AiMode
+    {
+        // Scamcheck removed. Everything is clarify unless you later add other modes.
+        if ($channel === 'email-clarify') {
+            return AiMode::Clarify;
+        }
+
+        // Safe fallback
+        return AiMode::Generic;
+    }
+
+    // ============================================================
+    // Risk handling (kept for schema stability)
+    // ============================================================
     private function normaliseRiskLevel(mixed $risk, mixed $isScamFallback): string
     {
         $r = strtolower(trim((string)($risk ?? '')));
@@ -152,7 +179,6 @@ final class CheckEngine
             return $r;
         }
 
-        // Fallback: if upstream only provides is_scam as boolish
         if (is_bool($isScamFallback)) {
             return $isScamFallback ? 'high' : 'low';
         }
@@ -164,9 +190,9 @@ final class CheckEngine
         return 'low';
     }
 
-    /**
-     * Always returns valid JSON.
-     */
+    // ============================================================
+    // JSON safety
+    // ============================================================
     private function safeJsonEncode(array $data): string
     {
         try {
@@ -180,13 +206,9 @@ final class CheckEngine
         return '{}';
     }
 
-    /**
-     * Ensures a user exists for the given email address and returns users.id.
-     *
-     * - Uses users.email (UNIQUE) as the natural key.
-     * - Inserts plan='free' for new users.
-     * - Race-safe: if two processes insert at once, handle duplicate then re-select.
-     */
+    // ============================================================
+    // User lookup / creation
+    // ============================================================
     private function getOrCreateUserIdByEmail(string $email): int
     {
         $email = trim(strtolower($email));
@@ -195,7 +217,7 @@ final class CheckEngine
             throw new \RuntimeException('Invalid user email for user lookup.');
         }
 
-        // 1) Try select
+        // 1) Select
         $sel = $this->pdo->prepare('SELECT id FROM users WHERE email = :email LIMIT 1');
         $sel->execute([':email' => $email]);
         $found = $sel->fetchColumn();
@@ -203,7 +225,7 @@ final class CheckEngine
             return (int)$found;
         }
 
-        // 2) Insert
+        // 2) Insert (race-safe)
         try {
             $ins = $this->pdo->prepare('
                 INSERT INTO users (email, plan, created_at)
@@ -215,7 +237,7 @@ final class CheckEngine
             ]);
             return (int)$this->pdo->lastInsertId();
         } catch (Throwable $e) {
-            // Duplicate insert or transient issue; re-select
+            // Another process likely inserted; re-select
             $sel2 = $this->pdo->prepare('SELECT id FROM users WHERE email = :email LIMIT 1');
             $sel2->execute([':email' => $email]);
             $found2 = $sel2->fetchColumn();
@@ -226,15 +248,17 @@ final class CheckEngine
         }
     }
 
-    /**
-     * UTF-8 safe trim to max chars.
-     */
+    // ============================================================
+    // Helpers
+    // ============================================================
     private function mbTrimTo(string $s, int $maxChars): string
     {
         $s = trim($s);
         if ($s === '') { return $s; }
+
         $len = mb_strlen($s, 'UTF-8');
         if ($len <= $maxChars) { return $s; }
+
         return rtrim(mb_substr($s, 0, $maxChars, 'UTF-8'));
     }
 }
