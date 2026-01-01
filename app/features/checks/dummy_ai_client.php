@@ -7,35 +7,27 @@ use Throwable;
 /**
  * DummyAiClient
  *
- * Dev stub that returns a predictable v1-shaped payload.
- * MUST match AiClient interface:
- *   analyze(string $text, string $mode, array $ctx = []): array
+ * Dev stub that returns a predictable payload.
+ * Signature MUST match AiClient (AiMode typed).
  */
 final class DummyAiClient implements AiClient
 {
     /**
-     * @param string $text  Cleaned + capped message text
-     * @param string $mode  'clarify'|'scamcheck'|'generic'
      * @param array<string,mixed> $ctx
-     *
      * @return array<string,mixed>
      */
-    public function analyze(string $text, string $mode, array $ctx = []): array
+    public function analyze(string $text, AiMode $mode, array $ctx = []): array
     {
         try {
-            $mode = strtolower(trim($mode));
-            if (!in_array($mode, ['clarify', 'scamcheck', 'generic'], true)) {
-                $mode = 'generic';
-            }
+            $modeValue = $mode->value;
 
-            // Super simple stub behaviour
-            $isScam = ($mode === 'scamcheck') ? false : false;
+            // Stub behaviour
+            $isScam = ($modeValue === 'scamcheck') ? false : false;
 
-            $headline = ($mode === 'clarify')
+            $headline = ($modeValue === 'clarify')
                 ? 'Clarified'
-                : (($mode === 'scamcheck') ? 'Checked' : 'Processed');
+                : (($modeValue === 'scamcheck') ? 'Checked' : 'Processed');
 
-            // Keep the capsule short and user-friendly
             $capsule = $this->makeCapsule($text);
 
             return [
@@ -46,15 +38,14 @@ final class DummyAiClient implements AiClient
                 'scam_risk_level' => $isScam ? 'high' : 'low',
                 'is_scam' => $isScam,
 
-                // Website fields (optional, but present)
+                // Website fields (optional)
                 'web_what_the_message_says' => $capsule,
                 'web_what_its_asking_for' => '',
                 'web_scam_level_line' => $isScam ? 'High scam risk' : 'Low scam risk',
                 'web_low_risk_note' => $isScam ? '' : 'No major red flags detected in this stub response.',
-                'web_scam_explanation' => $isScam ? 'This is a dummy stub; no real scam analysis performed.' : '',
+                'web_scam_explanation' => $isScam ? 'Dummy stub; no real scam analysis performed.' : '',
             ];
         } catch (Throwable $e) {
-            // Fail-open: return minimum safe shape
             error_log('DummyAiClient failed: ' . $e->getMessage());
             return [
                 'status' => 'ok',
@@ -69,12 +60,11 @@ final class DummyAiClient implements AiClient
 
     private function makeCapsule(string $text): string
     {
-        $t = trim(preg_replace("/\s+/", ' ', $text) ?? '');
+        $t = trim((string)preg_replace("/\s+/", ' ', $text));
         if ($t === '') {
             return 'This message appears to be about: unknown';
         }
 
-        // Take first ~120 chars as a simple “topic line”
         if (mb_strlen($t, 'UTF-8') > 120) {
             $t = rtrim(mb_substr($t, 0, 120, 'UTF-8')) . '…';
         }

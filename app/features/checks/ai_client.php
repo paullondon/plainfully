@@ -3,20 +3,15 @@
 namespace App\Features\Checks;
 
 /**
- * ============================================================
- * Plainfully File Info
- * ============================================================
- * File: app/features/checks/ai_client.php
- * Purpose: Contract for analysis providers.
- * Change history:
- *   - 2026-01-01: Switched $mode from string to AiMode enum for safety.
- * ============================================================
+ * AiClient
+ *
+ * Contract for analysis providers.
  */
 interface AiClient
 {
     /**
      * @param string $text  Cleaned + capped message text
-     * @param AiMode $mode  Scamcheck|Clarify|Generic
+     * @param AiMode $mode  Generic|Clarify|Scamcheck
      * @param array<string,mixed> $ctx Optional context
      *
      * @return array<string,mixed>

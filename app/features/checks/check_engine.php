@@ -20,6 +20,8 @@ use Throwable;
  * - No dynamic SQL
  * - Fail-open on DB insert so UX still works (but logs)
  */
+$ROOT . '/app/features/checks/ai_mode.php',
+
 final class CheckEngine
 {
     private PDO $pdo;
@@ -44,11 +46,7 @@ final class CheckEngine
         // AiClient returns an array (DummyAiClient should too)
         $analysis = [];
         try {
-            $analysis = $this->ai->analyze(
-                $input->content,
-                $mode,
-                ['is_paid' => $isPaid, 'channel' => $input->channel]
-            );
+            $analysis = $this->ai->analyze($input->content, $mode, ['is_paid' => $isPaid, 'channel' => $input->channel]);
         } catch (Throwable $e) {
             // Fail-open: continue with defaults (still writes a DB row if possible)
             error_log('AiClient analyze failed (fail-open): ' . $e->getMessage());
