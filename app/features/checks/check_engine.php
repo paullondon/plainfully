@@ -20,7 +20,7 @@ use Throwable;
  * - No dynamic SQL
  * - Fail-open on DB insert so UX still works (but logs)
  */
-$ROOT . '/app/features/checks/ai_mode.php',
+$ROOT . '/app/features/checks/ai_mode.php';
 
 final class CheckEngine
 {
