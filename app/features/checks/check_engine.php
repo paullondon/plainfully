@@ -34,15 +34,23 @@ final class CheckEngine
     public function run(CheckInput $input, bool $isPaid): CheckResult
     {
         // Determine analysis mode by channel
-        $mode = 'generic';
+        $mode = AiMode::Generic;
         if ($input->channel === 'email-scamcheck') {
-            $mode = 'scamcheck';
+            $mode = AiMode::Scamcheck;
         } elseif ($input->channel === 'email-clarify') {
-            $mode = 'clarify';
+            $mode = AiMode::Clarify;
+        }
+
+        $modeEnum = AiMode::Generic;
+        if ($input->channel === 'email-scamcheck') {
+            $modeEnum = AiMode::Scamcheck;
+        } elseif ($input->channel === 'email-clarify') {
+            $modeEnum = AiMode::Clarify;
         }
 
         // AiClient returns an array (DummyAiClient should too)
-        $analysis = $this->ai->analyze($input->content, $mode);
+        $$analysis = $this->ai->analyze($input->content, $mode, ['is_paid' => $isPaid, 'channel' => $input->channel]);
+
         if (!is_array($analysis)) { $analysis = []; }
 
         // ---------

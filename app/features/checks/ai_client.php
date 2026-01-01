@@ -3,30 +3,23 @@
 namespace App\Features\Checks;
 
 /**
- * AiClient
- *
- * Contract for analysis providers.
- *
- * IMPORTANT:
- * - Implementations MUST return an array.
- * - Preferred (new) shape:
- *     ['result_json' => '{...}']  // JSON string matching Plainfully v1 schema
- *   or
- *     ['result' => [...]]         // decoded array that will be wrapped into v1
- *
- * - Legacy shape is still accepted by CheckEngine (best-effort):
- *     ['short_verdict' => '...', 'capsule' => '...', 'is_scam' => bool]
- *
- * The optional $ctx allows plan-aware behaviour without changing call sites again.
+ * ============================================================
+ * Plainfully File Info
+ * ============================================================
+ * File: app/features/checks/ai_client.php
+ * Purpose: Contract for analysis providers.
+ * Change history:
+ *   - 2026-01-01: Switched $mode from string to AiMode enum for safety.
+ * ============================================================
  */
 interface AiClient
 {
     /**
      * @param string $text  Cleaned + capped message text
-     * @param string $mode  'clarify'|'scamcheck'|'generic' (caller controlled)
-     * @param array<string,mixed> $ctx Optional context (e.g. ['is_paid'=>true, 'source_type'=>'email'])
+     * @param AiMode $mode  Scamcheck|Clarify|Generic
+     * @param array<string,mixed> $ctx Optional context
      *
      * @return array<string,mixed>
      */
-    public function analyze(string $text, string $mode, array $ctx = []): array;
+    public function analyze(string $text, AiMode $mode, array $ctx = []): array;
 }

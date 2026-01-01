@@ -10,8 +10,9 @@ namespace App\Features\Checks;
  */
 final class DummyAiClient implements AiClient
 {
-    public function analyze(string $text, string $mode, array $ctx = []): array
+    public function analyze(string $text, AiMode $mode, array $ctx = []): array
     {
+        $isScam = ($mode === AiMode::Scamcheck);
         $isPaid = (bool)($ctx['is_paid'] ?? false);
 
         // Very small, deterministic dummy behaviour.
