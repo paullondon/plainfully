@@ -10,7 +10,7 @@ use Throwable;
  *
  * - Calls AiClient
  * - Ensures a matching `users` row exists (by users.email) and gets user_id
- * - Inserts into `checks` using the ACTUAL live schema:
+ * - Inserts into `checks` using the live schema:
  *     ai_result_json, channel, content_type, created_at, id, is_paid, is_scam,
  *     short_summary, source_identifier, updated_at, user_id
  * - Returns CheckResult (matches CheckResult v1 signature in your repo)
@@ -33,23 +33,27 @@ final class CheckEngine
 
     public function run(CheckInput $input, bool $isPaid): CheckResult
     {
-        // Determine analysis mode by channel
-        $mode = AiMode::Generic;
+        // Determine analysis mode by channel (AiClient expects STRING mode)
+        $mode = 'generic';
         if ($input->channel === 'email-scamcheck') {
-            $mode = AiMode::Scamcheck;
+            $mode = 'scamcheck';
         } elseif ($input->channel === 'email-clarify') {
-            $mode = AiMode::Clarify;
-        }
-
-        $modeEnum = AiMode::Generic;
-        if ($input->channel === 'email-scamcheck') {
-            $modeEnum = AiMode::Scamcheck;
-        } elseif ($input->channel === 'email-clarify') {
-            $modeEnum = AiMode::Clarify;
+            $mode = 'clarify';
         }
 
         // AiClient returns an array (DummyAiClient should too)
-        $$analysis = $this->ai->analyze($input->content, $mode, ['is_paid' => $isPaid, 'channel' => $input->channel]);
+        $analysis = [];
+        try {
+            $analysis = $this->ai->analyze(
+                $input->content,
+                $mode,
+                ['is_paid' => $isPaid, 'channel' => $input->channel]
+            );
+        } catch (Throwable $e) {
+            // Fail-open: continue with defaults (still writes a DB row if possible)
+            error_log('AiClient analyze failed (fail-open): ' . $e->getMessage());
+            $analysis = [];
+        }
 
         if (!is_array($analysis)) { $analysis = []; }
 
@@ -74,7 +78,7 @@ final class CheckEngine
         // Boolean is_scam stored in DB (conservative: only "high" = scam)
         $isScam = ($scamRiskLevel === 'high');
 
-        // Build JSON for DB (must be valid JSON to satisfy your constraint)
+        // Build JSON for DB (must be valid JSON)
         $rawJson = $this->safeJsonEncode($analysis);
 
         // Store (best effort). If DB write fails, still return result so UX works.
