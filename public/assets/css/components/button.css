@@ -1,0 +1,19 @@
+.pf-btn {
+  display: inline-block;
+  padding: 0.625rem 1rem;
+  border-radius: 8px;
+  font-weight: 500;
+  text-decoration: none;
+  border: 1px solid transparent;
+}
+
+.pf-btn-primary {
+  background: var(--pf-accent);
+  color: #000;
+}
+
+.pf-btn-secondary {
+  background: var(--pf-surface);
+  color: var(--pf-text);
+  border-color: var(--pf-border);
+}

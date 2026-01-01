@@ -22,11 +22,6 @@
  *     - recipient_email_hash (HMAC-SHA256 of lower(trim(email)))
  *     - user_id, check_id, expires_at, validated_at
  *
- * Change history:
- *   - 2025-12-28 16:44:40Z  Initial MVP implementation
- *   - 2025-12-29 17:15:00Z  Remove validated_expires_at dependency; enforce 30m via validated_at
- *   - 2025-12-29           Use adaptive errors/404.php payload (single error view)
- *
  * Notes:
  *   - Stores NO plaintext email; hashes only.
  *   - RESULT_TOKEN_PEPPER env var is required.
@@ -53,22 +48,28 @@ if (!function_exists('result_access_controller')) {
         }
 
         $pdo = pf_db();
-        if (!($pdo instanceof PDO)) {
+        if (!($pdo instanceof \PDO)) {
             pf_result_link_error('server_error', 500);
             return;
         }
 
         $tokenHash = hash_hmac('sha256', $token, $pepper);
 
-        $stmt = $pdo->prepare("
-            SELECT id, user_id, check_id, recipient_email_hash, expires_at, validated_at
-            FROM result_access_tokens
-            WHERE token_hash = :th
-              AND expires_at > NOW()
-            LIMIT 1
-        ");
-        $stmt->execute([':th' => $tokenHash]);
-        $rec = $stmt->fetch(PDO::FETCH_ASSOC);
+        try {
+            $stmt = $pdo->prepare("
+                SELECT id, user_id, check_id, recipient_email_hash, expires_at, validated_at
+                FROM result_access_tokens
+                WHERE token_hash = :th
+                  AND expires_at > NOW()
+                LIMIT 1
+            ");
+            $stmt->execute([':th' => $tokenHash]);
+            $rec = $stmt->fetch(\PDO::FETCH_ASSOC);
+        } catch (\Throwable $e) {
+            error_log('result_access_controller: select failed: ' . $e->getMessage());
+            pf_result_link_error('server_error', 500);
+            return;
+        }
 
         if (!$rec) {
             pf_result_link_error('expired_or_invalid', 404);
@@ -88,7 +89,7 @@ if (!function_exists('result_access_controller')) {
 
         // If already validated, allow only for 30 minutes since validated_at.
         if ($validatedAt !== '') {
-            $validatedTs = strtotime($validatedAt . ' UTC');
+            $validatedTs = strtotime($validatedAt);
             if ($validatedTs === false) {
                 pf_result_link_error('expired_validated', 403);
                 return;
@@ -110,60 +111,58 @@ if (!function_exists('result_access_controller')) {
         }
 
         // Not validated yet -> ask to confirm email, then validate+login.
-        $errors   = [];
-        $oldEmail = '';
-
         if ($method === 'POST') {
-            $oldEmail = strtolower(trim((string)($_POST['email'] ?? '')));
+            $email = strtolower(trim((string)($_POST['email'] ?? '')));
 
-            if ($oldEmail === '' || !filter_var($oldEmail, FILTER_VALIDATE_EMAIL)) {
-                $errors[] = 'Please enter a valid email address.';
-            } else {
-                $enteredHash = hash_hmac('sha256', $oldEmail, $pepper);
-
-                if (hash_equals($recipientHash, $enteredHash)) {
-                    try {
-                        $upd = $pdo->prepare("
-                            UPDATE result_access_tokens
-                            SET validated_at = NOW()
-                            WHERE id = :id
-                              AND validated_at IS NULL
-                            LIMIT 1
-                        ");
-                        $upd->execute([':id' => $tokenRowId]);
-
-                        if (pf_result_access_login_user($pdo, $userId) === true) {
-                            pf_redirect('/clarifications/view?id=' . $checkId);
-                            return;
-                        }
-
-                        pf_result_link_error('server_error', 500);
-                        return;
-
-                    } catch (Throwable $e) {
-                        error_log('result_access_controller: validation update failed: ' . $e->getMessage());
-                        pf_result_link_error('server_error', 500);
-                        return;
-                    }
-                }
-
-                // Wrong email -> stop the loop and show a single friendly page.
+            if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
                 pf_result_link_error('wrong_email', 403);
                 return;
             }
+
+            $enteredHash = hash_hmac('sha256', $email, $pepper);
+
+            // Wrong email -> stop loop + show friendly page.
+            if (!hash_equals($recipientHash, $enteredHash)) {
+                pf_result_link_error('wrong_email', 403);
+                return;
+            }
+
+            // Correct email -> validate token (once) + login + redirect
+            try {
+                $upd = $pdo->prepare("
+                    UPDATE result_access_tokens
+                    SET validated_at = NOW()
+                    WHERE id = :id
+                      AND validated_at IS NULL
+                    LIMIT 1
+                ");
+                $upd->execute([':id' => $tokenRowId]);
+            } catch (\Throwable $e) {
+                error_log('result_access_controller: validation update failed: ' . $e->getMessage());
+                pf_result_link_error('server_error', 500);
+                return;
+            }
+
+            if (pf_result_access_login_user($pdo, $userId) === true) {
+                pf_redirect('/clarifications/view?id=' . $checkId);
+                return;
+            }
+
+            pf_result_link_error('server_error', 500);
+            return;
         }
 
-        // Render confirm form
+        // Render confirm form (GET)
         $viewData = [
             'token'    => $token,
-            'errors'   => $errors,
-            'oldEmail' => $oldEmail,
+            'errors'   => [],
+            'oldEmail' => '',
         ];
 
         ob_start();
         $vm = $viewData;
         require dirname(__DIR__) . '/views/results/confirm_email.php';
-        $inner = ob_get_clean();
+        $inner = (string)ob_get_clean();
 
         pf_render_shell('Confirm email address', $inner);
     }
@@ -178,6 +177,10 @@ if (!function_exists('pf_result_link_error')) {
      */
     function pf_result_link_error(string $codeKey, int $httpCode = 400): void
     {
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            @session_start();
+        }
+
         http_response_code($httpCode);
 
         $isLoggedIn = isset($_SESSION['user_id']) && (int)$_SESSION['user_id'] > 0;
@@ -196,7 +199,6 @@ if (!function_exists('pf_result_link_error')) {
             ],
         ];
 
-        // Logged-in users: dashboard is useful
         if ($isLoggedIn) {
             $payload['actions'][] = ['href' => '/dashboard', 'label' => 'Go to dashboard', 'class' => 'pf-btn pf-btn-secondary'];
         }
@@ -250,26 +252,25 @@ if (!function_exists('pf_result_link_error')) {
 
             case 'server_error':
             default:
-                // Keep defaults
                 break;
         }
 
         ob_start();
         $vm = $payload;
         require dirname(__DIR__) . '/views/errors/404.php';
-        $inner = ob_get_clean();
+        $inner = (string)ob_get_clean();
 
         pf_render_shell('Oops', $inner);
     }
 }
 
 if (!function_exists('pf_result_access_login_user')) {
-    function pf_result_access_login_user(PDO $pdo, int $userId): bool
+    function pf_result_access_login_user(\PDO $pdo, int $userId): bool
     {
         try {
             $stmt = $pdo->prepare("SELECT id, email FROM users WHERE id = :id LIMIT 1");
             $stmt->execute([':id' => $userId]);
-            $u = $stmt->fetch(PDO::FETCH_ASSOC);
+            $u = $stmt->fetch(\PDO::FETCH_ASSOC);
 
             if (!$u) { return false; }
 
@@ -291,7 +292,7 @@ if (!function_exists('pf_result_access_login_user')) {
 
             return true;
 
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             error_log('pf_result_access_login_user failed: ' . $e->getMessage());
             return false;
         }
