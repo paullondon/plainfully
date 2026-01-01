@@ -36,17 +36,26 @@ final class CheckEngine
     public function run(CheckInput $input, bool $isPaid): CheckResult
     {
         // Determine analysis mode by channel (AiClient expects STRING mode)
-        $mode = 'generic';
-        if ($input->channel === 'email-scamcheck') {
-            $mode = 'scamcheck';
-        } elseif ($input->channel === 'email-clarify') {
-            $mode = 'clarify';
-        }
+        use App\Features\Checks\AiMode;
+
+        $mode = match ($input->channel) {
+            'email-clarify'   => AiMode::Clarify,
+            'email-scamcheck' => AiMode::Scamcheck,
+            default           => AiMode::Generic,
+        };
+
 
         // AiClient returns an array (DummyAiClient should too)
         $analysis = [];
         try {
-            $analysis = $this->ai->analyze($input->content, $mode, ['is_paid' => $isPaid, 'channel' => $input->channel]);
+            $analysis = $this->ai->analyze(
+                $input->content,
+                $mode,
+                [
+                    'is_paid' => $isPaid,
+                    'channel' => $input->channel,
+                ]
+            );
         } catch (Throwable $e) {
             // Fail-open: continue with defaults (still writes a DB row if possible)
             error_log('AiClient analyze failed (fail-open): ' . $e->getMessage());
