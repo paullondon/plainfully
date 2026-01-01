@@ -2,91 +2,83 @@
 
 namespace App\Features\Checks;
 
+use Throwable;
+
 /**
  * DummyAiClient
  *
- * MVP placeholder that returns a v1-compatible structured result.
- * This lets you wire end-to-end storage + rendering before the real API is in.
+ * Dev stub that returns a predictable v1-shaped payload.
+ * MUST match AiClient interface:
+ *   analyze(string $text, string $mode, array $ctx = []): array
  */
 final class DummyAiClient implements AiClient
 {
-    public function analyze(string $text, AiMode $mode, array $ctx = []): array
+    /**
+     * @param string $text  Cleaned + capped message text
+     * @param string $mode  'clarify'|'scamcheck'|'generic'
+     * @param array<string,mixed> $ctx
+     *
+     * @return array<string,mixed>
+     */
+    public function analyze(string $text, string $mode, array $ctx = []): array
     {
-        $isScam = ($mode === AiMode::Scamcheck);
-        $isPaid = (bool)($ctx['is_paid'] ?? false);
+        try {
+            $mode = strtolower(trim($mode));
+            if (!in_array($mode, ['clarify', 'scamcheck', 'generic'], true)) {
+                $mode = 'generic';
+            }
 
-        // Very small, deterministic dummy behaviour.
-        $risk = 'low';
-        $headline = 'Here’s a clear breakdown of this message';
+            // Super simple stub behaviour
+            $isScam = ($mode === 'scamcheck') ? false : false;
 
-        // Simple heuristic to make testing easier (NOT real detection).
-        $t = mb_strtolower($text, 'UTF-8');
-        if (str_contains($t, 'password') || str_contains($t, 'verify') || str_contains($t, 'urgent') || str_contains($t, 'bank')) {
-            $risk = 'medium';
-            $headline = 'This message may carry some risk';
+            $headline = ($mode === 'clarify')
+                ? 'Clarified'
+                : (($mode === 'scamcheck') ? 'Checked' : 'Processed');
+
+            // Keep the capsule short and user-friendly
+            $capsule = $this->makeCapsule($text);
+
+            return [
+                'status' => 'ok',
+                'headline' => $headline,
+                'external_risk_line' => $isScam ? 'Scam risk level: high' : 'Scam risk level: low',
+                'external_topic_line' => $capsule,
+                'scam_risk_level' => $isScam ? 'high' : 'low',
+                'is_scam' => $isScam,
+
+                // Website fields (optional, but present)
+                'web_what_the_message_says' => $capsule,
+                'web_what_its_asking_for' => '',
+                'web_scam_level_line' => $isScam ? 'High scam risk' : 'Low scam risk',
+                'web_low_risk_note' => $isScam ? '' : 'No major red flags detected in this stub response.',
+                'web_scam_explanation' => $isScam ? 'This is a dummy stub; no real scam analysis performed.' : '',
+            ];
+        } catch (Throwable $e) {
+            // Fail-open: return minimum safe shape
+            error_log('DummyAiClient failed: ' . $e->getMessage());
+            return [
+                'status' => 'ok',
+                'headline' => 'Your result is ready',
+                'external_risk_line' => 'Scam risk level: unknown',
+                'external_topic_line' => 'This message appears to be about: unknown',
+                'scam_risk_level' => 'low',
+                'is_scam' => false,
+            ];
         }
-        if (str_contains($t, 'gift card') || str_contains($t, 'crypto') || str_contains($t, 'wallet') || str_contains($t, 'action required immediately')) {
-            $risk = 'high';
-            $headline = 'This message is very likely not genuine';
+    }
+
+    private function makeCapsule(string $text): string
+    {
+        $t = trim(preg_replace("/\s+/", ' ', $text) ?? '');
+        if ($t === '') {
+            return 'This message appears to be about: unknown';
         }
 
-        $topicLine = 'This looks like a general message that is asking for your attention.';
-        if ($mode === 'scamcheck') {
-            $topicLine = 'This message is being checked mainly for scam risk.';
-        } elseif ($mode === 'clarify') {
-            $topicLine = 'This message is being clarified in plain English.';
+        // Take first ~120 chars as a simple “topic line”
+        if (mb_strlen($t, 'UTF-8') > 120) {
+            $t = rtrim(mb_substr($t, 0, 120, 'UTF-8')) . '…';
         }
 
-        $riskLineExternal = 'Scam risk level: ' . ucfirst($risk) . ' (checked)';
-        $riskLineWeb      = 'Scam risk level: ' . ucfirst($risk === 'unable' ? 'Unable to assess' : $risk);
-
-        $lowNote = ($risk === 'low')
-            ? 'We always scan for potential risks. In this case, we have deemed it low risk.'
-            : 'We always scan for potential risks. The details below explain why this risk level was given.';
-
-        $explain = match ($risk) {
-            'high'   => 'Some parts of the message match common scam patterns.',
-            'medium' => 'Some parts of the message look unusual or time-pressured.',
-            default  => 'No strong risk signals were detected in the available text.',
-        };
-
-        // Treat very short content as unreadable for realism.
-        $trimmed = trim($text);
-        $status = (mb_strlen($trimmed, 'UTF-8') < 20) ? 'unreadable' : 'ok';
-        if ($status === 'unreadable') {
-            $risk = 'unable';
-            $headline = 'We couldn’t clearly read this message';
-            $riskLineExternal = 'Scam risk level: Unable to assess (checked)';
-            $riskLineWeb      = 'Scam risk level: Unable to assess';
-            $topicLine = 'There isn’t enough clear text to explain what this message means.';
-            $lowNote   = 'We always scan for potential risks. The details below explain why this risk level was given.';
-            $explain   = 'We always check for potential risks, but there wasn’t enough readable content to assess this one.';
-        }
-
-        $result = [
-            'status' => $status,
-            'headline' => $headline,
-            'scam_risk_level' => $risk,
-            'external_summary' => [
-                'risk_line' => $riskLineExternal,
-                'topic_line' => $topicLine,
-            ],
-            'web' => [
-                'what_the_message_says' => ($status === 'unreadable')
-                    ? 'The message doesn’t contain enough clear text for us to explain what it means. This can happen if the content is very short, heavily formatted, or cut off.'
-                    : ($isPaid ? 'This is a placeholder clarification until the real AI is connected.' : 'This is a short placeholder clarification.'),
-                'what_its_asking_for' => ($status === 'unreadable')
-                    ? 'It’s not clear what is being asked for.'
-                    : 'It is not clear what is being asked for.',
-                'scam_risk' => [
-                    'level_line' => $riskLineWeb,
-                    'low_level_note' => $lowNote,
-                    'explanation' => $explain,
-                ],
-            ],
-        ];
-
-        // Return decoded (CheckEngine will wrap into v1 and store rawJson)
-        return ['result' => $result];
+        return 'This message appears to be about: ' . $t;
     }
 }
