@@ -428,12 +428,13 @@ while (true) {
 
             $bodyText = pf_clean_email_body_to_text($rawBody, (bool)$rawIsHtml);
 
-            $ing = \App\Support\Ingestion\pf_imap_extract_attachments($inbox, $msgno, [
-                'max_files' => $maxFiles,
+            $ing = pf_imap_extract_attachments($inbox, (int)$msgno, [
+                'max_files'       => $maxFiles,
                 'max_total_bytes' => $maxTotalBytes,
-                'max_file_bytes' => $maxFileBytes,
-                'allow_ext' => ['pdf','docx','txt','png','jpg','jpeg','webp'],
+                'max_file_bytes'  => $maxFileBytes,
+                'allow_ext'       => ['pdf','docx','txt','png','jpg','jpeg','webp'],
             ]);
+
 
             if (($ing['ok'] ?? false) !== true) {
                 pf_send_ingest_failed_email($fromEmail, $mode, (string)($ing['reason'] ?? 'generic'));
