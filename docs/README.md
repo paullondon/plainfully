@@ -1,4 +1,11 @@
-# Plainfully
+# Plainfully — Internal Documentation
+
+This folder contains internal documentation for Plainfully.
+
+These documents are **not user-facing**. They exist to:
+- Explain how the system works
+- Capture architectural decisions
+- Support maintenance, audits, and future development
 
 **Plainfully** is a calm, reliable clarification service designed to reduce confusion and anxiety by providing clear explanations of messages, letters, and emails.
 
