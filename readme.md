@@ -1,84 +1,177 @@
-# 🐐 Plainfully  
-### Clear answers, anywhere — delivered safely, simply, and fast.
+# Plainfully
 
-Plainfully is a clarity platform built to help people understand scam messages, confusing emails, suspicious texts, and difficult documents using a clean, safe, and privacy-first AI engine.  
-The system unifies **multiple input channels** (Web, Email, SMS, Messenger, WhatsApp) into **one structured Check Engine** that returns clear, plain-English guidance.
+**Plainfully** is a calm, reliable clarification service designed to reduce confusion and anxiety by providing clear explanations of messages, letters, and emails.
 
-This README describes the purpose, architecture, data flow, and key features of the Plainfully system.
+This document reflects the **current locked MVP state**. Anything not listed as supported is intentionally out of scope for now.
 
 ---
 
-# 🌟 What Plainfully Does
+## MVP STATUS (LOCKED)
 
-Plainfully allows users to send in:
-- Scam text messages  
-- Suspicious emails  
-- Letters or documents (via image upload + OCR)  
-- Screenshots  
-- General clarification queries  
-- Messenger / WhatsApp forwarded messages  
-- Premium SMS scam-check requests
+**Internal version:** `text-core-v1`  
+**Stage:** End-to-end functional (email → queue → AI → email + web result)
 
-Every input type is **normalised**, fed into the **Check Engine**, processed through the Plainfully AI prompt chain, then returned to the user with a clear, trustworthy explanation.
-
-The user can access full results through their dashboard and upgrade to unlimited usage for £4.99/month.
+This MVP focuses on *clarity-first text analysis* with strong safety, privacy, and predictable behaviour.
 
 ---
 
-# 🎯 Core Principles
+## What Works (End-to-End)
 
-### ✔ One engine, many entry points  
-No matter where the user sends content from, everything is processed by the same Check Engine.
+### Input Channels
+- ✅ Email ingestion (e.g. `hello@plainfully.com`)
+- ✅ Website text submission
 
-### ✔ Safety and privacy first  
-- No sensitive data stored longer than 28 days  
-- Minimal PII stored  
-- AI receives only cleaned, screened content  
-- All temporary data auto-purges
+### Processing
+- ✅ Text normalization and safety checks
+- ✅ Single queue, single worker model
+- ✅ AI analysis via `CheckEngine`
+- ✅ Automatic user creation by email (free plan)
 
-### ✔ Simplicity for users  
-- No app to install  
-- Magic-link login  
-- SMS service requires **no login**  
-- Email forwarding works instantly  
-- Messenger/WhatsApp replies are frictionless
+### Output
+- ✅ Immediate acknowledgement email (receipt confirmation)
+- ✅ Result email with secure “View full details” link
+- ✅ Web-based result page (requires token + email verification)
+- ✅ Dashboard view for logged-in users
 
-### ✔ Controlled, stable releases  
-Plainfully is built in structured “Release Packages” to maintain stability and predictable delivery.
+### Security & Access
+- ✅ Result-scoped tokens (HMAC hashed, no plaintext)
+- ✅ Token rules:
+  - 24 hours to validate (email confirmation)
+  - Once validated, valid for 30 minutes
+- ✅ Adaptive error handling using a single error view
+- ✅ Works whether user is logged in or not
+
+### UX & Accessibility
+- ✅ Calm, neutral language
+- ✅ WCAG-aware colour system
+- ✅ Scales correctly up to 400% zoom
+- ✅ Dark / light mode via CSS tokens
+- ✅ Reduced-motion respected
 
 ---
 
-# 🔧 Architecture Overview
+## Explicitly NOT Supported (By Design)
 
-## 1. Ingestion Channels (Front Door)
-Plainfully accepts content through:
+These are intentionally excluded from MVP:
 
-### **Web**
-OCR uploads, text submissions, screenshots  
+- ❌ File attachments (PDF, images, HEIC, DOCX, etc)
+- ❌ OCR (image or scanned documents)
+- ❌ ScamCheck as a separate mode
+- ❌ Multiple input items per request
+- ❌ Real-time queue positions or ETAs
+- ❌ File storage or long-term raw input retention
 
-### **Email**
-- `scamcheck@plainfully.com` → scam detection  
-- `clarify@plainfully.com` → general clarifications  
+If an unsupported feature is detected:
+- The request **fails fast**
+- The user is **not charged**
+- A clear, calm explanation is sent
 
-### **Messenger**
-Forwarded scam messages and suspicious DMs  
+---
 
-### **WhatsApp**
-Direct forwarding of scam content  
+## Email Attachments (Current Behaviour)
 
-### **SMS (TextCheck)**
-- Trial long-code (cheap) for development  
-- Premium rate shortcode (£1 per check) for production  
-  - No login required  
-  - Instant reply  
-  - Bypasses quotas
+- Any inbound email **with attachments** is rejected
+- The email is acknowledged with:
+  - Explanation that attachments are not yet supported
+  - Assurance nothing was processed
+- The message is **not queued**
+- No analysis or billing occurs
 
-All channels convert inbound messages into a shared internal format:
+This prevents:
+- Malware risk
+- Unexpected OCR costs
+- Ambiguous parsing
+- Privacy leakage
 
-```php
-{
-  channel: "email" | "web" | "messenger" | "whatsapp" | "sms_premium" | ...,
-  source_identifier: email/phone/platform ID,
-  raw_content: "text to analyse",
-  metadata: {...}
-}
+---
+
+## Architecture (MVP)
+
+### High-level flow
+
+```
+Input (Email / Web)
+        ↓
+   Inbound Queue
+        ↓
+   Single Worker
+        ↓
+  CheckEngine
+        ↓
+ Email Result + Web View
+```
+
+### Design Principles
+- Many inputs → one queue → one engine → many outputs
+- Fail-closed on security
+- Fail-open on AI (graceful degradation)
+- Deterministic behaviour over cleverness
+
+---
+
+## Privacy & Data Handling
+
+- No plaintext email addresses stored in tokens
+- Tokens and emails are hashed (HMAC + pepper)
+- Raw input is minimized
+- Attachments are not stored
+- Results are scoped per user
+- No third-party sharing
+
+---
+
+## Known Limitations
+
+- Text-only analysis
+- English-first
+- No OCR
+- No attachment handling
+- No prioritization or batching
+- Basic subscription logic only
+
+These are **acceptable limitations** for MVP.
+
+---
+
+## Next Milestones
+
+### N3 — Attachment Ingestion (Planned)
+- PDF text extraction
+- Image OCR (cost-aware)
+- Size limits (e.g. 10MB)
+- Malware scanning
+- Clear failure reasons
+
+### N4 — Confidence & Source Signals
+- Confidence indicators
+- Clearer “what this means / what to do next”
+- Improved explanations
+
+### N5 — Performance & Scaling
+- Multiple workers
+- Back-pressure handling
+- Cost controls
+
+---
+
+## Development Notes
+
+- PHP 8.x
+- No framework dependency
+- Token-based auth flows
+- CSS token system:
+  - `base.css` (accessibility + scaling)
+  - `theme.css` (single source of truth)
+  - `components/*.css`
+
+---
+
+## Guiding Principle
+
+> **Calm. Clear. Contained.**  
+> Confusion stays inside the boundary.  
+> Clarity comes out.
+
+---
+
+© Plainfully / Hissing Goat Studios
