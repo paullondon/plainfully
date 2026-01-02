@@ -44,6 +44,7 @@ date_default_timezone_set('UTC');
 $ROOT = realpath(__DIR__ . '/..') ?: (__DIR__ . '/..');
 
 require_once $ROOT . '/app/support/email_templates.php';
+require_once $ROOT . '/app/support/imap_attachments.php';
 
 if (!function_exists('pf_load_env_file')) {
     function pf_load_env_file(string $path): void
