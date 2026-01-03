@@ -7,48 +7,27 @@
  * Purpose:
  *   Queue worker (process queued inbound emails + send the THIN result email).
  *
- * Key behaviours:
- *   - Aggressive trim + hard caps (Free 1500 / Unlimited 4000)
- *   - Runs CheckEngine
- *   - Sends a short email with:
- *       * headline
- *       * scam risk line
- *       * topic line
- *       * "View your full result" link
- *
- * Flow B (result link confirmation):
- *   - Generates a result-scoped token stored hashed in result_access_tokens
- *   - Email link points to: /r/{token}
- *   - User confirms the email address the link was sent to
- *   - System logs them in and redirects to /clarifications/view?id=...
- *
- * ENV:
- *   - RESULT_TOKEN_PEPPER (required)
- *   - RESULT_LINK_TTL_DAYS (optional; default 28)
- *
- * Change history:
- *   - 2025-12-28 17:28:14Z  Add Flow B result-link tokens in outbound email
+ * Trace timeline:
+ *   Uses inbound_queue.trace_id to log every step (if enabled).
  * ============================================================
  */
-if (PHP_SAPI !== 'cli') {
-    http_response_code(403);
-    echo "CLI only.\n";
-    exit(1);
-}
+
+if (PHP_SAPI !== 'cli') { http_response_code(403); echo "CLI only.\n"; exit(1); }
 
 date_default_timezone_set('UTC');
 
-
 $ROOT = realpath(__DIR__ . '/..') ?: (__DIR__ . '/..');
+
+require_once $ROOT . '/app/support/trace.php';
 require_once $ROOT . '/app/features/checks/ai_mode.php';
 require_once $ROOT . '/app/support/email_templates.php';
+require_once $ROOT . '/app/support/db.php';
 
 /** Minimal .env loader (fail-open) */
 if (!function_exists('pf_load_env_file')) {
     function pf_load_env_file(string $path): void
     {
         if (!is_readable($path)) { return; }
-
         $lines = file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
         if (!is_array($lines)) { return; }
 
@@ -64,9 +43,7 @@ if (!function_exists('pf_load_env_file')) {
             if (
                 (str_starts_with($v, '"') && str_ends_with($v, '"')) ||
                 (str_starts_with($v, "'") && str_ends_with($v, "'"))
-            ) {
-                $v = substr($v, 1, -1);
-            }
+            ) { $v = substr($v, 1, -1); }
 
             if ($k !== '' && getenv($k) === false) {
                 putenv($k . '=' . $v);
@@ -81,25 +58,17 @@ pf_load_env_file($ROOT . '/.env');
 $config = $GLOBALS['config'] ?? null;
 $appConfigPath = $ROOT . '/config/app.php';
 if ($config === null && is_readable($appConfigPath)) {
-    /** @noinspection PhpIncludeInspection */
     $config = require $appConfigPath;
     $GLOBALS['config'] = $config;
 }
 
-/** DB helper */
-require_once __DIR__ . '/../app/support/db.php';
+/** DB */
 $pdo = pf_db();
-if (!($pdo instanceof PDO)) {
-    fwrite(STDERR, "ERROR: unable to get DB connection.\n");
-    exit(1);
-}
+if (!($pdo instanceof PDO)) { fwrite(STDERR, "ERROR: unable to get DB connection.\n"); exit(1); }
 
 /** Mailer */
 $mailerPath = $ROOT . '/app/support/mailer.php';
-if (!is_readable($mailerPath)) {
-    fwrite(STDERR, "ERROR: mailer.php not found at {$mailerPath}\n");
-    exit(1);
-}
+if (!is_readable($mailerPath)) { fwrite(STDERR, "ERROR: mailer.php not found at {$mailerPath}\n"); exit(1); }
 require_once $mailerPath;
 
 /** Feature classes (no composer) */
@@ -111,18 +80,13 @@ $files = [
     $ROOT . '/app/features/checks/dummy_ai_client.php',
 ];
 foreach ($files as $p) {
-    if (!is_readable($p)) {
-        fwrite(STDERR, "ERROR: missing required file: {$p}\n");
-        exit(2);
-    }
+    if (!is_readable($p)) { fwrite(STDERR, "ERROR: missing required file: {$p}\n"); exit(2); }
     require_once $p;
 }
 
 /** Reuse normaliser helper if present */
 $hooksControllerPath = $ROOT . '/app/controllers/email_hooks_controller.php';
-if (is_readable($hooksControllerPath)) {
-    require_once $hooksControllerPath;
-}
+if (is_readable($hooksControllerPath)) { require_once $hooksControllerPath; }
 
 use App\Features\Checks\CheckInput;
 use App\Features\Checks\CheckEngine;
@@ -157,7 +121,6 @@ if (!function_exists('pf_worker_id')) {
 
 /**
  * Aggressive trimming + hard caps.
- *
  * Returns: [string $cleaned, int $used, int $cap, bool $truncated]
  */
 if (!function_exists('pf_aggressive_trim_and_cap')) {
@@ -166,23 +129,13 @@ if (!function_exists('pf_aggressive_trim_and_cap')) {
         $cap = $isPaid ? 4000 : 1500;
 
         $t = str_replace(["\r\n", "\r"], "\n", $text);
-
         $t = strip_tags($t);
         $t = html_entity_decode($t, ENT_QUOTES | ENT_HTML5, 'UTF-8');
 
-        $markers = [
-            "\nOn ",
-            "\nFrom: ",
-            "\nSent: ",
-            "\n-----Original Message-----",
-            "\n> ",
-        ];
+        $markers = ["\nOn ", "\nFrom: ", "\nSent: ", "\n-----Original Message-----", "\n> "];
         foreach ($markers as $m) {
             $pos = stripos($t, $m);
-            if ($pos !== false && $pos > 0) {
-                $t = substr($t, 0, $pos);
-                break;
-            }
+            if ($pos !== false && $pos > 0) { $t = substr($t, 0, $pos); break; }
         }
 
         $t = preg_replace("/\n{3,}/", "\n\n", (string)$t);
@@ -203,51 +156,27 @@ if (!function_exists('pf_aggressive_trim_and_cap')) {
     }
 }
 
-$batch       = max(1, pf_env_int('EMAIL_QUEUE_BATCH', 200));
-$maxAttempts = max(1, pf_env_int('EMAIL_QUEUE_MAX_ATTEMPTS', 3));
-$lockTtl     = max(30, pf_env_int('EMAIL_QUEUE_LOCK_TTL_SECONDS', 300));
-$workerId    = pf_worker_id();
-
-
 /**
  * Create a result-access token for Flow B and store ONLY hashed values.
- *
- * Returns the raw token for embedding in the email link, or null on failure.
- *
- * Security:
- * - Token is random_bytes-based
- * - token_hash = HMAC-SHA256(token, RESULT_TOKEN_PEPPER)
- * - recipient_email_hash = HMAC-SHA256(lower(trim(email)), RESULT_TOKEN_PEPPER)
- * - No plaintext email stored in result_access_tokens
  */
 if (!function_exists('pf_create_result_access_token')) {
     function pf_create_result_access_token(PDO $pdo, int $checkId, string $recipientEmail): ?string
     {
         $pepper = (string)(getenv('RESULT_TOKEN_PEPPER') ?: '');
-        if ($pepper === '') {
-            error_log('RESULT_TOKEN_PEPPER missing; cannot create result token');
-            return null;
-        }
+        if ($pepper === '') { error_log('RESULT_TOKEN_PEPPER missing; cannot create result token'); return null; }
 
         $ttlDays = (int)(getenv('RESULT_LINK_TTL_DAYS') ?: 28);
         if ($ttlDays < 1) { $ttlDays = 1; }
-        if ($ttlDays > 90) { $ttlDays = 90; } // fair-use cap
+        if ($ttlDays > 90) { $ttlDays = 90; }
 
         $emailNorm = strtolower(trim($recipientEmail));
-        if ($emailNorm === '' || !filter_var($emailNorm, FILTER_VALIDATE_EMAIL)) {
-            return null;
-        }
+        if ($emailNorm === '' || !filter_var($emailNorm, FILTER_VALIDATE_EMAIL)) { return null; }
 
-        // Lookup user_id from users.email (required by FK)
         $uStmt = $pdo->prepare('SELECT id FROM users WHERE email = :e LIMIT 1');
         $uStmt->execute([':e' => $emailNorm]);
         $userId = (int)($uStmt->fetchColumn() ?: 0);
-        if ($userId <= 0) {
-            // Fail-closed: without a user we cannot satisfy FK, so no token
-            return null;
-        }
+        if ($userId <= 0) { return null; }
 
-        // Raw token used only in the link (never stored)
         $raw = random_bytes(32);
         $token = rtrim(strtr(base64_encode($raw), '+/', '-_'), '=');
 
@@ -278,24 +207,12 @@ if (!function_exists('pf_create_result_access_token')) {
     }
 }
 
-/**
- * Self-heal orphaned "sending" rows (sending + no lock).
- */
-try {
-    $heal = $pdo->prepare('
-        UPDATE inbound_queue
-        SET status = "queued"
-        WHERE status = "sending"
-          AND locked_at IS NULL
-    ');
-    $heal->execute();
-} catch (Throwable $e) {
-    // fail-open
-}
+$batch       = max(1, pf_env_int('EMAIL_QUEUE_BATCH', 200));
+$maxAttempts = max(1, pf_env_int('EMAIL_QUEUE_MAX_ATTEMPTS', 3));
+$lockTtl     = max(30, pf_env_int('EMAIL_QUEUE_LOCK_TTL_SECONDS', 300));
+$workerId    = pf_worker_id();
 
-/**
- * Release stale locks (TTL) and re-queue stale sending rows.
- */
+/** Release stale locks (TTL). */
 try {
     $unlock = $pdo->prepare('
         UPDATE inbound_queue
@@ -307,13 +224,11 @@ try {
     ');
     $unlock->bindValue(':ttl', $lockTtl, PDO::PARAM_INT);
     $unlock->execute();
-} catch (Throwable $e) {
-    // fail-open
-}
+} catch (Throwable $e) {}
 
 /** Fetch candidates (FIFO) */
 $stmt = $pdo->prepare('
-    SELECT id, mode, from_email, to_email, subject, raw_body, raw_is_html, normalised_text
+    SELECT id, trace_id, mode, from_email, to_email, subject, raw_body, raw_is_html, normalised_text
     FROM inbound_queue
     WHERE status IN ("queued","prepped")
       AND locked_at IS NULL
@@ -325,29 +240,21 @@ $stmt->bindValue(':max_attempts', $maxAttempts, PDO::PARAM_INT);
 $stmt->bindValue(':lim', $batch, PDO::PARAM_INT);
 $stmt->execute();
 
-$rows = $stmt->fetchAll();
+$rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+if (!is_array($rows) || count($rows) === 0) { echo "OK worker: nothing to do.\n"; exit(0); }
 
-if (!is_array($rows) || count($rows) === 0) {
-    echo "OK worker: nothing to do.\n";
-    exit(0);
-}
-
-// Dummy client for now. Swap to real OpenAI client when ready.
 $aiClient = new DummyAiClient();
 $engine   = new CheckEngine($pdo, $aiClient);
 
 $baseUrl = '';
-if (is_array($config) && isset($config['app']['base_url'])) {
-    $baseUrl = rtrim((string)$config['app']['base_url'], '/');
-}
-if ($baseUrl === '') {
-    $baseUrl = rtrim((string)(getenv('APP_BASE_URL') ?: 'https://plainfully.com'), '/');
-}
+if (is_array($config) && isset($config['app']['base_url'])) { $baseUrl = rtrim((string)$config['app']['base_url'], '/'); }
+if ($baseUrl === '') { $baseUrl = rtrim((string)(getenv('APP_BASE_URL') ?: 'https://plainfully.com'), '/'); }
 
 $processed = 0;
 
 foreach ($rows as $row) {
     $id        = (int)($row['id'] ?? 0);
+    $traceId   = (string)($row['trace_id'] ?? '');
     $mode      = (string)($row['mode'] ?? 'generic');
     $fromEmail = (string)($row['from_email'] ?? '');
     $toEmail   = (string)($row['to_email'] ?? '');
@@ -357,9 +264,15 @@ foreach ($rows as $row) {
     $normText  = (string)($row['normalised_text'] ?? '');
 
     if ($id <= 0 || $fromEmail === '') { continue; }
+    if ($traceId === '') { $traceId = pf_uuidv4(); } // safety
 
     try {
-        /** Claim row (lock + attempts) */
+        pf_trace($pdo, $traceId, 'prep', 'info', false, 'pick', 'Worker picked row', [
+            'queue_id' => $id,
+            'mode' => $mode,
+            'worker_id' => $workerId,
+        ]);
+
         $claim = $pdo->prepare('
             UPDATE inbound_queue
             SET status = "sending",
@@ -375,7 +288,8 @@ foreach ($rows as $row) {
         $claim->execute([':locked_by' => $workerId, ':id' => $id]);
         if ($claim->rowCount() !== 1) { continue; }
 
-        /** Normalise + persist */
+        pf_trace($pdo, $traceId, 'prep', 'info', false, 'claimed', 'Claimed row', ['queue_id'=>$id]);
+
         if ($normText === '') {
             if (function_exists('plainfully_normalise_email_text')) {
                 $normText = plainfully_normalise_email_text($subject, $rawBody, $fromEmail);
@@ -385,28 +299,29 @@ foreach ($rows as $row) {
                 $normText = html_entity_decode($normText, ENT_QUOTES | ENT_HTML5, 'UTF-8');
                 $normText = trim($normText);
             }
-
             try {
                 $updNorm = $pdo->prepare('UPDATE inbound_queue SET normalised_text = :t WHERE id = :id');
                 $updNorm->execute([':t' => $normText, ':id' => $id]);
-            } catch (Throwable $e) {
-                // ignore
-            }
+            } catch (Throwable $e) {}
         }
 
-        /** Plan tier (current stub) */
-        $isPaid = pf_is_unlimited_tier_for_email($fromEmail);
+        $isPaid = false;
+        if (function_exists('pf_is_unlimited_tier_for_email')) { $isPaid = (bool)pf_is_unlimited_tier_for_email($fromEmail); }
 
-        /** Aggressive trimming + caps (per plan) */
+        pf_trace($pdo, $traceId, 'prep', 'info', false, 'tier', 'Tier determined', ['is_paid'=>$isPaid?1:0]);
+
         [$cleanedText, $charsUsed, $charsCap, $wasTruncated] = pf_aggressive_trim_and_cap($normText, $isPaid);
 
-        // Best-effort: persist truncated_text if column exists
+        pf_trace($pdo, $traceId, 'prep', 'info', false, 'cap', 'Caps applied', [
+            'chars_used'=>$charsUsed,
+            'chars_cap'=>$charsCap,
+            'truncated'=>$wasTruncated?1:0,
+        ]);
+
         try {
             $updTrunc = $pdo->prepare('UPDATE inbound_queue SET truncated_text = :t WHERE id = :id');
             $updTrunc->execute([':t' => $cleanedText, ':id' => $id]);
-        } catch (Throwable $e) {
-            // ignore
-        }
+        } catch (Throwable $e) {}
 
         $channels = pf_mode_to_channels($mode);
 
@@ -419,6 +334,7 @@ foreach ($rows as $row) {
             null,
             [
                 'queue_id' => $id,
+                'trace_id' => $traceId,
                 'to' => $toEmail,
                 'input_chars_used' => $charsUsed,
                 'input_chars_cap' => $charsCap,
@@ -426,13 +342,24 @@ foreach ($rows as $row) {
             ]
         );
 
+        pf_trace($pdo, $traceId, 'ai', 'info', false, 'ai_call', 'Calling AI client', [
+            'client' => 'DummyAiClient',
+            'channel' => (string)$channels['check_channel'],
+            'is_paid' => $isPaid ? 1 : 0,
+            'cleaned_preview' => substr($cleanedText, 0, 350), // only stored if TRACE_DEEP=1
+        ]);
+
         $result  = $engine->run($input, $isPaid);
         $checkId = (int)($result->id ?? 0);
 
+        pf_trace($pdo, $traceId, 'ai', 'info', false, 'ai_done', 'AI returned', [
+            'check_id' => $checkId,
+            'scam_risk_level' => (string)$result->scamRiskLevel,
+            'headline_preview' => substr((string)$result->headline, 0, 200), // deep mode only
+        ]);
+
         $token = pf_create_result_access_token($pdo, $checkId, $fromEmail);
-        $viewUrl = ($token !== null)
-            ? ($baseUrl . '/r/' . rawurlencode($token))
-            : ($baseUrl . '/login');
+        $viewUrl = ($token !== null) ? ($baseUrl . '/r/' . rawurlencode($token)) : ($baseUrl . '/login');
 
         $outSubject = ($result->scamRiskLevel === 'high')
             ? 'Plainfully — Possible scam risk flagged'
@@ -471,6 +398,12 @@ foreach ($rows as $row) {
             $mailError = 'pf_send_email helper not defined.';
         }
 
+        pf_trace($pdo, $traceId, 'output', $emailSent ? 'info' : 'error', !$emailSent, 'send', $emailSent ? 'Result email sent' : 'Result email failed', [
+            'queue_id' => $id,
+            'email_channel' => (string)$channels['email_channel'],
+            'error' => $emailSent ? null : (string)$mailError,
+        ]);
+
         $finalStatus = $emailSent ? 'done' : 'error';
 
         $upd2 = $pdo->prepare('
@@ -499,6 +432,11 @@ foreach ($rows as $row) {
             ':id'          => $id,
         ]);
 
+        pf_trace($pdo, $traceId, 'cleanup', 'info', false, 'done', 'Finished row', [
+            'queue_id' => $id,
+            'status' => $finalStatus,
+        ]);
+
         $processed++;
 
     } catch (Throwable $e) {
@@ -513,9 +451,13 @@ foreach ($rows as $row) {
                 WHERE id = :id
             ');
             $updE->execute([':err' => substr($e->getMessage(), 0, 1000), ':id' => $id]);
-        } catch (Throwable $t) {
-            // ignore
-        }
+        } catch (Throwable $t) {}
+
+        pf_trace($pdo, $traceId, 'cleanup', 'error', true, 'exception', 'Worker exception', [
+            'queue_id' => $id,
+            'err' => substr($e->getMessage(), 0, 300),
+        ]);
+
         error_log("Worker failed for queue id {$id}: " . $e->getMessage());
     }
 }

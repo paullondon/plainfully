@@ -97,6 +97,11 @@ switch (true) {
 
         result_access_controller($token);
         break;
+    
+    case ($path === '/trace') && ($method === 'GET'):
+        require_once __DIR__ . '/../app/controllers/trace_controller.php';
+        trace_controller();
+        break;
 
     // -------------------------------------------------
     // Login (GET + POST) – unified handler
