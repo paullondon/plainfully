@@ -1,8 +1,5 @@
 <?php declare(strict_types=1);
 
-use PDO;
-use Throwable;
-
 require_once dirname(__DIR__) . '/support/db.php';
 require_once dirname(__DIR__) . '/support/trace.php';
 
@@ -12,7 +9,7 @@ if (!function_exists('trace_controller')) {
         if (!pf_trace_allowed()) { http_response_code(404); echo "Not found."; return; }
 
         $pdo = pf_db();
-        if (!($pdo instanceof PDO)) { http_response_code(500); echo "DB unavailable."; return; }
+        if (!($pdo instanceof \PDO)) { http_response_code(500); echo "DB unavailable."; return; }
 
         $traceId = trim((string)($_GET['trace_id'] ?? ''));
         $k = (string)($_GET['k'] ?? '');
@@ -27,7 +24,7 @@ if (!function_exists('trace_controller')) {
                     LIMIT 2000
                 ');
                 $stmt->execute([':t' => $traceId]);
-                $events = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                $events = $stmt->fetchAll(\PDO::FETCH_ASSOC);
 
                 $q = $pdo->prepare('
                     SELECT id, status, mode, from_email, subject, trace_id, created_at, last_error
@@ -37,7 +34,7 @@ if (!function_exists('trace_controller')) {
                     LIMIT 1
                 ');
                 $q->execute([':t' => $traceId]);
-                $queueRow = $q->fetch(PDO::FETCH_ASSOC) ?: null;
+                $queueRow = $q->fetch(\PDO::FETCH_ASSOC) ?: null;
 
                 $vm = [
                     'mode' => 'single',
@@ -54,7 +51,7 @@ if (!function_exists('trace_controller')) {
                     ORDER BY last_at DESC
                     LIMIT 100
                 ');
-                $rows = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
+                $rows = $stmt ? $stmt->fetchAll(\PDO::FETCH_ASSOC) : [];
 
                 $vm = ['mode' => 'list', 'k' => $k, 'rows' => is_array($rows) ? $rows : []];
             }
@@ -66,7 +63,7 @@ if (!function_exists('trace_controller')) {
             if (function_exists('pf_render_shell')) { pf_render_shell('Trace', $inner); }
             else { echo $inner; }
 
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             http_response_code(500);
             echo "Trace error.";
             error_log('trace_controller: ' . $e->getMessage());

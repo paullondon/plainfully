@@ -2,9 +2,6 @@
 
 namespace App\Features\Checks;
 
-use PDO;
-use Throwable;
-
 /**
  * ============================================================
  * Plainfully — CheckEngine
@@ -27,10 +24,10 @@ use Throwable;
  */
 final class CheckEngine
 {
-    private PDO $pdo;
+    private \PDO $pdo;
     private AiClient $ai;
 
-    public function __construct(PDO $pdo, AiClient $ai)
+    public function __construct(\PDO $pdo, AiClient $ai)
     {
         $this->pdo = $pdo;
         $this->ai  = $ai;
@@ -59,7 +56,7 @@ final class CheckEngine
                     'channel' => (string)$input->channel,
                 ]
             );
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             error_log('AiClient analyze failed (fail-open): ' . $e->getMessage());
             $analysis = [];
         }
@@ -75,13 +72,12 @@ final class CheckEngine
         $headline          = (string)($analysis['headline'] ?? 'Your result is ready');
 
         // We keep these fields because CheckResult expects them.
-        // Even if you later add scam detection again, this structure stays stable.
         $externalRiskLine  = (string)($analysis['external_risk_line'] ?? 'Safety check: completed');
         $externalTopicLine = (string)($analysis['external_topic_line'] ?? 'Summary: ready');
 
         // Risk level stays supported (defaults to low)
-        $riskRaw        = $analysis['scam_risk_level'] ?? ($analysis['scamRiskLevel'] ?? null);
-        $scamRiskLevel  = $this->normaliseRiskLevel($riskRaw, $analysis['is_scam'] ?? null);
+        $riskRaw       = $analysis['scam_risk_level'] ?? ($analysis['scamRiskLevel'] ?? null);
+        $scamRiskLevel = $this->normaliseRiskLevel($riskRaw, $analysis['is_scam'] ?? null);
 
         // Web fields (optional, shown on website page)
         $webWhatTheMessageSays = (string)($analysis['web_what_the_message_says'] ?? '');
@@ -91,7 +87,6 @@ final class CheckEngine
         $webScamExplanation    = (string)($analysis['web_scam_explanation'] ?? '');
 
         // Stored is_scam flag in DB:
-        // We keep the column populated for compatibility, but only treat "high" as scam.
         $isScam = ($scamRiskLevel === 'high');
 
         // Always store valid JSON
@@ -130,7 +125,7 @@ final class CheckEngine
             ]);
 
             $id = (int)$this->pdo->lastInsertId();
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             error_log('CheckEngine DB insert failed (fail-open): ' . $e->getMessage());
         }
 
@@ -200,7 +195,7 @@ final class CheckEngine
             if (is_string($json) && $json !== '' && json_last_error() === JSON_ERROR_NONE) {
                 return $json;
             }
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             // ignore
         }
         return '{}';
@@ -236,7 +231,7 @@ final class CheckEngine
                 ':plan'  => 'free',
             ]);
             return (int)$this->pdo->lastInsertId();
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             // Another process likely inserted; re-select
             $sel2 = $this->pdo->prepare('SELECT id FROM users WHERE email = :email LIMIT 1');
             $sel2->execute([':email' => $email]);
