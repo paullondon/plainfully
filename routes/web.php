@@ -89,7 +89,7 @@ switch (true) {
     // -------------------------------------------------
     case str_starts_with($path, '/r/') && ($method === 'GET' || $method === 'POST'):
         //require_guest(); // Removed temporarily to allow access to consultation results while logged in.
-
+        pf_require_admin();
         $token = substr($path, 3); // everything after "/r/"
         $token = trim($token);
 
@@ -99,6 +99,7 @@ switch (true) {
         break;
     
     case ($path === '/trace') && ($method === 'GET'):
+        pf_require_admin();
         require_once __DIR__ . '/../app/controllers/trace_controller.php';
         trace_controller();
         break;
