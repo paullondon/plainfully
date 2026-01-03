@@ -264,7 +264,7 @@ foreach ($rows as $row) {
     $normText  = (string)($row['normalised_text'] ?? '');
 
     if ($id <= 0 || $fromEmail === '') { continue; }
-    if ($traceId === '') { $traceId = pf_uuidv4(); } // safety
+    if ($traceId === '') { $traceId = pf_trace_new_id(); } // safety
 
     try {
         pf_trace($pdo, $traceId, 'prep', 'info', false, 'pick', 'Worker picked row', [

@@ -275,7 +275,7 @@ while (true) {
 
     foreach ($emails as $msgno) {
         $msgno = (int)$msgno;
-        $traceId = pf_uuidv4();
+        $traceId = pf_trace_new_id();
 
         try {
             pf_trace($pdo, $traceId, 'ingest', 'info', false, 'seen', 'Found unseen email', [
