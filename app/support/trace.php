@@ -59,7 +59,7 @@ if (!function_exists('pf_trace')) {
         string $traceId,
         string $level,
         string $stage,
-        string $event,
+        $event,                 // <-- allow anything (bool/int/etc)
         string $message,
         array $meta = [],
         ?int $queueId = null,
@@ -68,12 +68,11 @@ if (!function_exists('pf_trace')) {
         if (!pf_trace_enabled()) { return; }
         if ($traceId === '' || !($pdo instanceof \PDO)) { return; }
 
-        $level = in_array($level, ['debug','info','warn','error'], true) ? $level : 'info';
-        $stage = substr($stage, 0, 64);
-        $event = substr($event, 0, 64);
-        $message = substr($message, 0, 255);
+        $level   = in_array($level, ['debug','info','warn','error'], true) ? $level : 'info';
+        $stage   = substr((string)$stage, 0, 64);
+        $event   = substr((string)$event, 0, 64);   // <-- this is the key line
+        $message = substr((string)$message, 0, 255);
 
-        // Redact deep content unless explicitly enabled
         if (!pf_trace_deep()) {
             foreach (['raw_body','body','content','text','prompt','ai_result','extracted_text','normalized_text','truncated_text'] as $k) {
                 if (array_key_exists($k, $meta)) { unset($meta[$k]); }
@@ -89,11 +88,11 @@ if (!function_exists('pf_trace')) {
             ');
             $stmt->execute([
                 ':trace_id' => $traceId,
-                ':level' => $level,
-                ':stage' => $stage,
-                ':event' => $event,
-                ':message' => $message,
-                ':meta_json' => $metaJson,
+                ':level'    => $level,
+                ':stage'    => $stage,
+                ':event'    => $event,
+                ':message'  => $message,
+                ':meta_json'=> $metaJson,
                 ':queue_id' => $queueId,
                 ':check_id' => $checkId,
             ]);
@@ -102,6 +101,7 @@ if (!function_exists('pf_trace')) {
         }
     }
 }
+
 
 if (!function_exists('pf_trace_allowed')) {
     function pf_trace_allowed(): bool
