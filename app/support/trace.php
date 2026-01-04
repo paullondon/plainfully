@@ -132,7 +132,7 @@ if (!function_exists('pf_trace_allowed')) {
     {
         $key = (string)(getenv('TRACE_VIEW_KEY') ?: '');
         $provided = (string)($_GET['k'] ?? '');
-        if ($key !== '' && $provided !== '' && hash_equals($key, $provided)) { return true; }
+        if (($key !== '' && $provided !== '' && hash_equals($key, $provided)) || pf_require_admin()) { return true; }
 
         if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
         return isset($_SESSION['user_id']) && (int)$_SESSION['user_id'] > 0;
