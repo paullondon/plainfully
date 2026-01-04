@@ -265,21 +265,19 @@ if (!function_exists('pf_result_link_error')) {
 }
 
 if (!function_exists('pf_result_access_login_user')) {
-    function pf_result_access_login_user(\PDO $pdo, int $userId): bool
+    function pf_result_access_login_user(PDO $pdo, int $userId): bool
     {
         try {
-            $stmt = $pdo->prepare("SELECT id, email, is_admin FROM users WHERE id = :id LIMIT 1");
+            $stmt = $pdo->prepare('SELECT id, email FROM users WHERE id = :id LIMIT 1');
             $stmt->execute([':id' => $userId]);
             $u = $stmt->fetch(PDO::FETCH_ASSOC);
 
-            $isAdmin = (int)($u['is_admin'] ?? 0) === 1;
+            if (!is_array($u)) { return false; }
 
-            $_SESSION['user_id']    = $id;
-            $_SESSION['user_email'] = $email;
-            $_SESSION['is_admin']   = $isAdmin ? 1 : 0;
+            $dbUserId = (int)($u['id'] ?? 0);
+            $dbEmail  = (string)($u['email'] ?? '');
 
-
-            if ($id <= 0 || $email === '') { return false; }
+            if ($dbUserId <= 0 || $dbEmail === '') { return false; }
 
             if (session_status() !== PHP_SESSION_ACTIVE) {
                 @session_start();
@@ -289,8 +287,8 @@ if (!function_exists('pf_result_access_login_user')) {
                 @session_regenerate_id(true);
             }
 
-            $_SESSION['user_id']    = $id;
-            $_SESSION['user_email'] = $email;
+            $_SESSION['user_id']    = $dbUserId;
+            $_SESSION['user_email'] = $dbEmail;
 
             return true;
 
