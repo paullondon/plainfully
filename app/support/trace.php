@@ -41,11 +41,20 @@ if (!function_exists('pf_trace_new_id')) {
 }
 
 if (!function_exists('pf_trace_safe_json')) {
-    function pf_trace_safe_json(array $meta): string
+    function pf_trace_safe_json($meta): string
     {
+        // Normalise meta into an array
+        if (is_string($meta)) {
+            $meta = ['_meta' => $meta];
+        } elseif (!is_array($meta)) {
+            $meta = ['_meta' => (string)$meta];
+        }
+
         try {
             $json = json_encode($meta, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-            if (is_string($json) && $json !== '' && json_last_error() === JSON_ERROR_NONE) { return $json; }
+            if (is_string($json) && $json !== '' && json_last_error() === JSON_ERROR_NONE) {
+                return $json;
+            }
         } catch (\Throwable $e) {
             // ignore
         }
@@ -59,9 +68,9 @@ if (!function_exists('pf_trace')) {
         string $traceId,
         string $level,
         string $stage,
-        $event,                 // <-- allow anything (bool/int/etc)
+        $event,                 // allow bool/int/etc
         string $message,
-        array $meta = [],
+        $meta = [],             // allow string/etc
         ?int $queueId = null,
         ?int $checkId = null
     ): void {
@@ -70,8 +79,15 @@ if (!function_exists('pf_trace')) {
 
         $level   = in_array($level, ['debug','info','warn','error'], true) ? $level : 'info';
         $stage   = substr((string)$stage, 0, 64);
-        $event   = substr((string)$event, 0, 64);   // <-- this is the key line
+        $event   = substr((string)$event, 0, 64);
         $message = substr((string)$message, 0, 255);
+
+        // Normalise meta into an array early
+        if (is_string($meta)) {
+            $meta = ['_meta' => $meta];
+        } elseif (!is_array($meta)) {
+            $meta = ['_meta' => (string)$meta];
+        }
 
         if (!pf_trace_deep()) {
             foreach (['raw_body','body','content','text','prompt','ai_result','extracted_text','normalized_text','truncated_text'] as $k) {
@@ -101,7 +117,6 @@ if (!function_exists('pf_trace')) {
         }
     }
 }
-
 
 if (!function_exists('pf_trace_allowed')) {
     function pf_trace_allowed(): bool
