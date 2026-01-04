@@ -98,7 +98,7 @@ switch (true) {
         break;
     // -------------------------------------------------
     // Admin check (plain text output)
-    case $path === '/admin-check' && $method === 'GET':
+    case $path === '/admin-check':
         require_once __DIR__ . '/../app/auth/login.php'; // where pf_is_admin() lives
         if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
 
