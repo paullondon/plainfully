@@ -34,19 +34,26 @@ function handle_login_form(array $config): void
  *   with a "not authorised" message (instead of echo/exit).
  * ============================================================
  */
+function pf_is_admin(): bool
+{
+    if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
+
+    $email = strtolower(trim((string)($_SESSION['user_email'] ?? '')));
+    if ($email === '') { return false; }
+
+    // Comma-separated allowlist in env: ADMIN_EMAILS="paul@x.com,other@y.com"
+    $allow = strtolower(trim((string)(getenv('ADMIN_EMAILS') ?: '')));
+    if ($allow === '') { return false; }
+
+    $list = array_filter(array_map('trim', explode(',', $allow)));
+    return in_array($email, $list, true);
+}
+
 if (!function_exists('pf_require_admin')) {
     function pf_require_admin(): void
-    {
-        if (session_status() !== PHP_SESSION_ACTIVE) {
-            @session_start();
-        }
-
-        $isAdmin = isset($_SESSION['is_admin']) && (int)$_SESSION['is_admin'] === 1;
-        if ($isAdmin) {
-            return;
-        }
-
-        // ---- Render via your single adaptive error view ----
+{
+    if (!pf_is_admin()) {
+        // ---- Render via single adaptive error view ----
         http_response_code(403);
 
         $vm = [
@@ -78,7 +85,6 @@ if (!function_exists('pf_require_admin')) {
             error_log('pf_require_admin render failed: ' . $e->getMessage());
             echo 'You are not authorised to view this page.';
         }
-
         exit;
     }
 }
