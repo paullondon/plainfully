@@ -2,8 +2,15 @@
 
 require_once __DIR__ . '/magic_link.php';
 
+/**
+ * ============================================================
+ * Plainfully Auth - Login Form Handler
+ * ============================================================
+ */
 function handle_login_form(array $config): void
 {
+    if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
+
     $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 
     if ($method === 'POST') {
@@ -14,10 +21,10 @@ function handle_login_form(array $config): void
 
     // GET → render login view
     $siteKey    = $config['security']['turnstile_site_key'] ?? '';
-    $loginError = $_SESSION['magic_link_error'] ?? '';
+    $loginError = (string)($_SESSION['magic_link_error'] ?? '');
     unset($_SESSION['magic_link_error']);
 
-    $loginOk = $_SESSION['magic_link_ok'] ?? '';
+    $loginOk = (string)($_SESSION['magic_link_ok'] ?? '');
     unset($_SESSION['magic_link_ok']);
 
     require __DIR__ . '/../views/auth_login.php';
@@ -30,8 +37,8 @@ function handle_login_form(array $config): void
  * ============================================================
  * Function: pf_require_admin()
  * Purpose:
- *   Enforce admin-only access and render the existing adaptive 404 view
- *   with a "not authorised" message (instead of echo/exit).
+ *   Enforce admin-only access and render the existing adaptive error view
+ *   with a "not authorised" message.
  * ============================================================
  */
 function pf_is_admin(): bool
@@ -51,8 +58,9 @@ function pf_is_admin(): bool
 
 if (!function_exists('pf_require_admin')) {
     function pf_require_admin(): void
-{
-    if (!pf_is_admin()) {
+    {
+        if (pf_is_admin()) { return; }
+
         // ---- Render via single adaptive error view ----
         http_response_code(403);
 
@@ -80,12 +88,12 @@ if (!function_exists('pf_require_admin')) {
             } else {
                 echo $inner;
             }
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             // Absolute fail-safe
             error_log('pf_require_admin render failed: ' . $e->getMessage());
             echo 'You are not authorised to view this page.';
         }
+
         exit;
     }
 }
-
