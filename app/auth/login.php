@@ -1,5 +1,4 @@
 <?php declare(strict_types=1);
-use Throwable;
 
 require_once __DIR__ . '/magic_link.php';
 
@@ -51,7 +50,7 @@ if (!function_exists('pf_require_admin')) {
         http_response_code(403);
 
         $vm = [
-            'emoji'    => '🔒',
+            'emoji'    => '⛔',
             'title'    => 'You are not authorised to view this page',
             'subtitle' => 'This area is restricted.',
             'list'     => [
