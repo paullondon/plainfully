@@ -1,6 +1,7 @@
 <?php declare(strict_types=1);
 
 require_once __DIR__ . '/magic_link.php';
+require_once __DIR__ . '/db.php';
 
 /**
  * ============================================================
@@ -43,17 +44,19 @@ function handle_login_form(array $config): void
  */
 function pf_is_admin(): bool
 {
-    if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
+    if (session_status() !== PHP_SESSION_ACTIVE) { return false; }
+
     $email = strtolower(trim((string)($_SESSION['user_email'] ?? '')));
     if ($email === '') { return false; }
 
-    // Comma-separated allowlist in env: ADMIN_EMAILS="paul@x.com,other@y.com"
-    $allow = strtolower(trim((string)(getenv('ADMIN_EMAILS') ?: '')));
+    $allow = (string)(getenv('ADMIN_EMAILS') ?: ($_ENV['ADMIN_EMAILS'] ?? ''));
+    $allow = strtolower(trim($allow));
     if ($allow === '') { return false; }
 
     $list = array_filter(array_map('trim', explode(',', $allow)));
     return in_array($email, $list, true);
 }
+
 
 if (!function_exists('pf_require_admin')) {
     function pf_require_admin(): void
@@ -94,5 +97,33 @@ if (!function_exists('pf_require_admin')) {
         }
 
         exit;
+    }
+}
+
+if (!function_exists('pf_auth_hydrate_session_email')) {
+    function pf_auth_hydrate_session_email(): void
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) { return; }
+
+        $uid = (int)($_SESSION['user_id'] ?? 0);
+        if ($uid <= 0) { return; }
+
+        $existing = strtolower(trim((string)($_SESSION['user_email'] ?? '')));
+        if ($existing !== '') { return; }
+
+        $pdo = pf_db();
+        if (!($pdo instanceof PDO)) { return; }
+
+        try {
+            $stmt = $pdo->prepare('SELECT email FROM users WHERE id = :id LIMIT 1');
+            $stmt->execute([':id' => $uid]);
+            $email = (string)($stmt->fetchColumn() ?: '');
+            $email = strtolower(trim($email));
+            if ($email !== '') {
+                $_SESSION['user_email'] = $email;
+            }
+        } catch (Throwable $e) {
+            error_log('pf_auth_hydrate_session_email failed: ' . $e->getMessage());
+        }
     }
 }
