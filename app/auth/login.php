@@ -32,19 +32,6 @@ function handle_login_form(array $config): void
     require __DIR__ . '/../views/auth_login.php';
 }
 
-
-/**
- * ============================================================
- * Plainfully Auth Helper
- * ============================================================
- * Function: pf_require_admin()
- * Purpose:
- *   Enforce admin-only access and render the existing adaptive error view
- *   with a "not authorised" message.
- * ============================================================
- */
-<?php declare(strict_types=1);
-
 /**
  * ============================================================
  * Plainfully Auth Helper
