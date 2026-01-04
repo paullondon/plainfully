@@ -92,7 +92,7 @@ function h($s): string { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'
             <td style="padding:8px;border-bottom:1px solid var(--pf-border);white-space:nowrap;"><?= h($e['created_at'] ?? '') ?></td>
             <td style="padding:8px;border-bottom:1px solid var(--pf-border);"><?= h($e['level'] ?? '') ?></td>
             <td style="padding:8px;border-bottom:1px solid var(--pf-border);"><?= h($e['stage'] ?? '') ?></td>
-            <td style="padding:8px;border-bottom:1px solid var(--pf-border);"><?= h($e['event'] ?? '') ?></td>
+            <td style="padding:8px;border-bottom:1px solid var(--pf-border);"><?= h($e['event_name'] ?? ($e['event'] ?? '')) ?></td>
             <td style="padding:8px;border-bottom:1px solid var(--pf-border);"><?= h($e['message'] ?? '') ?></td>
             <td style="padding:8px;border-bottom:1px solid var(--pf-border);">
               <?php if ($metaPretty !== ''): ?>

@@ -20,11 +20,12 @@ if (!function_exists('trace_controller')) {
         try {
             if ($traceId !== '') {
                 $stmt = $pdo->prepare('
-                    SELECT created_at, level, stage, event, message, meta_json, queue_id, check_id
+                    SELECT created_at, level, stage, event AS event_name, message, meta_json, queue_id, check_id
                     FROM trace_events
                     WHERE trace_id = :t
                     ORDER BY id ASC
                     LIMIT 2000
+
                 ');
                 $stmt->execute([':t' => $traceId]);
                 $events = $stmt->fetchAll(\PDO::FETCH_ASSOC);
