@@ -44,7 +44,6 @@ function handle_login_form(array $config): void
 function pf_is_admin(): bool
 {
     if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
-
     $email = strtolower(trim((string)($_SESSION['user_email'] ?? '')));
     if ($email === '') { return false; }
 

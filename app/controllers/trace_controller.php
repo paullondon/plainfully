@@ -2,10 +2,13 @@
 
 require_once dirname(__DIR__) . '/support/db.php';
 require_once dirname(__DIR__) . '/support/trace.php';
+require_once dirname(__DIR__) . '/auth/login.php'; // for pf_require_admin()
 
 if (!function_exists('trace_controller')) {
     function trace_controller(): void
     {
+        pf_require_admin();
+
         if (!pf_trace_allowed()) { http_response_code(404); echo "Not found."; return; }
 
         $pdo = pf_db();
