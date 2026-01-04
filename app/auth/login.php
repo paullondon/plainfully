@@ -45,19 +45,21 @@ function handle_login_form(array $config): void
  */
 function pf_is_admin(): bool
 {
-    if (session_status() !== PHP_SESSION_ACTIVE) { return false; }
+    if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
 
     $email = strtolower(trim((string)($_SESSION['user_email'] ?? '')));
     if ($email === '') { return false; }
 
-    $allow = (string)(getenv('ADMIN_EMAILS') ?: ($_ENV['ADMIN_EMAILS'] ?? ''));
-    $allow = strtolower(trim($allow));
-    if ($allow === '') { return false; }
+    $allowRaw = (string)(getenv('ADMIN_EMAILS') ?: '');
+    if ($allowRaw === '') { return false; }
 
-    $list = array_filter(array_map('trim', explode(',', $allow)));
+    $list = array_values(array_filter(array_map(
+        static fn($v) => strtolower(trim((string)$v)),
+        explode(',', $allowRaw)
+    )));
+
     return in_array($email, $list, true);
 }
-
 
 if (!function_exists('pf_require_admin')) {
     function pf_require_admin(): void
