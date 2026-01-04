@@ -1,7 +1,7 @@
 <?php declare(strict_types=1);
 
 require_once __DIR__ . '/magic_link.php';
-require_once __DIR__ . '/db.php';
+require_once dirname(__DIR__) . '/support/db.php';
 
 /**
  * ============================================================
