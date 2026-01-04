@@ -1,50 +1,39 @@
 <?php declare(strict_types=1);
 
-/**
- * db.php
- *
- * Central PDO connection helper for Plainfully.
- */
+if (!function_exists('pf_db')) {
+    /**
+     * Return a PDO connection (or throw on failure).
+     */
+    function pf_db(): PDO
+    {
+        static $pdo = null;
+        if ($pdo instanceof PDO) { return $pdo; }
 
-function pf_db(): PDO
-{
-    static $pdo = null;
-    if ($pdo instanceof PDO) {
-        return $pdo;
-    }
+        // Load config the same way your project already does (example)
+        $ROOT = realpath(__DIR__ . '/../../') ?: (__DIR__ . '/../../');
+        $configPath = $ROOT . '/config/app.php';
 
-    // NOTE: support/ → app/ → project root → config/app.php
-    $config = require __DIR__ . '/../../config/app.php';
-
-    $dsn  = $config['db']['dsn']  ?? '';
-    $user = $config['db']['user'] ?? '';
-    $pass = $config['db']['pass'] ?? '';
-
-    $options = [
-        PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
-        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-        PDO::ATTR_EMULATE_PREPARES   => false,
-    ];
-
-    try {
-        $pdo = new PDO($dsn, $user, $pass, $options);
-        return $pdo;
-    } catch (PDOException $e) {
-        $env = getenv('APP_ENV') ?: 'local';
-
-        if (in_array(strtolower($env), ['live', 'production'], true)) {
-            // In Live: generic message + log
-            error_log('Plainfully DB connection failed: ' . $e->getMessage());
-            http_response_code(500);
-            echo 'Database connection failed. Please try again later.';
-        } else {
-            // In local/dev: show actual error so we can fix it
-            http_response_code(500);
-            echo 'Database connection failed: '
-               . htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8')
-               . '<br><br>DSN: '
-               . htmlspecialchars($dsn, ENT_QUOTES, 'UTF-8');
+        $config = $GLOBALS['config'] ?? null;
+        if ($config === null && is_readable($configPath)) {
+            $config = require $configPath;
+            $GLOBALS['config'] = $config;
         }
-        exit;
+
+        $db = is_array($config) ? ($config['db'] ?? []) : [];
+        $dsn  = (string)($db['dsn']  ?? '');
+        $user = (string)($db['user'] ?? '');
+        $pass = (string)($db['pass'] ?? '');
+
+        if ($dsn === '') {
+            throw new RuntimeException('DB DSN missing.');
+        }
+
+        $pdo = new PDO($dsn, $user, $pass, [
+            PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            PDO::ATTR_EMULATE_PREPARES   => false,
+        ]);
+
+        return $pdo;
     }
 }

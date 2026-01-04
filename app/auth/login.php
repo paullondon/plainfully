@@ -1,7 +1,7 @@
 <?php declare(strict_types=1);
 
 require_once __DIR__ . '/magic_link.php';
-require_once dirname(__DIR__) . '/support/db.php';
+require_once __DIR__ . '/support/db.php';
 
 /**
  * ============================================================
@@ -97,6 +97,14 @@ if (!function_exists('pf_require_admin')) {
         }
 
         exit;
+    }
+}
+
+if (!function_exists('pf_user_email')) {
+    function pf_user_email(): string
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
+        return (string)($_SESSION['user_email'] ?? '');
     }
 }
 

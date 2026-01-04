@@ -28,6 +28,7 @@
  *   - Friendly fail-closed: shows adaptive error page (404.php) with a login button.
  * ============================================================
  */
+require_once dirname(__DIR__) . '/auth/session_helpers.php';
 
 if (!function_exists('result_access_controller')) {
     function result_access_controller(string $token): void
@@ -287,8 +288,7 @@ if (!function_exists('pf_result_access_login_user')) {
                 @session_regenerate_id(true);
             }
 
-            $_SESSION['user_id']    = $dbUserId;
-            $_SESSION['user_email'] = $dbEmail;
+            pf_session_login($dbUserId, $dbEmail);
 
             return true;
 

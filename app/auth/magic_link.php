@@ -1,6 +1,8 @@
 <?php declare(strict_types=1);
 
 // app/auth/magic_link.php
+require_once __DIR__ . '/session_helpers.php';
+
 
 if (!function_exists('handle_magic_request')) {
 
@@ -180,13 +182,18 @@ function handle_magic_verify(): void
         $update = $pdo->prepare('UPDATE magic_login_tokens SET consumed_at = NOW() WHERE id = :id');
         $update->execute([':id' => $row['id']]);
 
-        // login user
-        session_regenerate_id(true);
-        $_SESSION['user_id']         = (int)$row['user_id'];
-        $_SESSION['pf_fingerprint']  = pf_generate_fingerprint();
-        $_SESSION['pf_ip_prefix']    = implode('.', array_slice(explode('.', $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0'), 0, 3));
-        $_SESSION['pf_last_active']  = time();
-        $_SESSION['pf_created_at']   = time();
+        // Lookup email for the session (needed for admin/trace checks)
+        $u = $pdo->prepare('SELECT email FROM users WHERE id = :id LIMIT 1');
+        $u->execute([':id' => (int)$row['user_id']]);
+        $email = (string)($u->fetchColumn() ?: '');
+
+        pf_session_login((int)$row['user_id'], $email);
+
+        // Keep your extra security fields if you want them
+        $_SESSION['pf_fingerprint'] = pf_generate_fingerprint();
+        $_SESSION['pf_ip_prefix']   = implode('.', array_slice(explode('.', $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0'), 0, 3));
+        $_SESSION['pf_last_active'] = time();
+        $_SESSION['pf_created_at']  = $_SESSION['pf_created_at'] ?? time();
 
         pf_log_auth_event('login_success', (int)$row['user_id'], null, 'Magic link verified');
 

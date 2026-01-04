@@ -42,8 +42,8 @@ if (is_readable($envPath)) {
 // ---------------------------------------------------------
 // 3. Load DB helper only (no router, no HTTP stuff)
 // ---------------------------------------------------------
-require $rootPath . '/config/app.php';            // if needed by pf_db
-require $rootPath . '/app/support/db.php';
+require_once $rootPath . '/config/app.php';            // if needed by pf_db
+require_once $rootPath . '/app/support/db.php';
 
 /**
  * Simple logger for this script.
