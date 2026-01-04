@@ -43,23 +43,56 @@ function handle_login_form(array $config): void
  *   with a "not authorised" message.
  * ============================================================
  */
-function pf_is_admin(): bool
-{
-    if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
+<?php declare(strict_types=1);
 
-    $email = strtolower(trim((string)($_SESSION['user_email'] ?? '')));
-    if ($email === '') { return false; }
+/**
+ * ============================================================
+ * Plainfully Auth Helper
+ * ============================================================
+ * Function: pf_is_admin()
+ * Purpose:
+ *   Admin check using DB flag (users.is_admin).
+ *   Optional fallback: ADMIN_EMAILS env allowlist (if you ever want it).
+ * Security:
+ *   - Uses prepared statements only
+ *   - Never trusts request input
+ * ============================================================
+ */
 
-    $allowRaw = (string)(getenv('ADMIN_EMAILS') ?: '');
-    if ($allowRaw === '') { return false; }
+if (!function_exists('pf_is_admin')) {
+    function pf_is_admin(): bool
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
 
-    $list = array_values(array_filter(array_map(
-        static fn($v) => strtolower(trim((string)$v)),
-        explode(',', $allowRaw)
-    )));
+        $email = strtolower(trim((string)($_SESSION['user_email'] ?? '')));
+        if ($email === '') { return false; }
 
-    return in_array($email, $list, true);
+        // ---- Optional fallback allowlist (if env exists) ----
+        $allow = strtolower(trim((string)(getenv('ADMIN_EMAILS') ?: '')));
+        if ($allow !== '') {
+            $list = array_filter(array_map('trim', explode(',', $allow)));
+            if (in_array($email, $list, true)) { return true; }
+        }
+
+        // ---- Primary: DB flag ----
+        if (!function_exists('pf_db')) { return false; }
+
+        try {
+            $pdo = pf_db();
+            if (!($pdo instanceof \PDO)) { return false; }
+
+            $stmt = $pdo->prepare('SELECT is_admin FROM users WHERE email = :e LIMIT 1');
+            $stmt->execute([':e' => $email]);
+            $v = $stmt->fetchColumn();
+
+            return ((int)($v ?? 0)) === 1;
+        } catch (\Throwable $e) {
+            error_log('pf_is_admin failed: ' . $e->getMessage());
+            return false;
+        }
+    }
 }
+
 
 if (!function_exists('pf_require_admin')) {
     function pf_require_admin(): void
