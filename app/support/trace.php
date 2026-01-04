@@ -71,8 +71,8 @@ if (!function_exists('pf_trace')) {
         $event,                 // allow bool/int/etc
         string $message,
         $meta = [],             // allow string/etc
-        ?int $queueId = null,
-        ?int $checkId = null
+        $queueId = null,
+        $checkId = null
     ): void {
         if (!pf_trace_enabled()) { return; }
         if ($traceId === '' || !($pdo instanceof \PDO)) { return; }
@@ -98,6 +98,15 @@ if (!function_exists('pf_trace')) {
         $metaJson = pf_trace_safe_json($meta);
 
         try {
+            // Normalise queueId/checkId to ints (or null) to avoid tracer crashing the pipeline
+            if (is_array($queueId)) { $queueId = null; }
+            if (is_string($queueId) && ctype_digit($queueId)) { $queueId = (int)$queueId; }
+            if (!is_int($queueId)) { $queueId = null; }
+
+            if (is_array($checkId)) { $checkId = null; }
+            if (is_string($checkId) && ctype_digit($checkId)) { $checkId = (int)$checkId; }
+            if (!is_int($checkId)) { $checkId = null; }
+
             $stmt = $pdo->prepare('
                 INSERT INTO trace_events (trace_id, level, stage, event, message, meta_json, queue_id, check_id)
                 VALUES (:trace_id, :level, :stage, :event, :message, :meta_json, :queue_id, :check_id)
