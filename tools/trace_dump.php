@@ -1,41 +1,67 @@
 <?php declare(strict_types=1);
 /**
  * tools/trace_dump.php
- * Usage: php tools/trace_dump.php <trace_id>
+ *
+ * CLI utility to dump a single trace in chronological order.
+ *
+ * Usage:
+ *   php tools/trace_dump.php <trace_id>
+ *
+ * Notes:
+ * - Admin / debug only
+ * - Read-only
+ * - Safe to run in production (no writes)
  */
-if (PHP_SAPI !== 'cli') { echo "CLI only\n"; exit(1); }
+
+if (PHP_SAPI !== 'cli') {
+    fwrite(STDERR, "CLI only\n");
+    exit(1);
+}
 
 $traceId = trim((string)($argv[1] ?? ''));
-if ($traceId === '') { echo "Usage: php tools/trace_dump.php <trace_id>\n"; exit(2); }
+if ($traceId === '') {
+    fwrite(STDERR, "Usage: php tools/trace_dump.php <trace_id>\n");
+    exit(2);
+}
 
 $ROOT = realpath(__DIR__ . '/..') ?: (__DIR__ . '/..');
 require_once $ROOT . '/app/support/db.php';
 
-$pdo = pf_db();
-if (!($pdo instanceof PDO)) { echo "DB unavailable\n"; exit(3); }
+try {
+    $pdo = pf_db();
+} catch (Throwable $e) {
+    fwrite(STDERR, "DB unavailable: {$e->getMessage()}\n");
+    exit(3);
+}
 
 $stmt = $pdo->prepare('
-  SELECT created_at, stage, level, alert, action, summary, data_json
-  FROM trace_events
-  WHERE trace_id = :t
-  ORDER BY id ASC
+    SELECT created_at, level, stage, event, message, meta_json
+    FROM trace_events
+    WHERE trace_id = :t
+    ORDER BY id ASC
 ');
 $stmt->execute([':t' => $traceId]);
 $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-if (!is_array($rows) || count($rows) === 0) { echo "No trace events found for: {$traceId}\n"; exit(0); }
+if (!$rows) {
+    echo "No trace events found for: {$traceId}\n";
+    exit(0);
+}
+
+echo "Trace dump for {$traceId}\n";
+echo str_repeat('=', 80) . "\n";
 
 foreach ($rows as $r) {
-  $line = sprintf(
-    "[%s] %-11s %-5s %-6s %-16s %s",
-    (string)$r['created_at'],
-    (string)$r['stage'],
-    (string)$r['level'],
-    ((int)$r['alert'] === 1 ? 'ALERT' : ''),
-    (string)$r['action'],
-    (string)$r['summary']
-  );
-  echo $line . "\n";
-  $dj = (string)($r['data_json'] ?? '');
-  if ($dj !== '') { echo "  data: " . $dj . "\n"; }
+    printf(
+        "[%s] %-5s %-12s %-20s %s\n",
+        $r['created_at'],
+        strtoupper($r['level']),
+        $r['stage'],
+        $r['event'],
+        $r['message']
+    );
+
+    if (!empty($r['meta_json'])) {
+        echo "  meta: {$r['meta_json']}\n";
+    }
 }

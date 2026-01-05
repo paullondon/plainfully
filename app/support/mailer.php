@@ -1,21 +1,24 @@
 <?php declare(strict_types=1);
 
 /**
- * mailer.php
- *
- * PHPMailer wrapper for Plainfully.
+ * ============================================================
+ * Plainfully File Info
+ * ============================================================
+ * File: app/support/mailer.php
+ * Purpose:
+ *   PHPMailer wrapper for Plainfully.
  *
  * Why this file exists:
- * - Centralizes all outbound SMTP config + sending.
- * - Avoids brittle coupling to config/app.php shape.
- * - Supports BOTH env naming schemes:
- *     MAIL_*   (your stable config/app.php reads these)
- *     SMTP_*   (common alternative; useful in CLI scripts or older env files)
+ *   - Centralises outbound SMTP config + sending
+ *   - Supports BOTH env naming schemes:
+ *       MAIL_* (preferred)
+ *       SMTP_* (fallback)
  *
  * Security:
- * - Validates recipient email (fail-closed).
- * - No dynamic headers from user input.
- * - Optional CID embedding for a locally hosted PNG logo.
+ *   - Validates recipient email (fail-closed)
+ *   - No dynamic headers from user input
+ *   - Optional CID embedding for a locally hosted PNG logo
+ * ============================================================
  */
 
 use PHPMailer\PHPMailer\PHPMailer;
@@ -36,9 +39,7 @@ if (!class_exists(\PHPMailer\PHPMailer\PHPMailer::class)) {
     ];
 
     foreach ($files as $file) {
-        if (is_readable($file)) {
-            require_once $file;
-        }
+        if (is_readable($file)) { require_once $file; }
     }
 }
 
@@ -58,9 +59,7 @@ function pf_env_first(array $keys): string
         $v = getenv((string)$k);
         if ($v !== false) {
             $v = trim((string)$v);
-            if ($v !== '') {
-                return $v;
-            }
+            if ($v !== '') { return $v; }
         }
     }
     return '';
@@ -82,9 +81,6 @@ function pf_env_first_int(array $keys, int $default): int
  *
  * Expected location:
  *   httpdocs/assets/img/plainfully-logo-light.256.png
- *
- * This file lives at:
- *   httpdocs/app/support/mailer.php
  */
 function pf_local_logo_path(): ?string
 {
@@ -96,10 +92,10 @@ function pf_local_logo_path(): ?string
 }
 
 /**
- * Build a normalized SMTP config array.
+ * Build a normalised SMTP config array.
  *
  * Priority:
- * 1) $config['smtp'] if present (your stable config/app.php)
+ * 1) $config['smtp'] if present (config/app.php)
  * 2) Env vars (MAIL_* first, then SMTP_* fallbacks)
  */
 function pf_smtp_config(string $fromUser = '', string $fromPass = ''): array
@@ -110,35 +106,22 @@ function pf_smtp_config(string $fromUser = '', string $fromPass = ''): array
         if (!is_array($cfg)) { $cfg = []; }
     }
 
-    // Host/port/secure: try config first, then env.
     $host = trim((string)($cfg['host'] ?? ''));
-    if ($host === '') {
-        $host = pf_env_first(['MAIL_HOST', 'SMTP_HOST']);
-    }
+    if ($host === '') { $host = pf_env_first(['MAIL_HOST', 'SMTP_HOST']); }
 
     $port = (int)($cfg['port'] ?? 0);
-    if ($port <= 0) {
-        $port = pf_env_first_int(['MAIL_PORT', 'SMTP_PORT'], 587);
-    }
+    if ($port <= 0) { $port = pf_env_first_int(['MAIL_PORT', 'SMTP_PORT'], 587); }
 
     $secure = trim((string)($cfg['secure'] ?? ''));
-    if ($secure === '') {
-        $secure = pf_env_first(['MAIL_ENCRYPTION', 'SMTP_SECURE']);
-    }
-    if ($secure === '') {
-        $secure = 'tls';
-    }
-
-    // Credentials: the caller provides them (per-channel), but we keep fallbacks.
-    $user = trim($fromUser);
-    $pass = (string)$fromPass;
+    if ($secure === '') { $secure = pf_env_first(['MAIL_ENCRYPTION', 'SMTP_SECURE']); }
+    if ($secure === '') { $secure = 'tls'; }
 
     return [
         'host'   => $host,
         'port'   => $port,
         'secure' => $secure,
-        'user'   => $user,
-        'pass'   => $pass,
+        'user'   => trim($fromUser),
+        'pass'   => (string)$fromPass,
     ];
 }
 
@@ -163,8 +146,7 @@ function pf_mail_send(
 
     $smtp = pf_smtp_config($fromUser, $fromPass);
 
-    if (trim($smtp['host']) === '') {
-        // This is the exact issue you saw.
+    if (trim((string)$smtp['host']) === '') {
         error_log('pf_mail_send: SMTP host missing in config/env (MAIL_HOST or SMTP_HOST).');
         return false;
     }
@@ -193,13 +175,9 @@ function pf_mail_send(
         $mail->addAddress($to);
 
         // Content
-        if ($text === null) {
-            $text = trim(strip_tags($html));
-        }
+        if ($text === null) { $text = trim(strip_tags($html)); }
 
-        // -----------------------------------------------------
         // Logo support (CID embedding)
-        // -----------------------------------------------------
         $logoUrlMarker = 'https://plainfully.com/assets/img/plainfully-logo-light.256.png';
         $logoPath = pf_local_logo_path();
         if ($logoPath !== null) {
@@ -212,12 +190,11 @@ function pf_mail_send(
         $mail->Body    = $html;
         $mail->AltBody = (string)$text;
 
-        // Deliverability hints (safe static headers)
+        // Deliverability hints (static headers only)
         $mail->addCustomHeader('X-Mailer', 'Plainfully');
         $mail->addCustomHeader('List-Unsubscribe', '<mailto:unsubscribe@plainfully.com>');
 
         return (bool)$mail->send();
-
     } catch (\Throwable $e) {
         error_log('pf_mail_send error: ' . $e->getMessage());
         return false;
@@ -262,12 +239,12 @@ function pf_mail_clarify(string $to, string $subject, string $html, ?string $tex
 
 if (!function_exists('pf_send_email')) {
     /**
-     * Plainfully email wrapper used by newer features.
+     * Plainfully email wrapper used by controllers/features.
      *
      * $channel:
      *   - 'scamcheck' → sends from scamcheck@...
      *   - 'clarify'   → sends from clarify@...
-     *   - anything else / default → sends from noreply@...
+     *   - anything else → sends from noreply@...
      *
      * Returns: [bool $ok, ?string $error]
      */
@@ -283,51 +260,19 @@ if (!function_exists('pf_send_email')) {
                 case 'scamcheck':
                     $ok = pf_mail_scamcheck($to, $subject, $html, $text);
                     break;
-
                 case 'clarify':
                     $ok = pf_mail_clarify($to, $subject, $html, $text);
                     break;
-
                 default:
                     $ok = pf_mail_noreply($to, $subject, $html, $text);
                     break;
             }
 
-            if (!$ok) {
-                return [false, 'pf_mail_* returned false'];
-            }
-
+            if (!$ok) { return [false, 'pf_mail_* returned false']; }
             return [true, null];
         } catch (\Throwable $e) {
             error_log('pf_send_email failed: ' . $e->getMessage());
             return [false, $e->getMessage()];
         }
-    }
-}
-
-/**
- * Magic-link emails MUST return bool because the login flow expects it.
- */
-if (!function_exists('pf_send_magic_link_email')) {
-    function pf_send_magic_link_email(string $to, string $link): bool
-    {
-        $subject = 'Your Plainfully sign-in link';
-
-        $inner = '<p>Hello,</p>'
-            . '<p>Here\'s your one-time link to sign in to <strong>Plainfully</strong>:</p>'
-            . '<p><a href="' . htmlspecialchars($link, ENT_QUOTES, 'UTF-8') . '">Sign in to Plainfully</a></p>'
-            . '<p style="color:#6b7280;font-size:13px;margin:16px 0 0;">'
-            . 'This link expires shortly and can only be used once.'
-            . '</p>';
-
-        $html = pf_email_template('Your Plainfully sign-in link', $inner);
-
-        $text = "Hello,\n\n"
-            . "Here is your one-time link to sign in to Plainfully:\n\n"
-            . $link . "\n\n"
-            . "This link will expire shortly and can only be used once.\n"
-            . "If you did not request this email, you can safely ignore it.\n";
-
-        return pf_mail_noreply($to, $subject, $html, $text);
     }
 }

@@ -8,15 +8,11 @@
  * Purpose:
  *   Main router for Plainfully web app.
  *
- * Change history:
- *   - 2025-12-28 16:44:40Z  Add guest route GET/POST /r/{token} (result link confirmation)
- *   - 2025-12-29 10:11:00Z  Removed require_guest() to /r/{token} route (temporarily disabled)
- * ============================================================
- *
  * Notes:
- *   - /r/{token} is a guest route:
- *       - asks the user to confirm the email address the result was sent to
- *       - then logs them in and redirects to /clarifications/view?id=...
+ *   - /r/{token} is a guest route for result-link confirmation.
+ *   - /trace is ADMIN-ONLY (no token fallbacks).
+ *   - Debug endpoints should be ADMIN-ONLY or env-token protected.
+ * ============================================================
  */
 
 // HTTP method + path
@@ -32,9 +28,6 @@ if ($path !== '/' && str_ends_with($path, '/')) {
 }
 
 switch (true) {
-// ======================
-// !! LOGGED IN ROUTES !!
-// ======================
 
     // -------------------------------------------------
     // Home → redirect to dashboard (must be logged in)
@@ -78,38 +71,20 @@ switch (true) {
         handle_logout();
         break;
 
-// ======================
-// !! GUEST ROUTES     !!
-// ======================
-
     // -------------------------------------------------
     // Result link confirmation (guest)
     //   GET  /r/{token}
     //   POST /r/{token}
     // -------------------------------------------------
     case str_starts_with($path, '/r/') && ($method === 'GET' || $method === 'POST'):
-        //require_guest(); // Removed temporarily to allow access to consultation results while logged in.
-        $token = substr($path, 3); // everything after "/r/"
-        $token = trim($token);
-
+        $token = trim(substr($path, 3)); // everything after "/r/"
         require_once __DIR__ . '/../app/controllers/result_access_controller.php';
-
         result_access_controller($token);
         break;
-    // -------------------------------------------------
-    // Admin check (plain text output)
-    case $path === '/admin-check':
-        require_once __DIR__ . '/../app/auth/login.php'; // where pf_is_admin() lives
-        if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
 
-        header('Content-Type: text/plain; charset=utf-8');
-
-        echo "session user_email: " . ($_SESSION['user_email'] ?? '(none)') . "\n";
-        echo "env ADMIN_EMAILS: " . (getenv('ADMIN_EMAILS') ?: '(missing)') . "\n";
-        echo "pf_is_admin(): " . (function_exists('pf_is_admin') && pf_is_admin() ? 'YES' : 'NO') . "\n";
-        break;
     // -------------------------------------------------
     // Trace (admin only)
+    // -------------------------------------------------
     case ($path === '/trace') && ($method === 'GET'):
         pf_require_admin();
         require_once __DIR__ . '/../app/controllers/trace_controller.php';
@@ -141,49 +116,22 @@ switch (true) {
         break;
 
     // -------------------------------------------------
-    // Debug – env sanity
+    // DEV hooks (token protected)
     // -------------------------------------------------
-    case $path === '/debug/env-check' && $method === 'GET':
-        ensureDebugAccess();
-
-        header('Content-Type: text/plain; charset=utf-8');
-        echo "web.php reached\n";
-        echo "APP_ENV=" . (getenv('APP_ENV') ?: 'null') . "\n";
-        echo "PLAINFULLY_DEBUG_TOKEN=" . (getenv('PLAINFULLY_DEBUG_TOKEN') ?: 'null') . "\n";
-        break;
-
-    // -------------------------------------------------
-    // Debug – checks
-    // -------------------------------------------------
-    case $path === '/debug/checks' && $method === 'GET':
-        ensureDebugAccess();
-        debug_list_checks();
-        break;
-
-    case $path === '/debug/checks/view' && $method === 'GET':
-        ensureDebugAccess();
-        debug_view_check();
-        break;
-
-    // -------------------------------------------------
-    // Debug – consultations
-    // -------------------------------------------------
-    case $path === '/debug/consultations' && $method === 'GET':
-        ensureDebugAccess();
-        debug_list_consultations();
-        break;
-
-    case $path === '/debug/consultations/view' && $method === 'GET':
-        ensureDebugAccess();
-        debug_view_consultation();
-        break;
-
     case $path === '/hooks/email/inbound-dev' && $method === 'POST':
         email_inbound_dev_controller();
         return;
 
+    case $path === '/hooks/sms/inbound-dev' && $method === 'POST':
+        sms_inbound_dev_controller();
+        return;
+
+    // -------------------------------------------------
+    // Admin Debug – email bridge trace (admin only)
+    // -------------------------------------------------
     case $path === '/debug/email-bridge' && $method === 'GET':
-        ensureDebugAccess();
+        pf_require_admin();
+        require_once __DIR__ . '/../app/controllers/admin_debug_controller.php';
         admin_debug_email_bridge();
         break;
 

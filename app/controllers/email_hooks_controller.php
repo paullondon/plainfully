@@ -1,5 +1,31 @@
 <?php declare(strict_types=1);
 
+/**
+ * ============================================================
+ * Plainfully File Info
+ * ============================================================
+ * File: app/controllers/email_hooks_controller.php
+ * Purpose:
+ *   DEV inbound hooks used by your IMAP/SMS bridges.
+ *
+ * Why this file exists:
+ *   - Converts inbound payloads into CheckInput
+ *   - Applies limit checks (email only) BEFORE storing anything
+ *   - Calls CheckEngine (AI + DB insert)
+ *   - Sends an outbound reply email (email hook) or returns SMS template (sms hook)
+ *
+ * Tracing:
+ *   - If PLAINFULLY_TRACE=true, we log a per-request timeline in trace_events
+ *   - Trace is ALWAYS admin-only to view (no token access)
+ *   - Trace TTL is enforced at insert time (expires_at = NOW()+1 HOUR)
+ *
+ * Security:
+ *   - Hook access controlled by X-Plainfully-Token header (env: EMAIL_HOOK_TOKEN / SMS_HOOK_TOKEN)
+ *   - Fail-closed on auth; fail-open on trace logging (tracing never breaks ingestion)
+ *   - Email content is normalised to safe visible text (strips HTML, flags risky links)
+ * ============================================================
+ */
+
 use App\Features\Checks\CheckInput;
 use App\Features\Checks\CheckEngine;
 use App\Features\Checks\DummyAiClient;
@@ -9,36 +35,41 @@ require_once dirname(__DIR__) . '/features/checks/check_input.php';
 require_once dirname(__DIR__) . '/features/checks/check_result.php';
 require_once dirname(__DIR__) . '/features/checks/ai_client.php';
 require_once dirname(__DIR__) . '/features/checks/check_engine.php';
-// Dummy AI client
 require_once dirname(__DIR__) . '/features/checks/dummy_ai_client.php';
-// Email templates
+
+// Support
+require_once dirname(__DIR__) . '/support/db.php';
+require_once dirname(__DIR__) . '/support/trace.php';
+
+// Email templates + sending
 require_once __DIR__ . '/../support/email_templates.php';
+require_once __DIR__ . '/../support/mailer.php';
 
-
-// Billing (plan + limits) – safe to include even if you haven’t deployed yet
+// Billing (optional; safe to include even if not deployed yet)
 $pfBillingPath = dirname(__DIR__) . '/features/billing/billing.php';
 $pfLimitsPath  = dirname(__DIR__) . '/features/billing/limits.php';
 if (is_readable($pfBillingPath)) { require_once $pfBillingPath; }
 if (is_readable($pfLimitsPath))  { require_once $pfLimitsPath; }
 
 /**
- * Get domain part from an email address (after @).
+ * ------------------------------------------------------------
+ * Helpers (pure)
+ * ------------------------------------------------------------
+ */
+
+/**
+ * Extract domain part from an email address (after @).
  */
 if (!function_exists('plainfully_email_sender_domain')) {
     function plainfully_email_sender_domain(?string $email): ?string
     {
-        if (!$email || strpos($email, '@') === false) {
-            return null;
-        }
+        if (!$email || strpos($email, '@') === false) { return null; }
 
         $domain = trim(substr(strrchr($email, '@'), 1) ?: '');
-        if ($domain === '') {
-            return null;
-        }
+        if ($domain === '') { return null; }
 
         $domain = strtolower($domain);
-        $domain = preg_replace('/:\d+$/', '', $domain);
-
+        $domain = preg_replace('/:\d+$/', '', $domain); // strip :port
         return $domain ?: null;
     }
 }
@@ -46,13 +77,12 @@ if (!function_exists('plainfully_email_sender_domain')) {
 /**
  * Convert subject+body (plain or HTML) into safe visible text.
  * - Strips tags
- * - Converts <a>text</a> to "text [link]" or "text [link – potentially risky]"
+ * - Converts <a>...</a> into "text [link]" or "text [link – potentially risky]"
  */
 if (!function_exists('plainfully_normalise_email_text')) {
     function plainfully_normalise_email_text(string $subject, string $body, ?string $fromEmail = null): string
     {
         $full = $subject !== '' ? ($subject . "\n\n" . $body) : $body;
-
         $senderDomain = plainfully_email_sender_domain($fromEmail);
 
         // Fast path (no obvious HTML)
@@ -72,9 +102,7 @@ if (!function_exists('plainfully_normalise_email_text')) {
                 $anchorInner = $matches[1] ?? '';
 
                 $anchorText = trim(strip_tags($anchorInner));
-                if ($anchorText === '') {
-                    $anchorText = 'link';
-                }
+                if ($anchorText === '') { $anchorText = 'link'; }
 
                 $suffix = ' [link]';
 
@@ -89,7 +117,6 @@ if (!function_exists('plainfully_normalise_email_text')) {
 
                     if (is_string($href) && $href !== '') {
                         $host = parse_url($href, PHP_URL_HOST);
-
                         if (is_string($host) && $host !== '') {
                             $host = strtolower($host);
 
@@ -97,9 +124,7 @@ if (!function_exists('plainfully_normalise_email_text')) {
                                 stripos($host, $senderDomain) !== false ||
                                 stripos($senderDomain, $host) !== false;
 
-                            if (!$isSimilar) {
-                                $suffix = ' [link – potentially risky]';
-                            }
+                            if (!$isSimilar) { $suffix = ' [link – potentially risky]'; }
                         }
                     }
                 }
@@ -113,21 +138,22 @@ if (!function_exists('plainfully_normalise_email_text')) {
         $full = html_entity_decode($full, ENT_QUOTES | ENT_HTML5, 'UTF-8');
 
         $full = str_replace(["\r\n", "\r"], "\n", $full);
-        $full = preg_replace('/[ \t]+/u', ' ', $full);
-        $full = preg_replace("/\n{3,}/u", "\n\n", $full);
+        $full = preg_replace('/[ \t]+/u', ' ', (string)$full);
+        $full = preg_replace("/\n{3,}/u", "\n\n", (string)$full);
 
-        return trim($full);
+        return trim((string)$full);
     }
 }
 
 /**
- * Auth guard for dev inbound hooks (shared token).
+ * Auth guard for inbound hooks (shared token header).
+ * Header: X-Plainfully-Token
  */
 if (!function_exists('pf_require_hook_token')) {
     function pf_require_hook_token(string $envVarName): bool
     {
-        $tokenHeader = $_SERVER['HTTP_X_PLAINFULLY_TOKEN'] ?? '';
-        $expected    = getenv($envVarName) ?: '';
+        $tokenHeader = (string)($_SERVER['HTTP_X_PLAINFULLY_TOKEN'] ?? '');
+        $expected    = (string)(getenv($envVarName) ?: '');
 
         if ($expected === '' || !hash_equals($expected, $tokenHeader)) {
             http_response_code(401);
@@ -147,9 +173,8 @@ if (!function_exists('pf_env_int_nonneg')) {
     function pf_env_int_nonneg(string $key, int $default): int
     {
         $v = getenv($key);
-        if ($v === false || $v === '') {
-            return $default;
-        }
+        if ($v === false || $v === '') { return $default; }
+
         $n = (int)$v;
         return $n >= 0 ? $n : $default;
     }
@@ -173,6 +198,7 @@ if (!function_exists('pf_email_checks_count_since')) {
             ':sender' => $fromEmail,
             ':since'  => $since,
         ]);
+
         return (int)$stmt->fetchColumn();
     }
 }
@@ -184,6 +210,7 @@ if (!function_exists('pf_email_checks_count_since')) {
 if (!function_exists('pf_is_unlimited_tier_for_email')) {
     function pf_is_unlimited_tier_for_email(string $email): bool
     {
+        // Manual allowlist for quick testing
         $raw = (string)(getenv('PLAINFULLY_UNLIMITED_EMAILS') ?: '');
         if ($raw !== '') {
             $list = array_filter(array_map('trim', explode(',', strtolower($raw))));
@@ -192,11 +219,13 @@ if (!function_exists('pf_is_unlimited_tier_for_email')) {
             }
         }
 
+        // If billing is deployed, it should answer plan-by-email
         if (class_exists('PfBilling') && method_exists('PfBilling', 'planByEmail')) {
             try {
                 $plan = (string)PfBilling::planByEmail($email);
-                return true;
-            } catch (Throwable $e) {
+                // NOTE: You can tighten this later; keeping permissive for now.
+                return ($plan !== '');
+            } catch (\Throwable $e) {
                 error_log('pf_is_unlimited_tier_for_email billing lookup failed (fallback to free): ' . $e->getMessage());
                 return false;
             }
@@ -215,7 +244,7 @@ if (!function_exists('pf_is_unlimited_tier_for_email')) {
  *  - EMAIL_CAP_PER_HOUR (default 20)   [burst safety]
  *  - EMAIL_CAP_PER_DAY  (default 200)  [burst safety]
  *
- * FAIL-OPEN.
+ * FAIL-OPEN (limits never block due to errors).
  */
 if (!function_exists('pf_email_inbound_limit_status')) {
     function pf_email_inbound_limit_status(string $fromEmail, bool $isUnlimited): array
@@ -268,12 +297,13 @@ if (!function_exists('pf_email_inbound_limit_status')) {
                     ');
                     $stmt->execute([':sender' => $fromEmail, ':since' => $since28]);
                     $oldest = $stmt->fetchColumn();
+
                     if (is_string($oldest) && $oldest !== '') {
                         $oldestDt = new DateTimeImmutable($oldest);
                         $resetAt  = $oldestDt->add(new DateInterval('P28D'));
                         $resetSeconds = max(0, $resetAt->getTimestamp() - $now->getTimestamp());
                     }
-                } catch (Throwable $t) {
+                } catch (\Throwable $t) {
                     // ignore
                 }
             }
@@ -292,7 +322,7 @@ if (!function_exists('pf_email_inbound_limit_status')) {
                 ],
                 'reset_in_seconds' => $resetSeconds,
             ];
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             error_log('pf_email_inbound_limit_status fail-open: ' . $e->getMessage());
             return [
                 'limited' => false,
@@ -377,6 +407,12 @@ if (!function_exists('pf_send_limit_upsell_email')) {
 }
 
 /**
+ * ------------------------------------------------------------
+ * Controllers
+ * ------------------------------------------------------------
+ */
+
+/**
  * DEV inbound email hook used by your IMAP bridge:
  * POST form fields: from, to, subject, body
  * Header: X-Plainfully-Token
@@ -393,9 +429,19 @@ if (!function_exists('email_inbound_dev_controller')) {
             return;
         }
 
-        if (!pf_require_hook_token('EMAIL_HOOK_TOKEN')) {
-            return;
-        }
+        if (!pf_require_hook_token('EMAIL_HOOK_TOKEN')) { return; }
+
+        $pdo = null;
+        try { $pdo = pf_db(); } catch (\Throwable $e) { $pdo = null; }
+
+        // ---------------------------------------------------------
+        // Stage: ingest (trace id created immediately)
+        // ---------------------------------------------------------
+        $traceId = pf_trace_new_id();
+        pf_trace_ttl($pdo, $traceId, 'info', 'ingest', 'received', 'Email hook received', [
+            'remote_ip' => (string)($_SERVER['REMOTE_ADDR'] ?? ''),
+            'ua'        => (string)($_SERVER['HTTP_USER_AGENT'] ?? ''),
+        ]);
 
         $from    = trim((string)($_POST['from'] ?? ''));
         $to      = trim((string)($_POST['to'] ?? ''));
@@ -403,6 +449,11 @@ if (!function_exists('email_inbound_dev_controller')) {
         $body    = trim((string)($_POST['body'] ?? ''));
 
         if ($from === '' || $body === '') {
+            pf_trace_ttl($pdo, $traceId, 'warn', 'ingest', 'invalid_payload', 'Missing required fields', [
+                'has_from' => ($from !== ''),
+                'has_body' => ($body !== ''),
+            ]);
+
             http_response_code(400);
             header('Content-Type: application/json; charset=utf-8');
             echo json_encode(['error' => 'Fields "from" and "body" are required.']);
@@ -427,11 +478,25 @@ if (!function_exists('email_inbound_dev_controller')) {
             }
         }
 
-        // Plan lookup (email -> user -> billing). If not deployed, defaults to free.
+        pf_trace_ttl($pdo, $traceId, 'info', 'ingest', 'routing', 'Inbound routing decided', [
+            'to'           => $toLower,
+            'mode'         => $mode,
+            'checkChannel' => $checkChannel,
+            'replyFrom'    => $emailChannel,
+        ]);
+
+        // Plan lookup
         $isUnlimited = pf_is_unlimited_tier_for_email($from);
 
         // ✅ LIMIT CHECK BEFORE CheckEngine (so we store NOTHING when over limit)
         $limit = pf_email_inbound_limit_status($from, $isUnlimited);
+        pf_trace_ttl($pdo, $traceId, 'info', 'plan', 'limit_checked', 'Limit check computed', [
+            'tier'        => $isUnlimited ? 'unlimited' : 'free',
+            'limited'     => (bool)($limit['limited'] ?? false),
+            'reason'      => (string)($limit['reason'] ?? ''),
+            'counts'      => (array)($limit['counts'] ?? []),
+        ]);
+
         if (($limit['limited'] ?? false) === true) {
             $emailSent = false;
             $mailError = null;
@@ -443,16 +508,23 @@ if (!function_exists('email_inbound_dev_controller')) {
                     (array)($limit['counts'] ?? []),
                     is_int($limit['reset_in_seconds'] ?? null) ? (int)$limit['reset_in_seconds'] : null
                 );
-            } catch (Throwable $t) {
+            } catch (\Throwable $t) {
                 $emailSent = false;
                 $mailError = 'limit upsell send failed: ' . $t->getMessage();
             }
+
+            pf_trace_ttl($pdo, $traceId, 'info', 'output', 'limited_response_sent', 'Limit response handled', [
+                'email_sent'   => (bool)$emailSent,
+                'mail_error'   => $mailError,
+                'stored_input' => false,
+            ]);
 
             // IMPORTANT: return 200 so the bridge deletes the email (GDPR) and doesn’t retry forever
             http_response_code(200);
             header('Content-Type: application/json; charset=utf-8');
             echo json_encode([
                 'status'           => 'limited',
+                'trace_id'         => $traceId,
                 'mode'             => $mode,
                 'tier'             => $isUnlimited ? 'unlimited' : 'free',
                 'email_sent'       => (bool)$emailSent,
@@ -466,10 +538,15 @@ if (!function_exists('email_inbound_dev_controller')) {
 
         // Normalise HTML to safe visible text
         $rawContent = plainfully_normalise_email_text($subject, $body, $from);
+        pf_trace_ttl($pdo, $traceId, 'info', 'prep', 'normalised', 'Email text normalised', [
+            'subject_len' => strlen($subject),
+            'body_len'    => strlen($body),
+            'norm_len'    => strlen($rawContent),
+        ]);
 
-        $pdo      = pf_db();
-        $aiClient = new DummyAiClient();
-        $engine   = new CheckEngine($pdo, $aiClient);
+        // Engine
+        $aiClient = pf_ai_client();
+        $engine   = new CheckEngine($pdo ?: pf_db(), $aiClient);
 
         $input = new CheckInput(
             $checkChannel,
@@ -478,18 +555,28 @@ if (!function_exists('email_inbound_dev_controller')) {
             $rawContent,
             $from,
             null,
-            null
+            ['trace_id' => $traceId]
         );
 
         // Paid means "unlimited tier" for engine flags
         $isPaid = $isUnlimited;
 
         try {
+            pf_trace_ttl($pdo, $traceId, 'info', 'ai', 'engine_run', 'CheckEngine run starting', [
+                'is_paid' => $isPaid,
+            ]);
+
             $result = $engine->run($input, $isPaid);
 
             $baseUrl = rtrim((string)($config['app']['base_url'] ?? 'https://plainfully.com'), '/');
             $checkId = (int)($result->id ?? 0);
             $viewUrl = $baseUrl . '/clarifications/view?id=' . $checkId;
+
+            pf_trace_ttl($pdo, $traceId, 'info', 'ai', 'engine_run_done', 'CheckEngine run completed', [
+                'check_id'      => $checkId,
+                'status'        => (string)($result->status ?? ''),
+                'scam_level'    => (string)($result->scamRiskLevel ?? ''),
+            ], null, $checkId);
 
             if ($mode === 'scamcheck') {
                 $outSubject = 'Plainfully ScamCheck result';
@@ -534,9 +621,16 @@ if (!function_exists('email_inbound_dev_controller')) {
                 $mailError = 'pf_send_email helper not defined.';
             }
 
+            pf_trace_ttl($pdo, $traceId, 'info', 'output', 'reply_sent', 'Reply email attempted', [
+                'email_sent' => (bool)$emailSent,
+                'mail_error' => $mailError,
+                'view_url'   => $viewUrl,
+            ], null, $checkId);
+
             header('Content-Type: application/json; charset=utf-8');
             echo json_encode([
                 'status'        => 'ok',
+                'trace_id'      => $traceId,
                 'check_id'      => $checkId,
                 'short_verdict' => $result->shortVerdict,
                 'is_scam'       => $result->isScam,
@@ -547,7 +641,11 @@ if (!function_exists('email_inbound_dev_controller')) {
                 'mode'          => $mode,
             ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
+            pf_trace_ttl($pdo, $traceId, 'error', 'ai', 'engine_error', 'Unhandled error running CheckEngine', [
+                'error' => $e->getMessage(),
+            ]);
+
             error_log('email_inbound_dev_controller error: ' . $e->getMessage());
             http_response_code(500);
             header('Content-Type: application/json; charset=utf-8');
@@ -572,23 +670,33 @@ if (!function_exists('sms_inbound_dev_controller')) {
             return;
         }
 
-        if (!pf_require_hook_token('SMS_HOOK_TOKEN')) {
-            return;
-        }
+        if (!pf_require_hook_token('SMS_HOOK_TOKEN')) { return; }
+
+        $pdo = null;
+        try { $pdo = pf_db(); } catch (\Throwable $e) { $pdo = null; }
+
+        $traceId = pf_trace_new_id();
+        pf_trace_ttl($pdo, $traceId, 'info', 'ingest', 'received', 'SMS hook received', [
+            'remote_ip' => (string)($_SERVER['REMOTE_ADDR'] ?? ''),
+        ]);
 
         $from = trim((string)($_POST['from'] ?? ''));
         $body = trim((string)($_POST['body'] ?? ''));
 
         if ($from === '' || $body === '') {
+            pf_trace_ttl($pdo, $traceId, 'warn', 'ingest', 'invalid_payload', 'Missing required fields', [
+                'has_from' => ($from !== ''),
+                'has_body' => ($body !== ''),
+            ]);
+
             http_response_code(400);
             header('Content-Type: application/json; charset=utf-8');
             echo json_encode(['error' => 'Fields "from" and "body" are required.']);
             return;
         }
 
-        $pdo      = pf_db();
-        $aiClient = new DummyAiClient();
-        $engine   = new CheckEngine($pdo, $aiClient);
+        $aiClient = pf_ai_client();
+        $engine   = new CheckEngine($pdo ?: pf_db(), $aiClient);
 
         $input = new CheckInput(
             'sms',
@@ -597,12 +705,16 @@ if (!function_exists('sms_inbound_dev_controller')) {
             $body,
             null,
             $from,
-            null
+            ['trace_id' => $traceId]
         );
 
         $isPaid = true;
 
         try {
+            pf_trace_ttl($pdo, $traceId, 'info', 'ai', 'engine_run', 'CheckEngine run starting', [
+                'is_paid' => $isPaid,
+            ]);
+
             $result = $engine->run($input, $isPaid);
 
             $baseUrl = rtrim((string)($config['app']['base_url'] ?? 'https://plainfully.com'), '/');
@@ -613,10 +725,17 @@ if (!function_exists('sms_inbound_dev_controller')) {
                 ? 'Plainfully: This text looks like a scam. Don’t click links or share codes. Verify the sender via a trusted source.'
                 : 'Plainfully: No obvious scam signs found, but stay cautious with links and requests for personal or payment details.';
 
+            pf_trace_ttl($pdo, $traceId, 'info', 'output', 'sms_reply_ready', 'SMS reply template created', [
+                'check_id'  => $checkId,
+                'view_url'  => $viewUrl,
+                'is_scam'   => (bool)$result->isScam,
+            ], null, $checkId);
+
             http_response_code(200);
             header('Content-Type: application/json; charset=utf-8');
             echo json_encode([
                 'status'             => 'ok',
+                'trace_id'           => $traceId,
                 'check_id'           => $checkId,
                 'short_verdict'      => $result->shortVerdict,
                 'is_scam'            => $result->isScam,
@@ -625,7 +744,11 @@ if (!function_exists('sms_inbound_dev_controller')) {
                 'sms_reply_template' => $smsReply,
             ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
+            pf_trace_ttl($pdo, $traceId, 'error', 'ai', 'engine_error', 'Unhandled error running CheckEngine', [
+                'error' => $e->getMessage(),
+            ]);
+
             error_log('sms_inbound_dev_controller error: ' . $e->getMessage());
             http_response_code(500);
             header('Content-Type: application/json; charset=utf-8');

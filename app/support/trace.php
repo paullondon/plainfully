@@ -1,14 +1,23 @@
 <?php declare(strict_types=1);
 
 /**
- * trace.php
+ * ============================================================
+ * Plainfully File Info
+ * ============================================================
+ * File: app/support/trace.php
+ * Purpose:
+ *   Database-backed tracing for a single clarification run.
  *
- * Global tracing helpers.
+ * Key rules:
+ *   - Tracing is OFF unless PLAINFULLY_TRACE is enabled.
+ *   - Trace viewing is ADMIN ONLY (no token access).
+ *   - Trace viewing is time-limited (default: last 1 hour).
+ *   - Fail-open: tracing must never break the main pipeline.
  *
- * NOTE:
- * - This file lives in the global namespace (no `namespace ...;`)
- * - Therefore `use PDO;` / `use Throwable;` is unnecessary and triggers warnings.
- * - We use fully-qualified \PDO and \Throwable instead.
+ * Env flags:
+ *   - PLAINFULLY_TRACE=true|false
+ *   - PLAINFULLY_TRACE_MAX_AGE_SECONDS=3600
+ * ============================================================
  */
 
 if (!function_exists('pf_trace_enabled')) {
@@ -20,12 +29,13 @@ if (!function_exists('pf_trace_enabled')) {
     }
 }
 
-if (!function_exists('pf_trace_deep')) {
-    function pf_trace_deep(): bool
+if (!function_exists('pf_trace_max_age_seconds')) {
+    function pf_trace_max_age_seconds(): int
     {
-        $v = getenv('PLAINFULLY_TRACE_DEEP');
-        if ($v === false || $v === '') { return false; }
-        return in_array(strtolower((string)$v), ['1','true','yes','on'], true);
+        $raw = getenv('PLAINFULLY_TRACE_MAX_AGE_SECONDS');
+        if ($raw === false || trim((string)$raw) === '') { return 3600; }
+        $n = (int)$raw;
+        return ($n > 0 && $n <= 86400) ? $n : 3600;
     }
 }
 
@@ -36,74 +46,92 @@ if (!function_exists('pf_trace_new_id')) {
         $data[6] = chr((ord($data[6]) & 0x0f) | 0x40);
         $data[8] = chr((ord($data[8]) & 0x3f) | 0x80);
         $hex = bin2hex($data);
-        return substr($hex, 0, 8) . '-' . substr($hex, 8, 4) . '-' . substr($hex, 12, 4) . '-' . substr($hex, 16, 4) . '-' . substr($hex, 20, 12);
+
+        return substr($hex, 0, 8) . '-' .
+               substr($hex, 8, 4) . '-' .
+               substr($hex, 12, 4) . '-' .
+               substr($hex, 16, 4) . '-' .
+               substr($hex, 20, 12);
+    }
+}
+
+if (!function_exists('pf_trace_redact_meta')) {
+    function pf_trace_redact_meta($meta): array
+    {
+        if (is_string($meta)) {
+            $meta = ['_meta' => $meta];
+        } elseif (!is_array($meta)) {
+            $meta = ['_meta' => (string)$meta];
+        }
+
+        $redactKey = static function (string $k): bool {
+            return (bool)preg_match('/(pass(word)?|token|secret|authorization|cookie|api[_-]?key)/i', $k);
+        };
+
+        $walk = static function ($value) use (&$walk, $redactKey) {
+            if (is_array($value)) {
+                $out = [];
+                foreach ($value as $k => $v) {
+                    if (is_string($k) && $redactKey($k)) {
+                        $out[$k] = '[redacted]';
+                        continue;
+                    }
+                    $out[$k] = $walk($v);
+                }
+                return $out;
+            }
+
+            if (is_object($value)) {
+                return method_exists($value, '__toString') ? (string)$value : '[object]';
+            }
+
+            return $value;
+        };
+
+        return (array)$walk($meta);
     }
 }
 
 if (!function_exists('pf_trace_safe_json')) {
     function pf_trace_safe_json($meta): string
     {
-        // Normalise meta into an array
-        if (is_string($meta)) {
-            $meta = ['_meta' => $meta];
-        } elseif (!is_array($meta)) {
-            $meta = ['_meta' => (string)$meta];
-        }
-
+        $metaArr = pf_trace_redact_meta($meta);
         try {
-            $json = json_encode($meta, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            $json = json_encode($metaArr, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
             if (is_string($json) && $json !== '' && json_last_error() === JSON_ERROR_NONE) {
                 return $json;
             }
-        } catch (\Throwable $e) {
-            // ignore
-        }
+        } catch (Throwable $e) {}
         return '{}';
     }
 }
 
 if (!function_exists('pf_trace')) {
     function pf_trace(
-        ?\PDO $pdo,
+        ?PDO $pdo,
         string $traceId,
         string $level,
         string $stage,
-        $event,                 // allow bool/int/etc
+        $event,
         string $message,
-        $meta = [],             // allow string/etc
+        $meta = [],
         $queueId = null,
         $checkId = null
     ): void {
         if (!pf_trace_enabled()) { return; }
-        if ($traceId === '' || !($pdo instanceof \PDO)) { return; }
+        if ($traceId === '' || !($pdo instanceof PDO)) { return; }
 
         $level   = in_array($level, ['debug','info','warn','error'], true) ? $level : 'info';
         $stage   = substr((string)$stage, 0, 64);
         $event   = substr((string)$event, 0, 64);
         $message = substr((string)$message, 0, 255);
 
-        // Normalise meta into an array early
-        if (is_string($meta)) {
-            $meta = ['_meta' => $meta];
-        } elseif (!is_array($meta)) {
-            $meta = ['_meta' => (string)$meta];
-        }
-
-        if (!pf_trace_deep()) {
-            foreach (['raw_body','body','content','text','prompt','ai_result','extracted_text','normalized_text','truncated_text'] as $k) {
-                if (array_key_exists($k, $meta)) { unset($meta[$k]); }
-            }
-        }
-
         $metaJson = pf_trace_safe_json($meta);
 
         try {
-            // Normalise queueId/checkId to ints (or null) to avoid tracer crashing the pipeline
-            if (is_array($queueId)) { $queueId = null; }
             if (is_string($queueId) && ctype_digit($queueId)) { $queueId = (int)$queueId; }
             if (!is_int($queueId)) { $queueId = null; }
 
-            if (is_array($checkId)) { $checkId = null; }
             if (is_string($checkId) && ctype_digit($checkId)) { $checkId = (int)$checkId; }
             if (!is_int($checkId)) { $checkId = null; }
 
@@ -121,7 +149,7 @@ if (!function_exists('pf_trace')) {
                 ':queue_id' => $queueId,
                 ':check_id' => $checkId,
             ]);
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             error_log('pf_trace insert failed: ' . $e->getMessage());
         }
     }
@@ -130,11 +158,14 @@ if (!function_exists('pf_trace')) {
 if (!function_exists('pf_trace_allowed')) {
     function pf_trace_allowed(): bool
     {
-        $key = (string)(getenv('TRACE_VIEW_KEY') ?: '');
-        $provided = (string)($_GET['k'] ?? '');
-        if ($key !== '' && $provided !== '' && hash_equals($key, $provided)) { return true; }
-        if (pf_is_admin()) { return true; }
-        if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
-        return isset($_SESSION['user_id']) && (int)$_SESSION['user_id'] > 0;
+        return function_exists('pf_is_admin') && pf_is_admin();
+    }
+}
+
+if (!function_exists('pf_trace_view_cutoff_datetime')) {
+    function pf_trace_view_cutoff_datetime(): string
+    {
+        $seconds = pf_trace_max_age_seconds();
+        return date('Y-m-d H:i:s', time() - $seconds);
     }
 }
