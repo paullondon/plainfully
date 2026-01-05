@@ -15,13 +15,19 @@ function pf_render_shell(string $title, string $innerHtml, array $data = []): vo
     $isAdmin = function_exists('pf_is_admin') ? pf_is_admin() : false;
 
     // --- User tier badge (order: Admin > Unlimited > Basic) ---
+
     $tierLabel = 'Basic';
+    $tierBg    = '#6b7280'; // grey
+    $tierFg    = '#ffffff';
 
     if (function_exists('pf_is_admin') && pf_is_admin()) {
         $tierLabel = 'Admin';
+        $tierBg    = '#b91c1c'; // red
     } elseif (!empty($_SESSION['user_plan']) && $_SESSION['user_plan'] === 'unlimited') {
         $tierLabel = 'Unlimited';
+        $tierBg    = '#b45309'; // amber (darker for contrast)
     }
+
     // ----------------------------------------------------------
 
     $bodyClass = $isLoggedIn ? 'pf-shell-loggedin' : 'pf-shell-auth';
@@ -58,7 +64,7 @@ function pf_render_shell(string $title, string $innerHtml, array $data = []): vo
         </style>
     </head>
     <body class="<?= htmlspecialchars($bodyClass, ENT_QUOTES, 'UTF-8') ?>">
-     <?php if ($isLoggedIn): ?>
+    <?php if ($isLoggedIn): ?>
         <div style="
             position:fixed;
             top:12px;
@@ -66,14 +72,13 @@ function pf_render_shell(string $title, string $innerHtml, array $data = []): vo
             font-size:12px;
             padding:6px 10px;
             border-radius:999px;
-            background:#111827;
-            color:#fff;
-            opacity:0.85;
+            background:<?= htmlspecialchars($tierBg, ENT_QUOTES, 'UTF-8') ?>;
+            color:<?= htmlspecialchars($tierFg, ENT_QUOTES, 'UTF-8') ?>;
             z-index:1000;
         ">
             <?= htmlspecialchars($tierLabel, ENT_QUOTES, 'UTF-8') ?>
         </div>
-        <?php endif; ?>
+    <?php endif; ?>
    
     <main class="<?= htmlspecialchars($mainClass, ENT_QUOTES, 'UTF-8') ?>">
 
@@ -85,15 +90,6 @@ function pf_render_shell(string $title, string $innerHtml, array $data = []): vo
                         </a>
                     </div>
 
-                    <div class="pf-shellbar-right">
-                        <?php if ($userEmailSafe !== ''): ?>
-                            <span class="pf-shell-email"><?= $userEmailSafe ?></span>
-                        <?php endif; ?>
-
-                        <?php if ($isAdmin): ?>
-                            <span class="pf-admin-badge" title="Admin">ADMIN</span>
-                        <?php endif; ?>
-                    </div>
                 </div>
             <?php endif; ?>
 
