@@ -14,6 +14,16 @@ function pf_render_shell(string $title, string $innerHtml, array $data = []): vo
     // $isAdmin = (function_exists('pf_is_admin') && $isLoggedIn) ? (bool)pf_is_admin() : false;
     $isAdmin = function_exists('pf_is_admin') ? pf_is_admin() : false;
 
+    // --- User tier badge (order: Admin > Unlimited > Basic) ---
+    $tierLabel = 'Basic';
+
+    if (function_exists('pf_is_admin') && pf_is_admin()) {
+        $tierLabel = 'Admin';
+    } elseif (!empty($_SESSION['user_plan']) && $_SESSION['user_plan'] === 'unlimited') {
+        $tierLabel = 'Unlimited';
+    }
+    // ----------------------------------------------------------
+
     $bodyClass = $isLoggedIn ? 'pf-shell-loggedin' : 'pf-shell-auth';
     $mainClass = $isLoggedIn ? 'pf-main'           : 'pf-auth-card';
 
@@ -48,7 +58,24 @@ function pf_render_shell(string $title, string $innerHtml, array $data = []): vo
         </style>
     </head>
     <body class="<?= htmlspecialchars($bodyClass, ENT_QUOTES, 'UTF-8') ?>">
-        <main class="<?= htmlspecialchars($mainClass, ENT_QUOTES, 'UTF-8') ?>">
+     <?php if ($isLoggedIn): ?>
+        <div style="
+            position:fixed;
+            top:12px;
+            right:16px;
+            font-size:12px;
+            padding:6px 10px;
+            border-radius:999px;
+            background:#111827;
+            color:#fff;
+            opacity:0.85;
+            z-index:1000;
+        ">
+            <?= htmlspecialchars($tierLabel, ENT_QUOTES, 'UTF-8') ?>
+        </div>
+        <?php endif; ?>
+   
+    <main class="<?= htmlspecialchars($mainClass, ENT_QUOTES, 'UTF-8') ?>">
 
             <?php if ($isLoggedIn): ?>
                 <div class="pf-shellbar">
