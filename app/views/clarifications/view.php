@@ -1,313 +1,230 @@
 <?php declare(strict_types=1);
+
 /**
  * ============================================================
  * Plainfully File Info
  * ============================================================
  * File: app/views/clarifications/view.php
  * Purpose:
- *   Render a single clarification result page (web view).
+ *   Renders a single clarification result (web + email/SMS views).
  *
- * Key UX rules (MVP):
- *   - Calm, readable summary first.
- *   - Show optional detail sections only when present.
- *   - Follow-ups are NOT free text: user picks 1 guided question (max 1 total).
- *   - After a follow-up is chosen once, no further follow-ups are allowed.
+ * Design goals:
+ *   - Uses your existing global CSS tokens/classes (dark/light friendly)
+ *   - Avoids hard-coded colours
+ *   - Never throws notices/warnings if fields are missing
  *
- * Implementation notes:
- *   - This view is defensive: no notices/warnings if fields are missing.
- *   - Follow-up enforcement is client-side (localStorage) until DB wiring exists.
- *   - Follow-up action posts to /clarifications/new with a prebuilt prompt.
+ * Expected inputs:
+ *   - $vm (array) from clarifications_view_controller()
+ *       ['check'=>..., 'plan'=>..., 'key_points'=>..., 'risks'=>..., 'next_steps'=>..., 'short_verdict'=>...]
  * ============================================================
  */
 
-/** @var array $vm */
-$vm = isset($vm) && is_array($vm) ? $vm : [];
+$vm = (isset($vm) && is_array($vm)) ? $vm : [];
 
-function h($v): string {
-    return htmlspecialchars((string)($v ?? ''), ENT_QUOTES, 'UTF-8');
+$check = (isset($vm['check']) && is_array($vm['check'])) ? $vm['check'] : [];
+$plan  = (isset($vm['plan']) && is_array($vm['plan'])) ? $vm['plan'] : [];
+
+$keyPoints = (isset($vm['key_points']) && is_array($vm['key_points'])) ? $vm['key_points'] : [];
+$risks     = (isset($vm['risks']) && is_array($vm['risks'])) ? $vm['risks'] : [];
+$nextSteps = (isset($vm['next_steps']) && is_array($vm['next_steps'])) ? $vm['next_steps'] : [];
+
+$headline = (string)($vm['short_verdict'] ?? $check['short_summary'] ?? 'Your result is ready');
+
+$createdAt = (string)($check['created_at'] ?? '');
+$channel   = (string)($check['channel'] ?? '');
+$id        = (int)($check['id'] ?? 0);
+
+// -------------------------------
+// Safe fallbacks (avoid empties)
+// -------------------------------
+if (empty($keyPoints)) {
+    $keyPoints = ['No key points were provided for this result.'];
 }
-function arr($v): array {
-    return is_array($v) ? $v : [];
+if (empty($risks)) {
+    $risks = ['No major risks were identified, but stay cautious with links and any request for money or personal details.'];
 }
-
-/** Core record */
-$check = arr($vm['check'] ?? []);
-$checkId = (int)($check['id'] ?? 0);
-
-/** AI-derived view pieces (already parsed in controller) */
-$plan = arr($vm['plan'] ?? []);
-$keyPoints = arr($vm['key_points'] ?? []);
-$risks = arr($vm['risks'] ?? []);
-$nextSteps = arr($vm['next_steps'] ?? []);
-$shortVerdict = (string)($vm['short_verdict'] ?? ($check['short_summary'] ?? 'Result ready'));
-
-/** Optional “web” fields from CheckResult / AI JSON (safe fallbacks) */
-$whatSays = (string)($vm['web_what_the_message_says'] ?? '');
-$whatAsks = (string)($vm['web_what_its_asking_for'] ?? '');
-$scamLine = (string)($vm['web_scam_level_line'] ?? '');
-$lowRiskNote = (string)($vm['web_low_risk_note'] ?? '');
-$scamExpl = (string)($vm['web_scam_explanation'] ?? '');
-
-/**
- * Follow-up questions:
- * Expected shape (preferred, once you wire it):
- *   $vm['followups'] = [
- *      ['id' => 'f1', 'label' => 'Question text...'],
- *      ...
- *   ];
- *
- * Backward-compatible fallback:
- *   If not present, we show a fixed set (still AI-friendly wording).
- */
-$followups = arr($vm['followups'] ?? []);
-if (count($followups) < 3) {
-    $followups = [
-        ['id' => 'f1', 'label' => 'What should I do next, step-by-step?'],
-        ['id' => 'f2', 'label' => 'What parts of this message are the biggest red flags (if any)?'],
-        ['id' => 'f3', 'label' => 'Can you rewrite a safe reply I could send back (if I choose to respond)?'],
-        ['id' => 'f4', 'label' => 'How can I verify this is real using trusted contact routes?'],
-    ];
+if (empty($nextSteps)) {
+    $nextSteps = ['Most people use this to decide whether to ignore the message, verify the sender via a trusted route, or ask for a second opinion.'];
 }
 
-/** Cap to 3–5 options */
-$followups = array_slice($followups, 0, 5);
+$planName  = (string)($plan['name'] ?? 'Basic');
+$planUsed  = $plan['used'] ?? null;
+$planLimit = $plan['limit'] ?? null;
 
-/** Plan badge label (Basic/Unlimited/Admin) — prefer controller-provided if available */
-$planName = (string)($plan['name'] ?? '');
-if ($planName === '') {
-    // safe fallback: infer from user table if you later pass it; else Basic
-    $planName = 'Basic';
-}
+// -------------------------------
+// MVP follow-up (single-use lock)
+// NOTE: You asked for guided choices only (no free text).
+// For MVP, lock is stored in browser localStorage per check-id.
+// When you wire DB follow-ups later, swap this to server-enforced.
+// -------------------------------
+$followUpChoices = [
+    'What should I do next, step-by-step?',
+    'What are the biggest red flags (if any)?',
+    'Can you rewrite a safe reply I could send back (if I respond)?',
+    'How can I verify this is real using trusted contact routes?',
+    'What should I avoid doing right now?',
+];
+$followUpChoices = array_slice($followUpChoices, 0, 5); // keep to 3–5 in UI by CSS; still safe here.
 ?>
-<style>
-/* ============================================================
-   Page-local styling (uses your existing CSS tokens)
-   ============================================================ */
-.pf-result-wrap{max-width:980px;margin:18px auto;padding:0 14px;}
-.pf-result-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 14px;}
-.pf-logo{display:flex;align-items:center;gap:10px;text-decoration:none;}
-.pf-logo img{width:34px;height:34px;border-radius:10px;display:block}
-.pf-logo span{font-weight:700;color:var(--pf-text);letter-spacing:.2px}
-.pf-chip{display:inline-flex;align-items:center;gap:8px;padding:6px 10px;border-radius:999px;border:1px solid var(--pf-border);background:var(--pf-surface);color:var(--pf-text);font-size:13px;white-space:nowrap;}
-.pf-chip strong{font-weight:700}
-.pf-cardx{border:1px solid var(--pf-border);background:var(--pf-surface);border-radius:16px;padding:16px;margin:0 0 14px;}
-.pf-title{margin:0 0 8px 0;font-size:22px;line-height:1.2;}
-.pf-muted{color:var(--pf-text-muted);}
-.pf-row{display:flex;gap:12px;flex-wrap:wrap;margin-top:10px;}
-.pf-col{flex:1;min-width:240px;}
-.pf-h2{margin:0 0 10px 0;font-size:16px;}
-.pf-ul{margin:0;padding-left:18px;}
-.pf-ul li{margin:6px 0;}
-.pf-banner{padding:12px 14px;border-radius:14px;border:1px solid var(--pf-border);background:rgba(255,255,255,0.02);}
-.pf-banner strong{font-weight:800;}
-.pf-followup-grid{display:flex;gap:10px;flex-wrap:wrap;}
-.pf-followup-btn{border:1px solid var(--pf-border);background:var(--pf-surface);color:var(--pf-text);padding:10px 12px;border-radius:12px;cursor:pointer;min-width:240px;flex:1;}
-.pf-followup-btn:hover{filter:brightness(1.06);}
-.pf-followup-btn[disabled]{opacity:.45;cursor:not-allowed;filter:none;}
-.pf-divider{height:1px;background:var(--pf-border);margin:14px 0;}
-.pf-note{font-size:13px;color:var(--pf-text-muted);margin:8px 0 0;}
-</style>
+<div class="pf-page">
 
-<div class="pf-result-wrap">
-  <div class="pf-result-head">
-    <a class="pf-logo" href="/dashboard" aria-label="Back to dashboard">
-      <img src="/assets/img/plainfully-logo-light.256.png" alt="Plainfully" loading="lazy">
-      <span>Plainfully</span>
-    </a>
-    <div class="pf-chip" title="Your current plan">
-      <strong><?= h($planName) ?></strong>
-    </div>
-  </div>
-
-  <div class="pf-cardx">
-    <h1 class="pf-title"><?= h($shortVerdict) ?></h1>
-    <div class="pf-muted" style="font-size:13px;">
-      <?= h((string)($check['created_at'] ?? '')) ?>
-      <?php if (!empty($check['channel'])): ?>
-        • <?= h((string)$check['channel']) ?>
-      <?php endif; ?>
-      <?php if ($checkId > 0): ?>
-        • #<?= h((string)$checkId) ?>
-      <?php endif; ?>
-    </div>
-
-    <?php if ($scamLine !== ''): ?>
-      <div class="pf-banner" style="margin-top:12px;">
-        <strong><?= h($scamLine) ?></strong>
-        <?php if ($lowRiskNote !== ''): ?>
-          <div class="pf-note"><?= h($lowRiskNote) ?></div>
-        <?php endif; ?>
+  <!-- Page header card -->
+  <div class="pf-card pf-card-lg" style="margin-bottom:16px;">
+    <div class="pf-row" style="align-items:center; gap:12px;">
+      <div style="flex:0 0 auto;">
+        <img
+          src="/assets/img/plainfully-logo-light.256.png"
+          alt="Plainfully"
+          style="width:42px;height:42px;border-radius:10px;display:block;"
+          loading="lazy"
+        >
       </div>
-    <?php endif; ?>
 
-    <?php if ($whatSays !== '' || $whatAsks !== ''): ?>
-      <div class="pf-row">
-        <?php if ($whatSays !== ''): ?>
-          <div class="pf-col">
-            <div class="pf-h2">What the message says</div>
-            <div class="pf-banner"><?= nl2br(h($whatSays)) ?></div>
-          </div>
-        <?php endif; ?>
-        <?php if ($whatAsks !== ''): ?>
-          <div class="pf-col">
-            <div class="pf-h2">What it’s asking for</div>
-            <div class="pf-banner"><?= nl2br(h($whatAsks)) ?></div>
-          </div>
-        <?php endif; ?>
+      <div style="flex:1 1 auto; min-width:0;">
+        <h1 class="pf-h1" style="margin:0; font-size:22px; line-height:1.2;">
+          <?= htmlspecialchars($headline, ENT_QUOTES, 'UTF-8') ?>
+        </h1>
+
+        <div class="pf-muted" style="margin-top:6px;">
+          <?php if ($createdAt !== ''): ?>
+            <?= htmlspecialchars($createdAt, ENT_QUOTES, 'UTF-8') ?>
+          <?php endif; ?>
+          <?php if ($channel !== ''): ?>
+            <span aria-hidden="true"> • </span><?= htmlspecialchars($channel, ENT_QUOTES, 'UTF-8') ?>
+          <?php endif; ?>
+          <?php if ($id > 0): ?>
+            <span aria-hidden="true"> • </span>#<?= (int)$id ?>
+          <?php endif; ?>
+        </div>
       </div>
-    <?php endif; ?>
 
-    <?php if ($scamExpl !== ''): ?>
-      <div class="pf-divider"></div>
-      <div class="pf-h2">Why this verdict</div>
-      <div class="pf-banner"><?= nl2br(h($scamExpl)) ?></div>
-    <?php endif; ?>
-  </div>
-
-  <div class="pf-cardx">
-    <div class="pf-h2">Key things to know</div>
-    <?php if (count($keyPoints) > 0): ?>
-      <ul class="pf-ul">
-        <?php foreach ($keyPoints as $p): ?>
-          <?php if (is_string($p) && trim($p) !== ''): ?>
-            <li><?= h($p) ?></li>
+      <div style="flex:0 0 auto; text-align:right;">
+        <div class="pf-pill" style="display:inline-block;">
+          <?= htmlspecialchars($planName, ENT_QUOTES, 'UTF-8') ?>
+          <?php if ($planLimit !== null && $planUsed !== null): ?>
+            <span class="pf-muted">· <?= (int)$planUsed ?>/<?= (int)$planLimit ?></span>
           <?php endif; ?>
-        <?php endforeach; ?>
-      </ul>
-    <?php else: ?>
-      <div class="pf-muted">No key points were provided for this result.</div>
-    <?php endif; ?>
-  </div>
-
-  <div class="pf-cardx">
-    <div class="pf-h2">Risks / cautions</div>
-    <?php if (count($risks) > 0): ?>
-      <ul class="pf-ul">
-        <?php foreach ($risks as $r): ?>
-          <?php if (is_string($r) && trim($r) !== ''): ?>
-            <li><?= h($r) ?></li>
-          <?php endif; ?>
-        <?php endforeach; ?>
-      </ul>
-    <?php else: ?>
-      <div class="pf-muted">No major risks were identified, but stay cautious with links and any request for money or personal details.</div>
-    <?php endif; ?>
-  </div>
-
-  <div class="pf-cardx">
-    <div class="pf-h2">What people typically do next</div>
-    <?php if (count($nextSteps) > 0): ?>
-      <ul class="pf-ul">
-        <?php foreach ($nextSteps as $s): ?>
-          <?php if (is_string($s) && trim($s) !== ''): ?>
-            <li><?= h($s) ?></li>
-          <?php endif; ?>
-        <?php endforeach; ?>
-      </ul>
-    <?php else: ?>
-      <div class="pf-muted">Most people use this to decide whether to ignore the message, verify the sender via a trusted route, or ask for a second opinion.</div>
-    <?php endif; ?>
-  </div>
-
-  <div class="pf-cardx" id="pf-followup-card">
-    <div class="pf-h2">One guided follow‑up (optional)</div>
-    <div class="pf-muted" style="margin:0 0 10px 0;">
-      Pick one question. Once used, follow‑ups are locked for this result.
+        </div>
+      </div>
     </div>
+  </div>
 
-    <div class="pf-followup-grid" id="pf-followup-options">
-      <?php foreach ($followups as $f):
-        $fid = (string)($f['id'] ?? '');
-        $label = (string)($f['label'] ?? '');
-        if ($fid === '' || trim($label) === '') { continue; }
+  <!-- Key things to know -->
+  <div class="pf-card" style="margin-bottom:16px;">
+    <h2 class="pf-h2" style="margin-top:0;">Key things to know</h2>
+    <ul class="pf-list">
+      <?php foreach ($keyPoints as $p): ?>
+        <li><?= htmlspecialchars((string)$p, ENT_QUOTES, 'UTF-8') ?></li>
+      <?php endforeach; ?>
+    </ul>
+  </div>
 
-        // We post to /clarifications/new and ask the controller to prefill.
-        // (Server wiring can be added later; this already works as a normal new check.)
-        $prefill =
-          "Follow-up to clarification #{$checkId}\n\n" .
-          "Question: {$label}\n\n" .
-          "Context: (use the existing result details above — do NOT ask for the original email again unless essential)\n";
-      ?>
-        <form method="post" action="/clarifications/new" style="margin:0;">
-          <input type="hidden" name="tone" value="calm">
-          <input type="hidden" name="text" value="<?= h($prefill) ?>">
-          <button class="pf-followup-btn" type="submit"
-                  data-followup-btn="1"
-                  data-followup-qid="<?= h($fid) ?>"
-                  data-followup-label="<?= h($label) ?>">
-            <?= h($label) ?>
-          </button>
-        </form>
+  <!-- Risks / cautions -->
+  <div class="pf-card" style="margin-bottom:16px;">
+    <h2 class="pf-h2" style="margin-top:0;">Risks / cautions</h2>
+    <ul class="pf-list">
+      <?php foreach ($risks as $r): ?>
+        <li><?= htmlspecialchars((string)$r, ENT_QUOTES, 'UTF-8') ?></li>
+      <?php endforeach; ?>
+    </ul>
+  </div>
+
+  <!-- Next steps -->
+  <div class="pf-card" style="margin-bottom:16px;">
+    <h2 class="pf-h2" style="margin-top:0;">What people typically do next</h2>
+    <ul class="pf-list">
+      <?php foreach ($nextSteps as $s): ?>
+        <li><?= htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8') ?></li>
+      <?php endforeach; ?>
+    </ul>
+  </div>
+
+  <!-- One guided follow-up -->
+  <div class="pf-card">
+    <h2 class="pf-h2" style="margin-top:0;">One guided follow-up (optional)</h2>
+    <p class="pf-muted" style="margin-top:-4px;">
+      Pick one question. Once used, follow-ups are locked for this result.
+    </p>
+
+    <div id="pf-followup-wrap" class="pf-stack" style="gap:10px;">
+      <?php foreach ($followUpChoices as $i => $label): ?>
+        <button
+          type="button"
+          class="pf-btn pf-btn-secondary pf-followup-btn"
+          data-followup="<?= htmlspecialchars((string)$label, ENT_QUOTES, 'UTF-8') ?>"
+          style="width:100%; text-align:left; padding:14px 14px; border-radius:14px;"
+        >
+          <?= htmlspecialchars((string)$label, ENT_QUOTES, 'UTF-8') ?>
+        </button>
       <?php endforeach; ?>
     </div>
 
-    <div class="pf-divider"></div>
-
-    <div id="pf-followup-chosen" style="display:none;">
-      <div class="pf-h2" style="margin:0 0 8px 0;">Your follow‑up</div>
-      <div class="pf-banner" id="pf-followup-chosen-text"></div>
-      <div class="pf-note">Follow‑ups are now locked for this result.</div>
-    </div>
-
-    <div class="pf-note">
-      MVP note: this lock is stored in your browser for now. When you wire DB follow-ups, this will become account‑wide.
+    <div id="pf-followup-result" style="display:none; margin-top:14px;">
+      <div class="pf-divider" style="margin:14px 0;"></div>
+      <div class="pf-muted" style="margin-bottom:8px;">Your follow-up:</div>
+      <div id="pf-followup-chosen" class="pf-card" style="margin:0; padding:14px;"></div>
+      <p class="pf-muted" style="margin-top:10px; font-size:13px;">
+        MVP note: this lock is stored in your browser for now. When you wire DB follow-ups, this will become account-wide.
+      </p>
     </div>
   </div>
+
 </div>
 
 <script>
-/**
- * ============================================================
- * Follow-up lock (client-side MVP)
- * ============================================================
- * - Once a follow-up is selected for a check_id, we disable the buttons
- * - We show the chosen follow-up underneath
- *
- * Storage key:
- *   pf_followup_used_{checkId} = JSON string { id, label, ts }
- */
 (function () {
-  var checkId = <?= (int)$checkId ?>;
-  if (!checkId) return;
-
-  var key = "pf_followup_used_" + checkId;
-  var used = null;
-
   try {
-    var raw = window.localStorage.getItem(key);
-    if (raw) used = JSON.parse(raw);
-  } catch (e) {}
+    var checkId = <?= (int)$id ?>;
+    if (!checkId) { return; }
 
-  var btns = document.querySelectorAll("[data-followup-btn='1']");
-  var chosenWrap = document.getElementById("pf-followup-chosen");
-  var chosenText = document.getElementById("pf-followup-chosen-text");
+    var key = "pf_followup_used_" + String(checkId);
+    var used = localStorage.getItem(key);
 
-  function lockUI(selected) {
-    btns.forEach(function (b) { b.disabled = true; });
-    if (selected && selected.label && chosenWrap && chosenText) {
-      chosenText.textContent = selected.label;
-      chosenWrap.style.display = "block";
+    var wrap = document.getElementById("pf-followup-wrap");
+    var res  = document.getElementById("pf-followup-result");
+    var out  = document.getElementById("pf-followup-chosen");
+
+    function lockButtons(chosenText) {
+      if (!wrap) { return; }
+      var btns = wrap.querySelectorAll(".pf-followup-btn");
+      btns.forEach(function (b) {
+        b.disabled = true;
+        b.classList.add("is-disabled");
+        b.style.opacity = "0.55";
+      });
+
+      if (res && out) {
+        out.textContent = chosenText || "Follow-up completed.";
+        res.style.display = "block";
+      }
     }
-  }
 
-  if (used && used.label) {
-    lockUI(used);
-    return;
-  }
+    if (used) {
+      lockButtons(used);
+      return;
+    }
 
-  // On click, store lock before navigating
-  btns.forEach(function (b) {
-    b.addEventListener("click", function () {
-      try {
-        var payload = {
-          id: b.getAttribute("data-followup-qid") || "",
-          label: b.getAttribute("data-followup-label") || "",
-          ts: Date.now()
-        };
-        window.localStorage.setItem(key, JSON.stringify(payload));
-        lockUI(payload);
-      } catch (e) {}
-    }, { passive: true });
-  });
+    if (!wrap) { return; }
+
+    wrap.addEventListener("click", function (e) {
+      var t = e.target;
+      if (!t || !t.classList || !t.classList.contains("pf-followup-btn")) { return; }
+
+      var chosen = t.getAttribute("data-followup") || "";
+      if (!chosen) { return; }
+
+      // Store lock BEFORE UI changes (fail-safe)
+      localStorage.setItem(key, chosen);
+
+      // Replace with chosen summary under the card
+      lockButtons(chosen);
+
+      // TODO (next step): submit follow-up to server + store in DB + run AI.
+      // For now we only store the chosen question text.
+    });
+
+  } catch (err) {
+    // fail-open: no follow-up lock if browser blocks storage
+  }
 })();
 </script>
