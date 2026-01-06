@@ -17,6 +17,7 @@ if (PHP_SAPI !== 'cli') { http_response_code(403); echo "CLI only.\n"; exit(1); 
 date_default_timezone_set('UTC');
 
 $ROOT = realpath(__DIR__ . '/..') ?: (__DIR__ . '/..');
+require_once __DIR__ . '/../../bootstrap/app.php';
 
 require_once $ROOT . '/app/support/trace.php';
 require_once $ROOT . '/app/features/checks/ai_mode.php';
