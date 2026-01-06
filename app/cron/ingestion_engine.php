@@ -31,7 +31,8 @@ date_default_timezone_set('UTC');
 
 $ROOT = realpath(__DIR__ . '/..') ?: (__DIR__ . '/..');
 
-require_once __DIR__ . '/../bootstrap/app.php';
+require_once __DIR__ . '/../../bootstrap/app.php';
+
 
 require_once $ROOT . '/support/email_templates.php';
 require_once $ROOT . '/support/imap_attachments.php';
