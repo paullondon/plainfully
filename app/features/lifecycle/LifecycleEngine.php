@@ -5,18 +5,6 @@ namespace App\Features\Lifecycle;
 use PDO;
 use Throwable;
 
-/**
- * LifecycleEngine
- *
- * Purpose:
- * - Decouple lifecycle emails from ingestion/registration
- * - Send calm, scheduled messages based on user state
- *
- * Security:
- * - Prepared statements only
- * - Idempotent flags (send-once markers)
- * - Per-user failure isolation (one bad address doesn't break the run)
- */
 final class LifecycleEngine
 {
     private PDO $pdo;
@@ -28,41 +16,18 @@ final class LifecycleEngine
         $this->mailer = new LifecycleMailer();
     }
 
-    /**
-     * Run lifecycle processing for up to $limit users.
-     *
-     * @param int $limit Max users processed per cron run (rate limiting).
-     */
     public function run(int $limit = 50): void
     {
-        // Ensure we have flags rows for newly created users.
         $this->ensureFlagsRows($limit);
 
-        // 1) Welcome (Day 0)
         $this->sendWelcome($limit);
-
-        // 2) Hints & tips (Day 3)
         $this->sendTips($limit);
-
-        // 3) Under-use reminder (Day 10, only if unused free allowance + not paid)
         $this->sendUnderusePrompt($limit);
-
-        // 4) Feedback request (Day 20)
         $this->sendDay20Feedback($limit);
-
-        // 5) Single-day token follow-up (near expiry)
         $this->sendSingleDayFollowup($limit);
-
-        // 6) Direct-debit unlimited check-in (10–20 days after first DD upgrade)
         $this->sendDirectDebitCheckin($limit);
-
-        // 7) Monthly “Clarification Engine Review” (every 28 days, DD unlimited only)
         $this->sendDirectDebitMonthlyReview($limit);
     }
-
-    // ---------------------------------------------------------------------
-    // Flags seeding (idempotent)
-    // ---------------------------------------------------------------------
 
     private function ensureFlagsRows(int $limit): void
     {
@@ -80,10 +45,6 @@ final class LifecycleEngine
         $stmt->bindValue(':lim', $limit, PDO::PARAM_INT);
         $stmt->execute();
     }
-
-    // ---------------------------------------------------------------------
-    // Email senders
-    // ---------------------------------------------------------------------
 
     private function sendWelcome(int $limit): void
     {
@@ -134,12 +95,6 @@ final class LifecycleEngine
 
     private function sendUnderusePrompt(int $limit): void
     {
-        /**
-         * Definition (MVP):
-         * - User has at least one FREE token that has not expired yet
-         * - User does NOT have any active PAID token (day or unlimited)
-         * - It's been 10+ days since signup
-         */
         $sql = "
             SELECT u.id, u.email
             FROM users u
@@ -200,12 +155,6 @@ final class LifecycleEngine
 
     private function sendSingleDayFollowup(int $limit): void
     {
-        /**
-         * Trigger:
-         * - Their most recent DAY token expires within 24 hours (or already expired within last 12h)
-         * - They do NOT have an active unlimited token
-         * - We haven't sent the follow-up before
-         */
         $sql = "
             SELECT u.id, u.email
             FROM users u
@@ -229,7 +178,6 @@ final class LifecycleEngine
         ";
 
         $this->sendBatch($sql, $limit, function (int $userId, string $email): void {
-            // MVP: offer another day “on us” + calm 99p next-27-days offer (optional CTA)
             $this->mailer->sendSingleDayFollowup($email, $userId);
 
             $upd = $this->pdo->prepare("
@@ -243,11 +191,6 @@ final class LifecycleEngine
 
     private function sendDirectDebitCheckin(int $limit): void
     {
-        /**
-         * Trigger:
-         * - First unlimited token purchased via direct debit was 10–20 days ago
-         * - Send once only
-         */
         $sql = "
             SELECT u.id, u.email
             FROM users u
@@ -279,11 +222,6 @@ final class LifecycleEngine
 
     private function sendDirectDebitMonthlyReview(int $limit): void
     {
-        /**
-         * Trigger:
-         * - User has an active unlimited token via direct debit
-         * - Last monthly review was 28+ days ago (or never)
-         */
         $sql = "
             SELECT u.id, u.email
             FROM users u
@@ -312,17 +250,6 @@ final class LifecycleEngine
         });
     }
 
-    // ---------------------------------------------------------------------
-    // Helpers
-    // ---------------------------------------------------------------------
-
-    /**
-     * Batch-send helper.
-     *
-     * @param string   $sql      Query that returns (id, email)
-     * @param int      $limit    Row limit
-     * @param callable $perUser  function(int $userId, string $email): void
-     */
     private function sendBatch(string $sql, int $limit, callable $perUser): void
     {
         $stmt = $this->pdo->prepare($sql);
@@ -330,25 +257,55 @@ final class LifecycleEngine
         $stmt->execute();
 
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        if (!$rows) {
-            return;
-        }
+        if (!$rows) { return; }
 
-        foreach ($rows as $r) {
-            $userId = (int)($r['id'] ?? 0);
-            $email  = (string)($r['email'] ?? '');
+        foreach ($rows as $row) {
+            $userId = (int)($row['id'] ?? 0);
+            $email  = (string)($row['email'] ?? '');
 
-            if ($userId <= 0 || $email === '') {
-                continue;
-            }
+            if ($userId <= 0 || $email === '') { continue; }
 
             try {
                 $perUser($userId, $email);
             } catch (Throwable $e) {
-                // Per-user failure isolation: mark nothing, retry next run.
+                $msg = strtolower($e->getMessage());
+
+                // DB sanitisation: delete only on strong permanent mailbox errors.
+                if ($this->isPermanentMailboxFailure($msg)) {
+                    $this->deleteUser($userId);
+                    error_log('[lifecycle_engine] deleted user ' . $userId . ' (mailbox invalid)');
+                    continue;
+                }
+
                 error_log('[lifecycle_engine] user ' . $userId . ' failed: ' . $e->getMessage());
             }
         }
     }
-}
 
+    private function isPermanentMailboxFailure(string $msg): bool
+    {
+        // DO NOT include 5.7.1 (policy) here — that can be real users.
+        $patterns = [
+            '5.1.1',
+            'unknown user',
+            'no such user',
+            'user does not exist',
+            'mailbox unavailable',
+            'recipient address rejected',
+            'address not found',
+        ];
+
+        foreach ($patterns as $p) {
+            if (str_contains($msg, $p)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private function deleteUser(int $userId): void
+    {
+        $del = $this->pdo->prepare("DELETE FROM users WHERE id = :id");
+        $del->execute([':id' => $userId]);
+    }
+}
