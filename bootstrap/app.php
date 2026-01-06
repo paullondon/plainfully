@@ -1,25 +1,32 @@
 <?php declare(strict_types=1);
 
 /**
+ * ============================================================
  * Plainfully Bootstrapper
- * 
- * Loads environment, config, handlers, middleware,
- * support libraries and all required controllers.
+ * ============================================================
+ * File: bootstrap/app.php
+ * Purpose:
+ *   Single entrypoint bootstrap for web + cron + hooks.
+ *
+ * Loads (in order):
+ *   1) Env loader (pf_load_env_file) + loads httpdocs/.env
+ *   2) Error handling
+ *   3) Central includes list (helpers/support/controllers)
+ *   4) Security headers (web-only)
+ *   5) Session settings (web-only) + start session + idle timeout
+ *   6) Router (unless PLAINFULLY_SKIP_ROUTER)
+ * ============================================================
  */
 
 // ---------------------------------------------------------
-// 0. Simple .env loader (root-level .env)
+// 0. Env loader + load .env ONCE (root-level httpdocs/.env)
 // ---------------------------------------------------------
-$envPath = dirname(__DIR__) . '/.env';
-if (is_readable($envPath)) {
-    foreach (file($envPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
-        $line = trim($line);
-        if ($line === '' || str_starts_with($line, '#')) {
-            continue;
-        }
-        [$k, $v] = array_map('trim', explode('=', $line, 2));
-        putenv("$k=$v");
-    }
+require_once __DIR__ . '/../app/controllers/file_loader_controller.php';
+pf_load_env_file(__DIR__ . '/../.env');
+
+// Marker for debugging: can verify bootstrap was loaded
+if (!defined('PF_BOOTSTRAPPED')) {
+    define('PF_BOOTSTRAPPED', true);
 }
 
 // ---------------------------------------------------------
@@ -40,15 +47,16 @@ set_exception_handler(function (Throwable $e): void {
     error_log('[Plainfully] Uncaught exception: ' . $e->getMessage() . ' in ' .
         $e->getFile() . ':' . $e->getLine());
 
-    http_response_code(500);
-    $env   = getenv('APP_ENV') ?: 'local';
-    $uri   = $_SERVER['REQUEST_URI'] ?? '';
-    $isCli = (PHP_SAPI === 'cli');
+    $env    = getenv('APP_ENV') ?: 'local';
+    $uri    = $_SERVER['REQUEST_URI'] ?? '';
+    $isCli  = (PHP_SAPI === 'cli');
     $isHook = is_string($uri) && str_starts_with($uri, '/hooks/');
 
     // CLI and /hooks/* → JSON, no pf_render_shell usage
     if ($isCli || $isHook) {
-        header('Content-Type: application/json; charset=utf-8');
+        if (!headers_sent()) {
+            header('Content-Type: application/json; charset=utf-8');
+        }
 
         if (strtolower($env) !== 'live' && strtolower($env) !== 'production') {
             echo json_encode([
@@ -66,6 +74,8 @@ set_exception_handler(function (Throwable $e): void {
     }
 
     // Normal web requests
+    http_response_code(500);
+
     if (strtolower($env) !== 'live' && strtolower($env) !== 'production') {
         // Debug page
         if (function_exists('pf_render_shell')) {
@@ -76,7 +86,9 @@ set_exception_handler(function (Throwable $e): void {
                 '</pre>'
             );
         } else {
-            header('Content-Type: text/plain; charset=utf-8');
+            if (!headers_sent()) {
+                header('Content-Type: text/plain; charset=utf-8');
+            }
             echo (string)$e;
         }
     } else {
@@ -87,87 +99,71 @@ set_exception_handler(function (Throwable $e): void {
             $inner = ob_get_clean();
             pf_render_shell('Error', $inner);
         } else {
-            header('Content-Type: text/plain; charset=utf-8');
-            echo "Something went wrong.\n";
+            if (!headers_sent()) {
+                header('Content-Type: text/plain; charset=utf-8');
+            }
+            echo "Something went wrong.
+";
         }
     }
 
     exit;
 });
 
-
+// ---------------------------------------------------------
+// 2. Central includes list (config + helpers + modules)
+// ---------------------------------------------------------
+require_once __DIR__ . '/includes.php';
 
 // ---------------------------------------------------------
-// 2. Security headers
+// 3. Security headers (web-only)
 // ---------------------------------------------------------
-header('X-Frame-Options: SAMEORIGIN');
-header('X-Content-Type-Options: nosniff');
-header('Referrer-Policy: strict-origin-when-cross-origin');
-header(
-    "Content-Security-Policy: " .
-    "default-src 'self'; " .
-    "style-src 'self' 'unsafe-inline'; " .
-    "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com; " .
-    "frame-src https://challenges.cloudflare.com;"
-);
-
-// ---------------------------------------------------------
-// 3. Sessions – secure cookie flags
-// ---------------------------------------------------------
-$cookieParams   = session_get_cookie_params();
-$sessionDays   = (int)(getenv('SESSION_LIFETIME_DAYS') ?: 7);
-$sessionHours  = (int)(getenv('SESSION_IDLE_HOURS') ?: 12);
-
-$cookieLifetime = 60 * 60 * 24 * $sessionDays;
-
-session_set_cookie_params([
-    'lifetime' => $cookieLifetime,
-    'path'     => $cookieParams['path'],
-    'domain'   => $cookieParams['domain'],
-    'secure'   => true,      // HTTPS only
-    'httponly' => true,      // not accessible to JS
-    'samesite' => 'Lax',     // good default for auth
-]);
+if (PHP_SAPI !== 'cli') {
+    header('X-Frame-Options: SAMEORIGIN');
+    header('X-Content-Type-Options: nosniff');
+    header('Referrer-Policy: strict-origin-when-cross-origin');
+    header(
+        "Content-Security-Policy: " .
+        "default-src 'self'; " .
+        "style-src 'self' 'unsafe-inline'; " .
+        "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com; " .
+        "frame-src https://challenges.cloudflare.com;"
+    );
+}
 
 // ---------------------------------------------------------
-// 4. Load config + helpers + modules
+// 4. Sessions – secure cookie flags (web-only)
 // ---------------------------------------------------------
-$config = require dirname(__DIR__) . '/config/app.php';
+if (PHP_SAPI !== 'cli') {
+    $cookieParams = session_get_cookie_params();
 
-session_start();
-// auth
-require dirname(__DIR__) . '/app/auth/login.php';
+    // Use standardised env helpers if present, else fallback
+    $sessionDays  = function_exists('pf_env_int') ? pf_env_int('SESSION_LIFETIME_DAYS', 7, 1, 365) : (int)(getenv('SESSION_LIFETIME_DAYS') ?: 7);
+    $sessionHours = function_exists('pf_env_int') ? pf_env_int('SESSION_IDLE_HOURS', 12, 1, 168) : (int)(getenv('SESSION_IDLE_HOURS') ?: 12);
 
-// views
-require dirname(__DIR__) . '/app/views/render.php';
+    $cookieLifetime = 60 * 60 * 24 * $sessionDays;
 
-// support
-require dirname(__DIR__) . '/app/support/helpers.php';
-require dirname(__DIR__) . '/app/support/db.php';
-require dirname(__DIR__) . '/app/support/mailer.php';
-require dirname(__DIR__) . '/app/support/rate_limiter.php';
-require dirname(__DIR__) . '/app/support/session_hardening.php';
-pf_enforce_idle_timeout();
-require dirname(__DIR__) . '/app/support/auth_middleware.php';
-require dirname(__DIR__) . '/app/support/request.php';
-require dirname(__DIR__) . '/app/support/csrf.php';
-require dirname(__DIR__) . '/app/support/auth_log.php';
-require dirname(__DIR__) . '/app/support/debug_guard.php';
-require dirname(__DIR__) . '/app/support/debug_consultations.php';
-require dirname(__DIR__) . '/app/support/debug_shell.php';
-//require dirname(__DIR__) . '/app/support/turnstile.php';
+    session_set_cookie_params([
+        'lifetime' => $cookieLifetime,
+        'path'     => $cookieParams['path'],
+        'domain'   => $cookieParams['domain'],
+        'secure'   => true,      // HTTPS only
+        'httponly' => true,      // not accessible to JS
+        'samesite' => 'Lax',     // good default for auth
+    ]);
 
-// controllers
-require dirname(__DIR__) . '/app/controllers/welcome_controller.php';
-require dirname(__DIR__) . '/app/controllers/health_controller.php';
-require dirname(__DIR__) . '/app/controllers/logout_controller.php';
-require dirname(__DIR__) . '/app/controllers/clarifications_controller.php';
-require dirname(__DIR__) . '/app/controllers/dashboard.php';
-require dirname(__DIR__) . '/app/controllers/email_hooks_controller.php';
-require dirname(__DIR__) . '/app/controllers/checks_debug_controller.php';
-require dirname(__DIR__) . '/app/controllers/admin_debug_controller.php';
+    if (session_status() !== PHP_SESSION_ACTIVE) {
+        session_start();
+    }
 
-// router
+    if (function_exists('pf_enforce_idle_timeout')) {
+        pf_enforce_idle_timeout();
+    }
+}
+
+// ---------------------------------------------------------
+// 5. Router (web-only) – unless explicitly skipped
+// ---------------------------------------------------------
 if (!defined('PLAINFULLY_SKIP_ROUTER')) {
     require dirname(__DIR__) . '/routes/web.php';
 }

@@ -31,6 +31,8 @@ date_default_timezone_set('UTC');
 
 $ROOT = realpath(__DIR__ . '/..') ?: (__DIR__ . '/..');
 
+require_once __DIR__ . '/../bootstrap/app.php';
+
 require_once $ROOT . '/support/email_templates.php';
 require_once $ROOT . '/support/imap_attachments.php';
 require_once $ROOT . '/support/trace.php';
@@ -45,47 +47,9 @@ $hooksControllerPath = $ROOT . '/controllers/email_hooks_controller.php';
 if (is_readable($hooksControllerPath)) { require_once $hooksControllerPath; }
 
 // ------------------------------------------------------------
-// Small helpers
+// Additional small helpers
 // ------------------------------------------------------------
-if (!function_exists('pf_load_env_file')) {
-    function pf_load_env_file(string $path): void
-    {
-        if (!is_readable($path)) { return; }
-        $lines = file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-        if (!is_array($lines)) { return; }
 
-        foreach ($lines as $line) {
-            $line = trim($line);
-            if ($line === '' || str_starts_with($line, '#')) { continue; }
-            if (!str_contains($line, '=')) { continue; }
-            [$k, $v] = explode('=', $line, 2);
-            $k = trim($k); $v = trim($v);
-            if (
-                (str_starts_with($v, '"') && str_ends_with($v, '"')) ||
-                (str_starts_with($v, "'") && str_ends_with($v, "'"))
-            ) { $v = substr($v, 1, -1); }
-            if ($k !== '' && getenv($k) === false) { putenv($k . '=' . $v); $_ENV[$k] = $v; }
-        }
-    }
-}
-pf_load_env_file($ROOT . '/.env');
-
-if (!function_exists('pf_env_int')) {
-    function pf_env_int(string $k, int $default): int
-    {
-        $v = getenv($k);
-        if ($v === false || $v === '') { return $default; }
-        return (int)$v;
-    }
-}
-if (!function_exists('pf_env_bool')) {
-    function pf_env_bool(string $k, bool $default = false): bool
-    {
-        $v = getenv($k);
-        if ($v === false || $v === '') { return $default; }
-        return in_array(strtolower((string)$v), ['1','true','yes','on'], true);
-    }
-}
 if (!function_exists('pf_extract_email')) {
     function pf_extract_email(string $header): string
     {
@@ -238,9 +202,9 @@ if (!function_exists('pf_send_ingest_failed_email')) {
 // ------------------------------------------------------------
 // IMAP polling loop
 // ------------------------------------------------------------
-$mailbox = (string)(getenv('EMAIL_IMAP_MAILBOX') ?: '');
-$user    = (string)(getenv('EMAIL_IMAP_USER') ?: '');
-$pass    = (string)(getenv('EMAIL_IMAP_PASS') ?: '');
+$mailbox = pf_env_str('EMAIL_IMAP_MAILBOX') ?: '';
+$user    = pf_env_str('EMAIL_IMAP_USER') ?: '';
+$pass    = pf_env_str('EMAIL_IMAP_PASS') ?: '';
 
 if ($mailbox === '' || $user === '' || $pass === '') { fwrite(STDERR, "ERROR: Missing EMAIL_IMAP_MAILBOX/USER/PASS.\n"); exit(2); }
 if (!function_exists('imap_open')) { fwrite(STDERR, "ERROR: PHP IMAP extension not installed/enabled.\n"); exit(3); }
