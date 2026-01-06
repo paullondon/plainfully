@@ -19,7 +19,6 @@ date_default_timezone_set('UTC');
 $ROOT = realpath(__DIR__ . '/..') ?: (__DIR__ . '/..');
 require_once __DIR__ . '/../../bootstrap/app.php';
 
-require_once $ROOT . '/app/support/trace.php';
 require_once $ROOT . '/app/features/checks/ai_mode.php';
 require_once $ROOT . '/app/support/email_templates.php';
 require_once $ROOT . '/app/support/db.php';
