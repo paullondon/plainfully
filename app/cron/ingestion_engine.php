@@ -31,17 +31,17 @@ date_default_timezone_set('UTC');
 
 $ROOT = realpath(__DIR__ . '/..') ?: (__DIR__ . '/..');
 
-require_once $ROOT . '/app/support/email_templates.php';
-require_once $ROOT . '/app/support/imap_attachments.php';
-require_once $ROOT . '/app/support/trace.php';
-require_once $ROOT . '/app/support/db.php';
+require_once $ROOT . '/support/email_templates.php';
+require_once $ROOT . '/support/imap_attachments.php';
+require_once $ROOT . '/support/trace.php';
+require_once $ROOT . '/support/db.php';
 
-$mailerPath = $ROOT . '/app/support/mailer.php';
+$mailerPath = $ROOT . '/support/mailer.php';
 if (!is_readable($mailerPath)) { fwrite(STDERR, "ERROR: mailer.php not found at {$mailerPath}\n"); exit(1); }
 require_once $mailerPath;
 
 // Optional normaliser helpers
-$hooksControllerPath = $ROOT . '/app/controllers/email_hooks_controller.php';
+$hooksControllerPath = $ROOT . '/controllers/email_hooks_controller.php';
 if (is_readable($hooksControllerPath)) { require_once $hooksControllerPath; }
 
 // ------------------------------------------------------------
