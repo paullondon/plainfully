@@ -1,0 +1,251 @@
+/* help.css
+ * ------------------------------------------------------------
+ * Plainfully Help section (route: /help)
+ * ------------------------------------------------------------
+ * Layout-only CSS.
+ * Relies on your existing component CSS for:
+ * - .card
+ * - .btn / .btn--ghost
+ */
+
+:root{
+  --pf-help-maxw: 1100px;
+  --pf-help-gap: 14px;
+}
+
+/* Skip link */
+.pf-skip{
+  position:absolute;
+  left:-9999px;
+  top:auto;
+  width:1px;height:1px;
+  overflow:hidden;
+}
+.pf-skip:focus{
+  left:12px;
+  top:12px;
+  width:auto;height:auto;
+  padding:10px 12px;
+  z-index:1000;
+}
+
+.pf-container{
+  max-width: var(--pf-help-maxw);
+  margin: 0 auto;
+  padding: 0 16px;
+}
+
+/* Topbar */
+.pf-help-topbar{
+  border-bottom: 1px solid var(--pf-border, #e5e7eb);
+  background: var(--pf-surface, #ffffff);
+}
+.pf-help-topbar__inner{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap: var(--pf-help-gap);
+  padding: 14px 0;
+  flex-wrap:wrap;
+}
+.pf-help-brand{
+  display:flex;
+  align-items:baseline;
+  gap: 8px;
+}
+.pf-help-brand__home,
+.pf-help-brand__section{
+  text-decoration:none;
+  color: var(--pf-text, #111827);
+  font-weight: 800;
+}
+.pf-help-brand__sep{
+  color: var(--pf-text-muted, #6b7280);
+}
+
+.pf-help-nav{
+  display:flex;
+  gap: 10px;
+  flex-wrap:wrap;
+}
+.pf-help-nav__link{
+  text-decoration:none;
+  color: var(--pf-text-muted, #6b7280);
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+}
+.pf-help-nav__link:hover{
+  border-color: var(--pf-border, #e5e7eb);
+  color: var(--pf-text, #111827);
+}
+.pf-help-nav__link.is-active{
+  border-color: var(--pf-border, #e5e7eb);
+  color: var(--pf-text, #111827);
+}
+
+/* Layout */
+.pf-help-main{
+  background: var(--pf-bg, #f7f9fa);
+  min-height: calc(100vh - 120px);
+}
+.pf-help-layout{
+  display:grid;
+  grid-template-columns: 1fr;
+  gap: var(--pf-help-gap);
+  padding: 18px 0 28px;
+}
+@media (min-width: 920px){
+  .pf-help-layout{
+    grid-template-columns: 320px 1fr;
+    align-items:start;
+  }
+}
+
+.pf-help-h1{
+  margin: 0 0 10px;
+  font-size: 1.8rem;
+}
+
+/* Sidebar */
+.pf-help-side__card{
+  padding: 14px;
+}
+.pf-help-side__title{
+  font-weight: 800;
+  margin-bottom: 10px;
+}
+.pf-help-side__list{
+  list-style:none;
+  padding:0;
+  margin:0;
+  display:flex;
+  flex-direction:column;
+  gap: 6px;
+}
+.pf-help-side__link{
+  text-decoration:none;
+  color: var(--pf-text-muted, #6b7280);
+  display:block;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+}
+.pf-help-side__link:hover{
+  border-color: var(--pf-border, #e5e7eb);
+  color: var(--pf-text, #111827);
+}
+.pf-help-side__link.is-active{
+  border-color: var(--pf-border, #e5e7eb);
+  color: var(--pf-text, #111827);
+  background: rgba(0,0,0,0.02);
+}
+
+/* Clarity */
+.pf-help-clarity__card{
+  padding: 14px;
+}
+.pf-help-clarity__label{
+  font-size: 0.9rem;
+  color: var(--pf-text-muted, #6b7280);
+  margin-bottom: 6px;
+}
+.pf-help-clarity__text{
+  margin: 0;
+  line-height: 1.45;
+}
+
+/* Hub grid */
+.pf-help-grid{
+  display:grid;
+  grid-template-columns: 1fr;
+  gap: var(--pf-help-gap);
+}
+@media (min-width: 920px){
+  .pf-help-grid{
+    grid-template-columns: 1fr 1fr;
+  }
+}
+.pf-help-card{
+  padding: 16px;
+}
+.pf-help-card--wide{
+  margin-top: var(--pf-help-gap);
+}
+.pf-help-h2{
+  margin: 0 0 10px;
+  font-size: 1.15rem;
+}
+.pf-help-list{
+  margin: 0;
+  padding-left: 18px;
+}
+.pf-help-list--ordered{
+  padding-left: 20px;
+}
+
+/* Tables */
+.pf-help-table-wrap{
+  overflow:auto;
+  border: 1px solid var(--pf-border, #e5e7eb);
+  border-radius: 12px;
+  background: var(--pf-surface, #fff);
+  margin-top: 10px;
+}
+.pf-help-table{
+  width:100%;
+  border-collapse: collapse;
+  min-width: 600px;
+}
+.pf-help-table th,
+.pf-help-table td{
+  text-align:left;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--pf-border, #e5e7eb);
+  vertical-align: top;
+}
+
+/* FAQ */
+.pf-help-faq{
+  margin: 10px 0;
+}
+.pf-help-faq summary{
+  cursor:pointer;
+  font-weight: 800;
+}
+.pf-help-faq__body{
+  margin-top: 8px;
+}
+
+/* Footer actions */
+.pf-help-footer-actions{
+  display:flex;
+  gap: 10px;
+  flex-wrap:wrap;
+  margin-top: 14px;
+}
+
+/* Footer */
+.pf-help-footer{
+  border-top: 1px solid var(--pf-border, #e5e7eb);
+  background: var(--pf-surface, #ffffff);
+}
+.pf-help-footer__inner{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap: var(--pf-help-gap);
+  flex-wrap:wrap;
+  padding: 14px 0;
+}
+.pf-help-footer__links a{
+  text-decoration:none;
+  color: var(--pf-text-muted, #6b7280);
+}
+.pf-help-footer__links a:hover{
+  color: var(--pf-text, #111827);
+}
+.pf-help-footer__meta{
+  color: var(--pf-text-muted, #6b7280);
+  font-size: 0.95rem;
+}
