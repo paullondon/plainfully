@@ -1,0 +1,277 @@
+/* transparency.css
+ * ------------------------------------------------------------
+ * Plainfully — Transparency Hub section styling
+ * ------------------------------------------------------------
+ * Designed to work alongside existing central CSS:
+ *  - /assets/css/theme.css
+ *  - /assets/css/base.css
+ *
+ * Notes:
+ * - Uses neutral, calm layout
+ * - Avoids overriding brand tokens; only adds structure
+ * - Accessible defaults (focus, spacing, readable widths)
+ */
+
+:root{
+  /* Layout sizing */
+  --pf-maxw: 1100px;
+  --pf-radius: 14px;
+  --pf-pad: 18px;
+  --pf-gap: 14px;
+}
+
+/* Skip link */
+.pf-skip{
+  position:absolute;
+  left:-9999px;
+  top:auto;
+  width:1px;height:1px;
+  overflow:hidden;
+}
+.pf-skip:focus{
+  left:12px;
+  top:12px;
+  width:auto;height:auto;
+  padding:10px 12px;
+  border-radius:10px;
+  background:var(--pf-surface, #fff);
+  border:1px solid var(--pf-border, #e5e7eb);
+  z-index:1000;
+}
+
+/* Layout container */
+.pf-container{
+  max-width: var(--pf-maxw);
+  margin: 0 auto;
+  padding: 0 16px;
+}
+
+/* Header */
+.pf-header{
+  background: var(--pf-surface, #fff);
+  border-bottom: 1px solid var(--pf-border, #e5e7eb);
+}
+.pf-header__inner{
+  display:flex;
+  gap: var(--pf-gap);
+  align-items:center;
+  justify-content:space-between;
+  padding: 14px 0;
+  flex-wrap:wrap;
+}
+
+.pf-brand{
+  display:flex;
+  gap:10px;
+  align-items:baseline;
+  min-width: 220px;
+}
+.pf-brand__link{
+  text-decoration:none;
+  font-weight: 800;
+  color: var(--pf-text, #111827);
+  letter-spacing: 0.2px;
+}
+.pf-brand__tag{
+  color: var(--pf-text-muted, #6b7280);
+  font-size: 0.95rem;
+}
+
+/* Nav */
+.pf-nav{
+  display:flex;
+  gap: 10px;
+  flex-wrap:wrap;
+  align-items:center;
+  justify-content:center;
+  flex: 1 1 auto;
+}
+.pf-nav__link{
+  text-decoration:none;
+  color: var(--pf-text-muted, #6b7280);
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+}
+.pf-nav__link:hover{
+  border-color: var(--pf-border, #e5e7eb);
+  color: var(--pf-text, #111827);
+}
+.pf-nav__link.is-active{
+  color: var(--pf-text, #111827);
+  border-color: var(--pf-border, #e5e7eb);
+  background: rgba(0,0,0,0.02);
+}
+
+/* Buttons */
+.pf-btn{
+  display:inline-block;
+  text-decoration:none;
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--pf-border, #e5e7eb);
+  color: var(--pf-text, #111827);
+  background: var(--pf-surface, #fff);
+}
+.pf-btn--ghost{
+  background: transparent;
+}
+
+/* Main */
+.pf-main{
+  background: var(--pf-bg, #f7f9fa);
+  min-height: calc(100vh - 120px);
+}
+
+.pf-hero{
+  padding: 22px 0 10px;
+}
+.pf-h1{
+  margin: 0 0 10px;
+  font-size: 1.75rem;
+}
+
+/* “Clarity engine” blurb box */
+.pf-clarity{
+  border: 1px solid var(--pf-border, #e5e7eb);
+  border-radius: var(--pf-radius);
+  background: var(--pf-surface, #fff);
+  padding: var(--pf-pad);
+}
+.pf-clarity__label{
+  font-size: 0.9rem;
+  color: var(--pf-text-muted, #6b7280);
+  margin-bottom: 6px;
+}
+.pf-clarity__text{
+  margin: 0;
+  color: var(--pf-text, #111827);
+  line-height: 1.45;
+}
+
+/* Content */
+.pf-content{
+  padding: 16px 0 28px;
+}
+.pf-card{
+  border: 1px solid var(--pf-border, #e5e7eb);
+  border-radius: var(--pf-radius);
+  background: var(--pf-surface, #fff);
+  padding: var(--pf-pad);
+}
+.pf-card--wide{
+  margin-top: var(--pf-gap);
+}
+
+.pf-grid{
+  display:grid;
+  grid-template-columns: 1fr;
+  gap: var(--pf-gap);
+}
+@media (min-width: 900px){
+  .pf-grid{
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* Text + headings */
+.pf-h2{
+  margin: 0 0 10px;
+  font-size: 1.15rem;
+}
+.pf-text{
+  margin: 0 0 10px;
+  color: var(--pf-text, #111827);
+  line-height: 1.55;
+}
+.pf-muted{
+  color: var(--pf-text-muted, #6b7280);
+}
+
+/* Lists */
+.pf-list{
+  margin: 0 0 10px 18px;
+}
+.pf-list--ordered{
+  margin-left: 20px;
+}
+
+/* Callouts */
+.pf-callout{
+  border-left: 4px solid var(--pf-border, #e5e7eb);
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(0,0,0,0.02);
+  margin: 12px 0;
+}
+
+/* Tables */
+.pf-table-wrap{
+  overflow:auto;
+  border: 1px solid var(--pf-border, #e5e7eb);
+  border-radius: 12px;
+  background: var(--pf-surface, #fff);
+  margin: 10px 0 12px;
+}
+.pf-table{
+  width:100%;
+  border-collapse: collapse;
+  min-width: 720px;
+}
+.pf-table th,
+.pf-table td{
+  text-align:left;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--pf-border, #e5e7eb);
+  vertical-align: top;
+}
+.pf-table th{
+  font-weight: 700;
+}
+
+/* FAQ */
+.pf-faq{
+  border: 1px solid var(--pf-border, #e5e7eb);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: var(--pf-surface, #fff);
+  margin: 10px 0;
+}
+.pf-faq summary{
+  cursor:pointer;
+  font-weight: 700;
+}
+.pf-faq__body{
+  margin-top: 8px;
+}
+
+/* Footer */
+.pf-footer{
+  border-top: 1px solid var(--pf-border, #e5e7eb);
+  background: var(--pf-surface, #fff);
+}
+.pf-footer__inner{
+  display:flex;
+  flex-wrap:wrap;
+  gap: 10px;
+  justify-content:space-between;
+  align-items:center;
+  padding: 14px 0;
+}
+.pf-footer__links a{
+  text-decoration:none;
+  color: var(--pf-text-muted, #6b7280);
+}
+.pf-footer__links a:hover{
+  color: var(--pf-text, #111827);
+}
+.pf-footer__meta{
+  color: var(--pf-text-muted, #6b7280);
+  font-size: 0.95rem;
+}
+
+/* Focus ring */
+a:focus, summary:focus, .pf-btn:focus{
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
