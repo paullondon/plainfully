@@ -3,7 +3,7 @@
  * ============================================================
  * Plainfully File Info
  * ============================================================
- * File: httpdocs/tools/queue_ingest_loop.php
+ * File: httpdocs/app/cron/ingestion_engine.php
  * Purpose:
  *   IMAP poller that:
  *    - pulls UNSEEN emails
@@ -13,44 +13,30 @@
  *    - sends a fast acknowledgement email
  *    - deletes the original email (GDPR + idempotency)
  *
- * Attachment MVP rules (LOCKED):
- *   - Allowlist only: pdf, txt, png, jpg, jpeg
- *   - Max 5 attachments
- *   - Max 10MB total, max 5MB per file
- *   - If any attachment needs OCR => reject (OCR pipeline not enabled in poller)
- *
- * Trace timeline:
- *   - trace_id per email
- *   - pf_trace() writes metadata (not raw content) if PLAINFULLY_TRACE=1
+ * IMPORTANT (architecture):
+ *   - This script loads bootstrap/app.php and NOTHING else.
+ *   - bootstrap/includes.php loads all helpers/support/controllers.
  * ============================================================
  */
 
-if (PHP_SAPI !== 'cli') { http_response_code(403); echo "CLI only.\n"; exit(1); }
+if (PHP_SAPI !== 'cli') { http_response_code(403); echo "CLI only.
+"; exit(1); }
 
+// Always use UTC for cron consistency
 date_default_timezone_set('UTC');
 
-$ROOT = realpath(__DIR__ . '/..') ?: (__DIR__ . '/..');
-
+// ------------------------------------------------------------
+// Bootstrap (must be FIRST include)
+// ------------------------------------------------------------
 require_once __DIR__ . '/../../bootstrap/app.php';
 
-
-require_once $ROOT . '/support/email_templates.php';
-require_once $ROOT . '/support/imap_attachments.php';
-require_once $ROOT . '/support/trace.php';
-require_once $ROOT . '/support/db.php';
-
-$mailerPath = $ROOT . '/support/mailer.php';
-if (!is_readable($mailerPath)) { fwrite(STDERR, "ERROR: mailer.php not found at {$mailerPath}\n"); exit(1); }
-require_once $mailerPath;
-
-// Optional normaliser helpers
-$hooksControllerPath = $ROOT . '/controllers/email_hooks_controller.php';
-if (is_readable($hooksControllerPath)) { require_once $hooksControllerPath; }
+// Safety: verify bootstrap was loaded (helps debugging)
+if (!defined('PF_BOOTSTRAPPED')) { fwrite(STDERR, "ERROR: bootstrap not loaded.
+"); exit(1); }
 
 // ------------------------------------------------------------
-// Additional small helpers
+// Small local helpers (safe, no side-effects)
 // ------------------------------------------------------------
-
 if (!function_exists('pf_extract_email')) {
     function pf_extract_email(string $header): string
     {
@@ -58,6 +44,7 @@ if (!function_exists('pf_extract_email')) {
         return strtolower(trim($header));
     }
 }
+
 if (!function_exists('pf_parse_mailbox_name')) {
     function pf_parse_mailbox_name(string $mailbox): string
     {
@@ -67,7 +54,11 @@ if (!function_exists('pf_parse_mailbox_name')) {
         return $name !== '' ? $name : 'INBOX';
     }
 }
+
 if (!function_exists('pf_mail_channel_for_to')) {
+    /**
+     * NOTE: Channel is now tagging only; outbound mail always uses no-reply@ + hello@ reply-to.
+     */
     function pf_mail_channel_for_to(string $to): array
     {
         $toLower = strtolower($to);
@@ -78,17 +69,20 @@ if (!function_exists('pf_mail_channel_for_to')) {
         return ['mode' => 'generic', 'email_channel' => 'noreply'];
     }
 }
+
 if (!function_exists('pf_extract_message_id')) {
     function pf_extract_message_id(string $rawHeaders): ?string
     {
         if (preg_match('/^Message-ID:\s*(.+)$/im', $rawHeaders, $m)) {
             $v = trim($m[1]);
-            $v = trim($v, " \t\r\n<>");
+            $v = trim($v, " 	
+<>");
             return $v !== '' ? $v : null;
         }
         return null;
     }
 }
+
 if (!function_exists('pf_clean_email_body_to_text')) {
     function pf_clean_email_body_to_text(string $rawBody, bool $isHtml): string
     {
@@ -100,16 +94,23 @@ if (!function_exists('pf_clean_email_body_to_text')) {
         }
 
         $txt = $isHtml ? strip_tags($rawBody) : $rawBody;
-        $txt = preg_replace("/\r\n|\r/", "\n", (string)$txt);
-        $txt = preg_replace("/\n{3,}/", "\n\n", (string)$txt);
+        $txt = preg_replace("/
+|/", "
+", (string)$txt);
+        $txt = preg_replace("/
+{3,}/", "
+
+", (string)$txt);
         return trim((string)$txt);
     }
 }
+
 if (!function_exists('pf_build_text_package')) {
     function pf_build_text_package(string $bodyText, array $attachments): string
     {
         $out = [];
-        if (trim($bodyText) !== '') { $out[] = "EMAIL BODY\n" . $bodyText; }
+        if (trim($bodyText) !== '') { $out[] = "EMAIL BODY
+" . $bodyText; }
 
         foreach ($attachments as $i => $a) {
             if (!is_array($a)) { continue; }
@@ -131,9 +132,14 @@ if (!function_exists('pf_build_text_package')) {
             }
         }
 
-        return trim(implode("\n\n---\n\n", $out));
+        return trim(implode("
+
+---
+
+", $out));
     }
 }
+
 if (!function_exists('pf_send_ack_email')) {
     function pf_send_ack_email(string $toEmail, string $mode): void
     {
@@ -153,16 +159,29 @@ if (!function_exists('pf_send_ack_email')) {
         $html = function_exists('pf_email_template') ? pf_email_template($subject, $inner) : $inner;
 
         $text =
-            "Hello\n\n" .
-            "Thanks — we’ve received your message and it’s in our system.\n" .
-            "We’ll email your Plainfully result to this address as soon as it’s ready.\n\n" .
-            "When you open the result link, we’ll ask you to confirm your email address before you can view it.\n\n" .
-            "No action needed right now.\n";
+            "Hello
+
+" .
+            "Thanks — we’ve received your message and it’s in our system.
+" .
+            "We’ll email your Plainfully result to this address as soon as it’s ready.
+
+" .
+            "When you open the result link, we’ll ask you to confirm your email address before you can view it.
+
+" .
+            "No action needed right now.
+";
 
         $channel = ($mode === 'clarify') ? 'clarify' : (($mode === 'scamcheck') ? 'scamcheck' : 'noreply');
-        pf_send_email($toEmail, $subject, $html, $channel, $text);
+
+        [$ok, $err] = pf_send_email($toEmail, $subject, $html, $channel, $text);
+        if (!$ok) {
+            error_log('[ingest] ACK send failed to=' . $toEmail . ' err=' . ($err ?? 'unknown'));
+        }
     }
 }
+
 if (!function_exists('pf_send_ingest_failed_email')) {
     function pf_send_ingest_failed_email(string $toEmail, string $mode, string $reasonKey): void
     {
@@ -191,24 +210,41 @@ if (!function_exists('pf_send_ingest_failed_email')) {
         $html = function_exists('pf_email_template') ? pf_email_template($subject, $inner) : $inner;
 
         $text =
-            "Hello\n\n" .
-            $msg . "\n\n" .
-            "Supported types: PDF, TXT, JPG/PNG. (No ZIPs, no password-protected files.)\n";
+            "Hello
+
+" .
+            $msg . "
+
+" .
+            "Supported types: PDF, TXT, JPG/PNG. (No ZIPs, no password-protected files.)
+";
 
         $channel = ($mode === 'clarify') ? 'clarify' : (($mode === 'scamcheck') ? 'scamcheck' : 'noreply');
-        pf_send_email($toEmail, $subject, $html, $channel, $text);
+
+        [$ok, $err] = pf_send_email($toEmail, $subject, $html, $channel, $text);
+        if (!$ok) {
+            error_log('[ingest] reject-email send failed to=' . $toEmail . ' err=' . ($err ?? 'unknown'));
+        }
     }
 }
 
 // ------------------------------------------------------------
 // IMAP polling loop
 // ------------------------------------------------------------
-$mailbox = pf_env_str('EMAIL_IMAP_MAILBOX') ?: '';
-$user    = pf_env_str('EMAIL_IMAP_USER') ?: '';
-$pass    = pf_env_str('EMAIL_IMAP_PASS') ?: '';
+$mailbox = pf_env_str('EMAIL_IMAP_MAILBOX');
+$user    = pf_env_str('EMAIL_IMAP_USER');
+$pass    = pf_env_str('EMAIL_IMAP_PASS');
 
-if ($mailbox === '' || $user === '' || $pass === '') { fwrite(STDERR, "ERROR: Missing EMAIL_IMAP_MAILBOX/USER/PASS.\n"); exit(2); }
-if (!function_exists('imap_open')) { fwrite(STDERR, "ERROR: PHP IMAP extension not installed/enabled.\n"); exit(3); }
+if ($mailbox === '' || $user === '' || $pass === '') {
+    fwrite(STDERR, "ERROR: Missing EMAIL_IMAP_MAILBOX/USER/PASS.
+");
+    exit(2);
+}
+if (!function_exists('imap_open')) {
+    fwrite(STDERR, "ERROR: PHP IMAP extension not installed/enabled.
+");
+    exit(3);
+}
 
 $pollSeconds   = max(1, pf_env_int('EMAIL_POLL_SECONDS', 5));
 $maxRuntime    = max(10, pf_env_int('EMAIL_POLL_MAX_RUNTIME_SECONDS', 55));
@@ -218,35 +254,54 @@ $maxFiles      = max(1, pf_env_int('EMAIL_ATTACH_MAX_FILES', 5));
 $maxTotalBytes = max(1024, pf_env_int('EMAIL_ATTACH_MAX_TOTAL_BYTES', 10 * 1024 * 1024));
 $maxFileBytes  = max(1024, pf_env_int('EMAIL_ATTACH_MAX_FILE_BYTES', 5 * 1024 * 1024));
 
-$maintenance = pf_env_bool('PLAINFULLY_MAINTENANCE', false);
+$maintenance = function_exists('pf_env_bool') ? pf_env_bool('PLAINFULLY_MAINTENANCE', false) : false;
 $mailboxName = pf_parse_mailbox_name($mailbox);
 
 $start = time();
 $loops = 0;
+
+error_log('[ingest] start mailbox=' . $mailboxName);
 
 while (true) {
     $loops++;
     if ((time() - $start) >= $maxRuntime) { break; }
 
     $inbox = @imap_open($mailbox, $user, $pass, 0, 1);
-    if ($inbox === false) { error_log('IMAP open failed: ' . (string)imap_last_error()); sleep($pollSeconds); continue; }
+    if ($inbox === false) {
+        error_log('[ingest] IMAP open failed: ' . (string)imap_last_error());
+        sleep($pollSeconds);
+        continue;
+    }
 
     $emails = imap_search($inbox, 'UNSEEN');
-    if ($emails === false) { imap_close($inbox); sleep($pollSeconds); continue; }
+    if ($emails === false) {
+        imap_close($inbox);
+        sleep($pollSeconds);
+        continue;
+    }
+
     sort($emails);
+    error_log('[ingest] unseen_count=' . count($emails));
 
     $pdo = pf_db();
-    if (!($pdo instanceof PDO)) { imap_close($inbox); sleep($pollSeconds); continue; }
+    if (!($pdo instanceof PDO)) {
+        error_log('[ingest] DB not available');
+        imap_close($inbox);
+        sleep($pollSeconds);
+        continue;
+    }
 
     foreach ($emails as $msgno) {
         $msgno = (int)$msgno;
-        $traceId = pf_trace_new_id();
+        $traceId = function_exists('pf_trace_new_id') ? pf_trace_new_id() : bin2hex(random_bytes(8));
 
         try {
-            pf_trace($pdo, $traceId, 'ingest', 'info', false, 'seen', 'Found unseen email', [
-                'mailbox' => $mailboxName,
-                'msgno' => $msgno,
-            ]);
+            if (function_exists('pf_trace')) {
+                pf_trace($pdo, $traceId, 'ingest', 'info', false, 'seen', 'Found unseen email', [
+                    'mailbox' => $mailboxName,
+                    'msgno' => $msgno,
+                ]);
+            }
 
             $overview = imap_fetch_overview($inbox, (string)$msgno, 0);
             $ov = is_array($overview) && isset($overview[0]) ? $overview[0] : null;
@@ -263,7 +318,9 @@ while (true) {
             $mode = (string)$chan['mode'];
 
             if ($maintenance) {
-                pf_trace($pdo, $traceId, 'ingest', 'warn', true, 'maintenance', 'Rejected (maintenance)', ['mode'=>$mode]);
+                if (function_exists('pf_trace')) {
+                    pf_trace($pdo, $traceId, 'ingest', 'warn', true, 'maintenance', 'Rejected (maintenance)', ['mode'=>$mode]);
+                }
                 imap_delete($inbox, (string)$msgno);
                 continue;
             }
@@ -286,11 +343,17 @@ while (true) {
 
             $bodyText = pf_clean_email_body_to_text($rawBody, (bool)$rawIsHtml);
 
-            pf_trace($pdo, $traceId, 'ingest', 'info', false, 'body', 'Body extracted', [
-                'mode' => $mode,
-                'raw_is_html' => $rawIsHtml ? 1 : 0,
-                'body_chars' => mb_strlen($bodyText, 'UTF-8'),
-            ]);
+            if (function_exists('pf_trace')) {
+                pf_trace($pdo, $traceId, 'ingest', 'info', false, 'body', 'Body extracted', [
+                    'mode' => $mode,
+                    'raw_is_html' => $rawIsHtml ? 1 : 0,
+                    'body_chars' => mb_strlen($bodyText, 'UTF-8'),
+                ]);
+            }
+
+            if (!function_exists('pf_imap_extract_attachments')) {
+                throw new RuntimeException('pf_imap_extract_attachments() missing – ensure imap_attachments.php is included by bootstrap.');
+            }
 
             $ing = pf_imap_extract_attachments($inbox, $msgno, [
                 'max_files'       => $maxFiles,
@@ -302,11 +365,13 @@ while (true) {
             if (($ing['ok'] ?? false) !== true) {
                 $reason = (string)($ing['reason'] ?? 'generic');
 
-                pf_trace($pdo, $traceId, 'attachments', 'warn', true, 'reject', 'Attachment ingest rejected', [
-                    'reason' => $reason,
-                    'total_attachments' => (int)($ing['total_attachments'] ?? 0),
-                    'total_bytes' => (int)($ing['total_bytes'] ?? 0),
-                ]);
+                if (function_exists('pf_trace')) {
+                    pf_trace($pdo, $traceId, 'attachments', 'warn', true, 'reject', 'Attachment ingest rejected', [
+                        'reason' => $reason,
+                        'total_attachments' => (int)($ing['total_attachments'] ?? 0),
+                        'total_bytes' => (int)($ing['total_bytes'] ?? 0),
+                    ]);
+                }
 
                 pf_send_ingest_failed_email($fromEmail, $mode, $reason);
                 imap_delete($inbox, (string)$msgno);
@@ -316,17 +381,14 @@ while (true) {
             $attachments = (array)($ing['attachments'] ?? []);
             $hasAttachments = !empty($attachments);
 
-            pf_trace($pdo, $traceId, 'attachments', 'info', false, 'ok', 'Attachments extracted', [
-                'count' => count($attachments),
-                'total_bytes' => (int)($ing['total_bytes'] ?? 0),
-            ]);
-
             foreach ($attachments as $a) {
                 if (is_array($a) && (($a['needs_ocr'] ?? false) === true)) {
-                    pf_trace($pdo, $traceId, 'attachments', 'warn', true, 'ocr_block', 'OCR required (not enabled)', [
-                        'filename' => (string)($a['filename'] ?? ''),
-                        'kind' => (string)($a['kind'] ?? ''),
-                    ]);
+                    if (function_exists('pf_trace')) {
+                        pf_trace($pdo, $traceId, 'attachments', 'warn', true, 'ocr_block', 'OCR required (not enabled)', [
+                            'filename' => (string)($a['filename'] ?? ''),
+                            'kind' => (string)($a['kind'] ?? ''),
+                        ]);
+                    }
 
                     pf_send_ingest_failed_email($fromEmail, $mode, 'ocr_required');
                     imap_delete($inbox, (string)$msgno);
@@ -343,19 +405,6 @@ while (true) {
                 'mailbox' => $mailboxName,
                 'message_id' => $messageId,
                 'has_attachments' => $hasAttachments,
-                'attachments' => array_map(static function($a) {
-                    if (!is_array($a)) { return []; }
-                    return [
-                        'filename' => (string)($a['filename'] ?? ''),
-                        'mime' => (string)($a['mime'] ?? ''),
-                        'bytes' => (int)($a['bytes'] ?? 0),
-                        'kind' => (string)($a['kind'] ?? ''),
-                        'extract_method' => (string)($a['extract_method'] ?? ''),
-                        'needs_ocr' => (bool)($a['needs_ocr'] ?? false),
-                        'notes' => (string)($a['notes'] ?? ''),
-                        'extracted_chars' => mb_strlen((string)($a['extracted_text'] ?? ''), 'UTF-8'),
-                    ];
-                }, $attachments),
             ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 
             if (!is_string($ingestionJson) || $ingestionJson === '') { $ingestionJson = '{}'; }
@@ -394,31 +443,16 @@ while (true) {
                 ':normalised_text' => $normalisedText,
             ]);
 
-            $queueId = (int)$pdo->lastInsertId();
-
-            pf_trace($pdo, $traceId, 'ingest', 'info', false, 'db_insert', 'Inserted inbound_queue row', [
-                'queue_id' => $queueId,
-                'mode' => $mode,
-                'has_attachments' => $hasAttachments ? 1 : 0,
-                'normalised_chars' => mb_strlen($normalisedText, 'UTF-8'),
-            ]);
-
             pf_send_ack_email($fromEmail, $mode);
-            pf_trace($pdo, $traceId, 'output', 'info', false, 'ack', 'ACK sent', [
-                'email_channel' => (string)($chan['email_channel'] ?? 'noreply'),
-            ]);
-
             imap_delete($inbox, (string)$msgno);
-            pf_trace($pdo, $traceId, 'cleanup', 'info', false, 'imap_delete', 'Deleted original email', [
-                'imap_uid' => $imapUid,
-                'message_id' => $messageId,
-            ]);
 
         } catch (Throwable $e) {
-            error_log('Poller message failed: ' . $e->getMessage());
-            pf_trace($pdo, $traceId, 'ingest', 'error', true, 'exception', 'Poller exception', [
-                'err' => substr($e->getMessage(), 0, 300),
-            ]);
+            error_log('[ingest] message failed: ' . $e->getMessage());
+            if (function_exists('pf_trace')) {
+                pf_trace($pdo, $traceId, 'ingest', 'error', true, 'exception', 'Poller exception', [
+                    'err' => substr($e->getMessage(), 0, 300),
+                ]);
+            }
             @imap_setflag_full($inbox, (string)$msgno, "\\Seen");
         }
     }
@@ -429,4 +463,6 @@ while (true) {
     sleep($pollSeconds);
 }
 
-echo "OK poller finished. loops={$loops}\n";
+error_log('[ingest] end loops=' . $loops);
+echo "OK poller finished. loops={$loops}
+";

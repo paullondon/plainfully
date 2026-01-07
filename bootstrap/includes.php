@@ -42,6 +42,9 @@ require_once dirname(__DIR__) . '/app/support/auth_log.php';
 require_once dirname(__DIR__) . '/app/support/debug_guard.php';
 require_once dirname(__DIR__) . '/app/support/debug_consultations.php';
 require_once dirname(__DIR__) . '/app/support/debug_shell.php';
+require_once dirname(__DIR__) . '/app/support/email_templates.php';
+require_once dirname(__DIR__) . '/app/support/imap_attachments.php';
+require_once dirname(__DIR__) . '/app/support/trace.php';
 // require_once dirname(__DIR__) . '/app/support/turnstile.php';
 
 // ---------------------------------------------------------
@@ -55,3 +58,8 @@ require_once dirname(__DIR__) . '/app/controllers/dashboard.php';
 require_once dirname(__DIR__) . '/app/controllers/email_hooks_controller.php';
 require_once dirname(__DIR__) . '/app/controllers/checks_debug_controller.php';
 require_once dirname(__DIR__) . '/app/controllers/admin_debug_controller.php';
+
+// ---------------------------------------------------------
+// Features (function holders)
+// ---------------------------------------------------------
+
