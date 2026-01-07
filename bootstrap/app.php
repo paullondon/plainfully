@@ -164,6 +164,7 @@ if (PHP_SAPI !== 'cli') {
 // ---------------------------------------------------------
 // 5. Router (web-only) – unless explicitly skipped
 // ---------------------------------------------------------
-if (!defined('PLAINFULLY_SKIP_ROUTER')) {
+if (PHP_SAPI !== 'cli' && !defined('PLAINFULLY_SKIP_ROUTER')) {
     require dirname(__DIR__) . '/routes/web.php';
 }
+
