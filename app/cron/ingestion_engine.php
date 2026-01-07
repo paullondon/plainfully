@@ -95,7 +95,8 @@ if (!function_exists('pf_clean_email_body_to_text')) {
 
         $txt = $isHtml ? strip_tags($rawBody) : $rawBody;
         $txt = preg_replace("/
-|/", "
+|
+/", "
 ", (string)$txt);
         $txt = preg_replace("/
 {3,}/", "
@@ -256,6 +257,9 @@ $maxFileBytes  = max(1024, pf_env_int('EMAIL_ATTACH_MAX_FILE_BYTES', 5 * 1024 * 
 
 $maintenance = function_exists('pf_env_bool') ? pf_env_bool('PLAINFULLY_MAINTENANCE', false) : false;
 $mailboxName = pf_parse_mailbox_name($mailbox);
+
+fwrite(STDOUT, "[ingest] mailbox={$mailboxName} pollSeconds={$pollSeconds} maxRuntime={$maxRuntime}\n");
+fwrite(STDOUT, "[ingest] env_ok?=" . (($mailbox!=='' && $user!=='' && $pass!=='') ? "1" : "0") . "\n");
 
 $start = time();
 $loops = 0;
