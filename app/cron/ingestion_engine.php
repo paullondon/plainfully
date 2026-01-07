@@ -469,5 +469,4 @@ while (true) {
 }
 
 error_log('[ingest] end loops=' . $loops);
-echo "OK poller finished. loops={$loops}
-";
+echo "OK poller finished. loops={$loops}";
