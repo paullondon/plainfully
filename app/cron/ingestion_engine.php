@@ -233,8 +233,11 @@ if (!function_exists('pf_send_ingest_failed_email')) {
 // IMAP polling loop
 // ------------------------------------------------------------
 $mailbox = pf_env_str('EMAIL_IMAP_MAILBOX');
+echo "[ingest] mailbox={$mailbox}\n";
 $user    = pf_env_str('EMAIL_IMAP_USER');
+echo "[ingest] imap user={$user}\n";
 $pass    = pf_env_str('EMAIL_IMAP_PASS');
+echo "[ingest] imap pass=" . ($pass !== '' ? '***' : '(empty)') . "\n";
 
 if ($mailbox === '' || $user === '' || $pass === '') {
     fwrite(STDERR, "ERROR: Missing EMAIL_IMAP_MAILBOX/USER/PASS.
@@ -258,8 +261,6 @@ $maxFileBytes  = max(1024, pf_env_int('EMAIL_ATTACH_MAX_FILE_BYTES', 5 * 1024 * 
 $maintenance = function_exists('pf_env_bool') ? pf_env_bool('PLAINFULLY_MAINTENANCE', false) : false;
 $mailboxName = pf_parse_mailbox_name($mailbox);
 
-fwrite(STDOUT, "[ingest] mailbox={$mailboxName} pollSeconds={$pollSeconds} maxRuntime={$maxRuntime}\n");
-fwrite(STDOUT, "[ingest] env_ok?=" . (($mailbox!=='' && $user!=='' && $pass!=='') ? "1" : "0") . "\n");
 
 $start = time();
 $loops = 0;
