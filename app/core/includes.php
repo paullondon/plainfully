@@ -36,6 +36,7 @@ require_once $rootDir . '/app/core/email_templates.php';
 require_once $rootDir . '/app/core/helpers.php';
 require_once $rootDir . '/app/core/csrf.php';
 require_once $rootDir . '/app/core/session_security.php';
+require_once $rootDir . '/app/core/rate_limiter.php';
 
 
 
@@ -44,7 +45,7 @@ require_once $rootDir . '/app/core/session_security.php';
 // ---------------------------------------------------------
 // Core support (helpers / utilities / middleware)
 // ---------------------------------------------------------
-require_once $rootDir . '/app/support/rate_limiter.php';
+
 require_once $rootDir . '/app/support/session_hardening.php';
 require_once $rootDir . '/app/support/auth_middleware.php';
 require_once $rootDir . '/app/support/request.php';
