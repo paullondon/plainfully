@@ -1,6 +1,6 @@
 <?php declare(strict_types=1);
 
-require_once dirname(__DIR__) . '/support/db.php';
+require_once dirname(__DIR__) . '/core/db.php';
 require_once __DIR__ . '/magic_link.php';
 require_once __DIR__ . '/session_helpers.php';
 
@@ -34,18 +34,12 @@ function handle_login_form(array $config): void
 
 /**
  * ============================================================
- * Plainfully Auth Helper
+ * Admin
  * ============================================================
- * Function: pf_is_admin()
- * Purpose:
- *   Admin check using DB flag (users.is_admin).
- *   Optional fallback: ADMIN_EMAILS env allowlist (if you ever want it).
- * Security:
- *   - Uses prepared statements only
- *   - Never trusts request input
- * ============================================================
+ * pf_is_admin():
+ * - Primary: users.is_admin flag
+ * - Optional: ADMIN_EMAILS allowlist (env)
  */
-
 if (!function_exists('pf_is_admin')) {
     function pf_is_admin(): bool
     {
@@ -54,19 +48,18 @@ if (!function_exists('pf_is_admin')) {
         $email = strtolower(trim((string)($_SESSION['user_email'] ?? '')));
         if ($email === '') { return false; }
 
-        // ---- Optional fallback allowlist (if env exists) ----
+        // Optional allowlist (env)
         $allow = strtolower(trim((string)(getenv('ADMIN_EMAILS') ?: '')));
         if ($allow !== '') {
             $list = array_filter(array_map('trim', explode(',', $allow)));
             if (in_array($email, $list, true)) { return true; }
         }
 
-        // ---- Primary: DB flag ----
+        // Primary: DB flag
         if (!function_exists('pf_db')) { return false; }
 
         try {
             $pdo = pf_db();
-            if (!($pdo instanceof \PDO)) { return false; }
 
             $stmt = $pdo->prepare('SELECT is_admin FROM users WHERE email = :e LIMIT 1');
             $stmt->execute([':e' => $email]);
@@ -80,15 +73,14 @@ if (!function_exists('pf_is_admin')) {
     }
 }
 
-
 if (!function_exists('pf_require_admin')) {
     function pf_require_admin(): void
     {
         if (pf_is_admin()) { return; }
 
-        // ---- Render via single adaptive error view ----
         http_response_code(403);
 
+        // View model for a generic error panel (used by views/errors/403.php if present)
         $vm = [
             'emoji'    => '⛔',
             'title'    => 'You are not authorised to view this page',
@@ -104,8 +96,14 @@ if (!function_exists('pf_require_admin')) {
         ];
 
         try {
+            $errorView = dirname(__DIR__) . '/views/errors/403.php';
+            if (!is_file($errorView)) {
+                // Fallback to 404 view only if 403 doesn't exist yet (temporary during tidy)
+                $errorView = dirname(__DIR__) . '/views/errors/404.php';
+            }
+
             ob_start();
-            require dirname(__DIR__) . '/views/errors/404.php';
+            require $errorView;
             $inner = (string)ob_get_clean();
 
             if (function_exists('pf_render_shell')) {
@@ -114,7 +112,6 @@ if (!function_exists('pf_require_admin')) {
                 echo $inner;
             }
         } catch (\Throwable $e) {
-            // Absolute fail-safe
             error_log('pf_require_admin render failed: ' . $e->getMessage());
             echo 'You are not authorised to view this page.';
         }
@@ -124,37 +121,4 @@ if (!function_exists('pf_require_admin')) {
 }
 
 if (!function_exists('pf_user_email')) {
-    function pf_user_email(): string
-    {
-        if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
-        return (string)($_SESSION['user_email'] ?? '');
-    }
-}
-
-if (!function_exists('pf_auth_hydrate_session_email')) {
-    function pf_auth_hydrate_session_email(): void
-    {
-        if (session_status() !== PHP_SESSION_ACTIVE) { return; }
-
-        $uid = (int)($_SESSION['user_id'] ?? 0);
-        if ($uid <= 0) { return; }
-
-        $existing = strtolower(trim((string)($_SESSION['user_email'] ?? '')));
-        if ($existing !== '') { return; }
-
-        $pdo = pf_db();
-        if (!($pdo instanceof PDO)) { return; }
-
-        try {
-            $stmt = $pdo->prepare('SELECT email FROM users WHERE id = :id LIMIT 1');
-            $stmt->execute([':id' => $uid]);
-            $email = (string)($stmt->fetchColumn() ?: '');
-            $email = strtolower(trim($email));
-            if ($email !== '') {
-                $_SESSION['user_email'] = $email;
-            }
-        } catch (Throwable $e) {
-            error_log('pf_auth_hydrate_session_email failed: ' . $e->getMessage());
-        }
-    }
-}
+    fu
