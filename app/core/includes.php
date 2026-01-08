@@ -29,7 +29,7 @@ require_once $rootDir . '/app/auth/login.php';
 // ---------------------------------------------------------
 // Views / Rendering
 // ---------------------------------------------------------
-require_once $rootDir . '/app/views/render.php';
+require_once $rootDir . '/app/core/render_shell.php';
 
 // ---------------------------------------------------------
 // Core support (helpers / utilities / middleware)
