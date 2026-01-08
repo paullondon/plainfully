@@ -45,6 +45,7 @@ require_once dirname(__DIR__) . '/app/support/debug_shell.php';
 require_once dirname(__DIR__) . '/app/support/email_templates.php';
 require_once dirname(__DIR__) . '/app/support/imap_attachments.php';
 require_once dirname(__DIR__) . '/app/support/trace.php';
+0
 // require_once dirname(__DIR__) . '/app/support/turnstile.php';
 
 // ---------------------------------------------------------
@@ -62,4 +63,4 @@ require_once dirname(__DIR__) . '/app/controllers/admin_debug_controller.php';
 // ---------------------------------------------------------
 // Features (function holders)
 // ---------------------------------------------------------
-
+require_once dirname(__DIR__) . '/app/features/checks/ai_mode.php';

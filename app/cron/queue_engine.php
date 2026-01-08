@@ -16,12 +16,10 @@ if (PHP_SAPI !== 'cli') { http_response_code(403); echo "CLI only.\n"; exit(1); 
 
 date_default_timezone_set('UTC');
 
-$ROOT = realpath(__DIR__ . '/..') ?: (__DIR__ . '/..');
+define('PLAINFULLY_SKIP_ROUTER', true);
 require_once __DIR__ . '/../../bootstrap/app.php';
 
-require_once $ROOT . '/app/features/checks/ai_mode.php';
-require_once $ROOT . '/app/support/email_templates.php';
-require_once $ROOT . '/app/support/db.php';
+
 
 /** Minimal .env loader (fail-open) */
 if (!function_exists('pf_load_env_file')) {
@@ -67,9 +65,9 @@ $pdo = pf_db();
 if (!($pdo instanceof PDO)) { fwrite(STDERR, "ERROR: unable to get DB connection.\n"); exit(1); }
 
 /** Mailer */
-$mailerPath = $ROOT . '/app/support/mailer.php';
+/* $mailerPath = $ROOT . '/app/support/mailer.php';
 if (!is_readable($mailerPath)) { fwrite(STDERR, "ERROR: mailer.php not found at {$mailerPath}\n"); exit(1); }
-require_once $mailerPath;
+require_once $mailerPath; */
 
 /** Feature classes (no composer) */
 $files = [
