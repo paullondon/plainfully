@@ -123,11 +123,8 @@ set_exception_handler(function (Throwable $e) use ($appEnvLower): void {
 // ---------------------------------------------------------
 // 2. Central includes list (config + helpers + modules)
 // ---------------------------------------------------------
-// Keep legacy includes list for now; we’ll migrate it next.
-$legacyIncludes = $rootDir . '/bootstrap/includes.php';
-if (is_file($legacyIncludes)) {
-    require_once $legacyIncludes;
-}
+$coreIncludes = $rootDir . '/app/core/includes.php';
+require_once $coreIncludes;
 
 // ---------------------------------------------------------
 // 3. Security headers (web-only)
