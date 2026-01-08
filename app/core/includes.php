@@ -38,6 +38,7 @@ require_once $rootDir . '/app/core/csrf.php';
 require_once $rootDir . '/app/core/session_security.php';
 require_once $rootDir . '/app/core/rate_limiter.php';
 require_once $rootDir . '/app/core/auth_log.php';
+require_once $rootDir . '/app/core/auth_middleware.php';
 
 
 
@@ -47,8 +48,6 @@ require_once $rootDir . '/app/core/auth_log.php';
 // Core support (helpers / utilities / middleware)
 // ---------------------------------------------------------
 
-require_once $rootDir . '/app/support/session_hardening.php';
-require_once $rootDir . '/app/support/auth_middleware.php';
 require_once $rootDir . '/app/support/request.php';
 require_once $rootDir . '/app/support/debug_guard.php';
 require_once $rootDir . '/app/support/debug_consultations.php';
