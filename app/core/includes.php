@@ -31,6 +31,7 @@ require_once $rootDir . '/app/auth/login.php';
 // ---------------------------------------------------------
 require_once $rootDir . '/app/core/render_shell.php';
 require_once $rootDir . '/app/core/db.php';
+require_once $rootDir . '/app/core/mailer.php';
 
 
 
@@ -40,7 +41,6 @@ require_once $rootDir . '/app/core/db.php';
 // Core support (helpers / utilities / middleware)
 // ---------------------------------------------------------
 require_once $rootDir . '/app/support/helpers.php';
-require_once $rootDir . '/app/support/mailer.php';
 require_once $rootDir . '/app/support/rate_limiter.php';
 require_once $rootDir . '/app/support/session_hardening.php';
 require_once $rootDir . '/app/support/auth_middleware.php';
