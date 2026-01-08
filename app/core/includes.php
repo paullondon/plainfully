@@ -32,6 +32,7 @@ require_once $rootDir . '/app/auth/login.php';
 require_once $rootDir . '/app/core/render_shell.php';
 require_once $rootDir . '/app/core/db.php';
 require_once $rootDir . '/app/core/mailer.php';
+require_once __DIR__ . '/email_templates.php';
 
 
 
@@ -50,7 +51,6 @@ require_once $rootDir . '/app/support/auth_log.php';
 require_once $rootDir . '/app/support/debug_guard.php';
 require_once $rootDir . '/app/support/debug_consultations.php';
 require_once $rootDir . '/app/support/debug_shell.php';
-require_once $rootDir . '/app/support/email_templates.php';
 require_once $rootDir . '/app/support/imap_attachments.php';
 require_once $rootDir . '/app/support/trace.php';
 
