@@ -32,7 +32,7 @@ require_once $rootDir . '/app/auth/magic_link.php';         // optional iff alre
 // core
 // ---------------------------------------------------------
 require_once $rootDir . '/app/core/render_shell.php';
-require_once $rootDir . '/app/core/db.php';
+require_once $rootDir . '/app/core/db.php';9
 require_once $rootDir . '/app/core/mailer.php';
 require_once $rootDir . '/app/core/email_templates.php';
 require_once $rootDir . '/app/core/helpers.php';
@@ -44,11 +44,21 @@ require_once $rootDir . '/app/core/auth_middleware.php';
 require_once $rootDir . '/app/core/request.php';
 require_once $rootDir . '/app/core/trace.php';
 
-
 // ---------------------------------------------------------
 // pipelines
 // ---------------------------------------------------------
 require_once $rootDir . '/app/pipelines/hooks/email_hooks_controller.php';
+
+// ---------------------------------------------------------
+// features
+// ---------------------------------------------------------
+require_once $rootDir . '/app/features/checks/ai_client_factory.php';
+
+
+
+
+
+
 
 
 

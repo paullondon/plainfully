@@ -90,9 +90,11 @@ switch (true) {
         email_inbound_dev_controller();
         return;
 
-    case $path === '/hooks/sms/inbound-dev' && $method === 'POST':
+    // SMS inbound dev hook
+    /*case $path === '/hooks/sms/inbound-dev' && $method === 'POST':
         sms_inbound_dev_controller();
         return;
+    */
 
     // Admin Debug – email bridge trace
     case $path === '/debug/email-bridge' && $method === 'GET':
