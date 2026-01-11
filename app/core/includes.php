@@ -25,6 +25,8 @@ $GLOBALS['config'] = require $rootDir . '/config/app.php';
 // Auth
 // ---------------------------------------------------------
 require_once $rootDir . '/app/auth/login.php';
+require_once $rootDir . '/app/auth/session_helpers.php';    // optional if already preloaded
+require_once $rootDir . '/app/auth/magic_link.php';         // optional iff already preloaded
 
 // ---------------------------------------------------------
 // core
@@ -40,8 +42,13 @@ require_once $rootDir . '/app/core/rate_limiter.php';
 require_once $rootDir . '/app/core/auth_log.php';
 require_once $rootDir . '/app/core/auth_middleware.php';
 require_once $rootDir . '/app/core/request.php';
+require_once $rootDir . '/app/core/trace.php';
 
 
+// ---------------------------------------------------------
+// pipelines
+// ---------------------------------------------------------
+require_once $rootDir . '/app/pipelines/hooks/email_hooks_controller.php';
 
 
 
@@ -53,7 +60,6 @@ require_once $rootDir . '/app/support/debug_guard.php';
 require_once $rootDir . '/app/support/debug_consultations.php';
 require_once $rootDir . '/app/support/debug_shell.php';
 require_once $rootDir . '/app/support/imap_attachments.php';
-require_once $rootDir . '/app/support/trace.php';
 
 // Optional / future
 // require_once $rootDir . '/app/support/turnstile.php';
@@ -66,7 +72,6 @@ require_once $rootDir . '/app/controllers/health_controller.php';
 require_once $rootDir . '/app/controllers/logout_controller.php';
 require_once $rootDir . '/app/controllers/clarifications_controller.php';
 require_once $rootDir . '/app/controllers/dashboard.php';
-require_once $rootDir . '/app/controllers/email_hooks_controller.php';
 require_once $rootDir . '/app/controllers/checks_debug_controller.php';
 require_once $rootDir . '/app/controllers/admin_debug_controller.php';
 

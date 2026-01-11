@@ -28,22 +28,22 @@
 
 use App\Features\Checks\CheckInput;
 use App\Features\Checks\CheckEngine;
-use App\Features\Checks\DummyAiClient;
 
 // Feature classes (no composer)
-require_once dirname(__DIR__) . '/features/checks/check_input.php';
-require_once dirname(__DIR__) . '/features/checks/check_result.php';
-require_once dirname(__DIR__) . '/features/checks/ai_client.php';
-require_once dirname(__DIR__) . '/features/checks/check_engine.php';
-require_once dirname(__DIR__) . '/features/checks/dummy_ai_client.php';
+require_once dirname(__DIR__, 2) . '/features/checks/check_input.php';
+require_once dirname(__DIR__, 2) . '/features/checks/check_result.php';
+require_once dirname(__DIR__, 2) . '/features/checks/ai_client.php';
+require_once dirname(__DIR__, 2) . '/features/checks/check_engine.php';
+require_once dirname(__DIR__, 2) . '/features/checks/dummy_ai_client.php';
 
-// Support
-require_once dirname(__DIR__) . '/support/db.php';
-require_once dirname(__DIR__) . '/support/trace.php';
+// Core
+require_once dirname(__DIR__, 2) . '/support/db.php';      // (we’ll move db later)
+require_once dirname(__DIR__, 2) . '/core/trace.php';
 
 // Email templates + sending
-require_once __DIR__ . '/../support/email_templates.php';
-require_once __DIR__ . '/../support/mailer.php';
+require_once dirname(__DIR__, 2) . '/support/email_templates.php';
+require_once dirname(__DIR__, 2) . '/support/mailer.php';
+
 
 // Billing (optional; safe to include even if not deployed yet)
 $pfBillingPath = dirname(__DIR__) . '/features/billing/billing.php';
