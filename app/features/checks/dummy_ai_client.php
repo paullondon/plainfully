@@ -22,7 +22,8 @@ final class DummyAiClient implements AiClient
             $modeValue = $mode->value;
 
             // Stub behaviour
-            $isScam = ($modeValue === 'scamcheck') ? false : false;
+            // Deterministic: if message contains obvious triggers, mark as scam (for UI testing only)
+            $isScam = ($modeValue === 'scamcheck') && (bool)preg_match('/\b(otp|code|verify|bank|invoice|urgent|password)\b/i', $text);
 
             $headline = ($modeValue === 'clarify')
                 ? 'Clarified'
