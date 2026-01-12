@@ -15,9 +15,7 @@
  * ============================================================
  */
 
-require_once dirname(__DIR__) . '/auth/session_helpers.php';
-require_once dirname(__DIR__) . '/support/db.php';
-require_once dirname(__DIR__) . '/views/render.php';
+// Note: core includes (db/session/render) are loaded via app/core/includes.php
 
 if (!function_exists('result_access_controller')) {
     function result_access_controller(string $token): void

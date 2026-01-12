@@ -7,8 +7,6 @@
  * - Logging failures must never break the request (fail-open).
  */
 
-use Throwable;
-
 if (!function_exists('pf_log_auth_event')) {
     function pf_log_auth_event(
         string $eventType,

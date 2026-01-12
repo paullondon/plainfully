@@ -14,8 +14,6 @@
  *  6) Router (unless PLAINFULLY_SKIP_ROUTER)
  */
 
-use Throwable;
-
 // ---------------------------------------------------------
 // 0. Env loader + load .env ONCE (root-level httpdocs/.env)
 // ---------------------------------------------------------

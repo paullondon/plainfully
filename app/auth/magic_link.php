@@ -4,8 +4,6 @@
 
 require_once __DIR__ . '/session_helpers.php';
 
-use DateTimeImmutable;
-use Throwable;
 
 if (!function_exists('handle_magic_request')) {
 

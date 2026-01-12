@@ -9,9 +9,6 @@
  * - Fail-open: tracing must never break the main pipeline.
  */
 
-use PDO;
-use Throwable;
-
 if (!function_exists('pf_trace_enabled')) {
     function pf_trace_enabled(): bool
     {

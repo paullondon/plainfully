@@ -16,8 +16,9 @@
  * ============================================================
  */
 
-use PHPMailer\PHPMailer\PHPMailer;
-use RuntimeException;
+// PHPMailer is optional in this repo export.
+// In production, prefer PHPMailer (SMTP) but fall back to PHP's mail()
+// if PHPMailer is not present.
 
 // ---------------------------------------------------------
 // Local builders (email HTML/text templates)
@@ -27,8 +28,12 @@ require_once __DIR__ . '/email_templates.php';
 // ---------------------------------------------------------
 // Load PHPMailer classes (no Composer)
 // ---------------------------------------------------------
-if (!class_exists(PHPMailer::class)) {
+if (!class_exists('PHPMailer\\PHPMailer\\PHPMailer')) {
+    // Try core/phpmailer first, then legacy support/phpmailer
     $base = __DIR__ . '/phpmailer';
+    if (!is_dir($base)) {
+        $base = dirname(__DIR__) . '/support/phpmailer';
+    }
 
     foreach (['Exception.php', 'PHPMailer.php', 'SMTP.php'] as $file) {
         $path = $base . '/' . $file;
@@ -38,11 +43,7 @@ if (!class_exists(PHPMailer::class)) {
     }
 }
 
-if (!class_exists(PHPMailer::class)) {
-    throw new RuntimeException(
-        'PHPMailer is not available. Ensure PHPMailer files exist in app/core/phpmailer.'
-    );
-}
+define('PF_HAS_PHPMAILER', class_exists('PHPMailer\\PHPMailer\\PHPMailer'));
 
 /**
  * Safely fetch first non-empty env var from list.
@@ -129,13 +130,46 @@ function pf_mail_send(
 
     $smtp = pf_smtp_config($fromUser, $fromPass);
 
-    if ($smtp['host'] === '') {
-        error_log('pf_mail_send: SMTP host missing');
-        return false;
+    // --------------------------------------------------------
+    // Fallback path: PHPMailer not available OR no SMTP host.
+    // This keeps the app functional on minimal hosting exports.
+    // --------------------------------------------------------
+    if (!class_exists('PHPMailer\\PHPMailer\\PHPMailer') || ($smtp['host'] ?? '') === '') {
+        $boundary = 'pf_' . bin2hex(random_bytes(12));
+
+        $headers = [];
+        $headers[] = 'MIME-Version: 1.0';
+        $headers[] = 'From: Plainfully <' . $fromUser . '>';
+        $headers[] = 'Reply-To: ' . $fromUser;
+        $headers[] = 'X-Mailer: Plainfully';
+        $headers[] = 'List-Unsubscribe: <mailto:unsubscribe@plainfully.com>';
+        $headers[] = 'Content-Type: multipart/alternative; boundary="' . $boundary . '"';
+
+        $safeText = $text ?? trim(strip_tags($html));
+
+        $body = "--{$boundary}\r\n" .
+            "Content-Type: text/plain; charset=UTF-8\r\n" .
+            "Content-Transfer-Encoding: 8bit\r\n\r\n" .
+            $safeText . "\r\n\r\n" .
+            "--{$boundary}\r\n" .
+            "Content-Type: text/html; charset=UTF-8\r\n" .
+            "Content-Transfer-Encoding: 8bit\r\n\r\n" .
+            $html . "\r\n\r\n" .
+            "--{$boundary}--\r\n";
+
+        try {
+            return (bool)mail($to, $subject, $body, implode("\r\n", $headers));
+        } catch (\Throwable $e) {
+            error_log('pf_mail_send mail() fallback failed: ' . $e->getMessage());
+            return false;
+        }
     }
 
+    // --------------------------------------------------------
+    // PHPMailer path (preferred)
+    // --------------------------------------------------------
     try {
-        $mail = new PHPMailer(true);
+        $mail = new \PHPMailer\PHPMailer\PHPMailer(true);
 
         $mail->isSMTP();
         $mail->Host       = $smtp['host'];

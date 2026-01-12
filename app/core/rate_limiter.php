@@ -7,8 +7,6 @@
  * Uses rate_limit_log table to enforce per-key limits.
  */
 
-use DateTimeImmutable;
-
 require_once __DIR__ . '/db.php';
 
 if (!function_exists('pf_rate_limit_exceeded')) {

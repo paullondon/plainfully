@@ -15,9 +15,6 @@
  * ============================================================
  */
 
-use PDO;
-use RuntimeException;
-
 if (!function_exists('pf_db')) {
 
     /**

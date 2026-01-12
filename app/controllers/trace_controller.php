@@ -24,9 +24,7 @@
  * ============================================================
  */
 
-require_once dirname(__DIR__) . '/support/db.php';
-require_once dirname(__DIR__) . '/support/trace.php';
-require_once dirname(__DIR__) . '/auth/login.php'; // pf_require_admin(), pf_is_admin()
+// Note: core includes (db/trace/login helpers) are loaded via app/core/includes.php
 
 if (!function_exists('trace_controller')) {
     function trace_controller(): void
