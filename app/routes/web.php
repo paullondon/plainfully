@@ -49,5 +49,11 @@ function pf_route_dispatch(string $path, string $method): void
         exit;
     }
 
+    // Debug inspect (gated)
+    if ($path === '/debug/inspect' && $method === 'GET') {
+        require_once PF_ROOT . '/app/pipelines/ingest/web/inspect_page.php';
+        exit;
+    }
+
     pf_http_error(404, 'Not Found');
 }
