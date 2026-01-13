@@ -43,5 +43,11 @@ function pf_route_dispatch(string $path, string $method): void
         exit;
     }
 
+    // Debug system snapshot (gated)
+    if ($path === '/debug/snapshot' && ($method === 'GET' || $method === 'POST')) {
+        require_once PF_ROOT . '/app/pipelines/ingest/web/snapshot_page.php';
+        exit;
+    }
+
     pf_http_error(404, 'Not Found');
 }
