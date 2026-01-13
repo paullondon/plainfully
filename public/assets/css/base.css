@@ -1,0 +1,18 @@
+/* base.css — accessibility + scaling */
+html{font-size:100%;}
+body{
+  margin:0;
+  font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif;
+  background:var(--pf-bg);
+  color:var(--pf-text);
+}
+a{color:inherit;}
+.container{max-width:1000px;margin:0 auto;padding:24px;}
+.card{
+  background:var(--pf-surface);
+  border:1px solid var(--pf-border);
+  border-radius:var(--pf-radius);
+  box-shadow:var(--pf-shadow);
+  padding:18px;
+}
+.small{color:var(--pf-text-muted);font-size:.95rem;}

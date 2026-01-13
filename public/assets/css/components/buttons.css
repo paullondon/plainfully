@@ -1,0 +1,20 @@
+/* components/buttons.css */
+.btn{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+  padding:10px 14px;
+  border-radius:12px;
+  border:1px solid var(--pf-border);
+  background:var(--pf-surface);
+  color:var(--pf-text);
+  cursor:pointer;
+  text-decoration:none;
+}
+.btn-primary{
+  background:var(--pf-brand);
+  color:white;
+  border-color:transparent;
+}
+.btn-primary:hover{filter:brightness(1.05);}
