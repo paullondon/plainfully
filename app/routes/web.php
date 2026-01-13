@@ -38,5 +38,11 @@ function pf_route_dispatch(string $path, string $method): void
         exit;
     }
 
+    // Debug POST test page (gated by env + token)
+    if ($path === '/debug/post' && ($method === 'GET' || $method === 'POST')) {
+        require_once PF_ROOT . '/app/pipelines/ingest/web/test_page.php';
+        exit;
+    }
+
     pf_http_error(404, 'Not Found');
 }
