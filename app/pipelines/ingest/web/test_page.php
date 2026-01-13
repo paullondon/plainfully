@@ -5,21 +5,20 @@
  * Debug Tool: Web POST Test Page
  * ============================================================
  * Purpose:
- *  - Lets you type text + channel
+ *  - Type text + channel
  *  - Sends POST JSON to /ingest/web
- *  - Shows raw response (status + body)
+ *  - Shows response (status + body) in a separate panel
  *
  * Safety:
  *  - Enabled ONLY when PF_DEBUG_TOOLS=1
  *  - Requires PF_DEBUG_TOKEN via ?t=... (or POST hidden field)
- *  - Easy to disable by flipping env flag
+ *  - Disable instantly by setting PF_DEBUG_TOOLS=0
  */
 
 require_once PF_ROOT . '/app/bootstrap.php';
 
 $enabled = (pf_env('PF_DEBUG_TOOLS', '0') === '1');
 $token   = (string)pf_env('PF_DEBUG_TOKEN', '');
-
 $reqToken = (string)($_GET['t'] ?? $_POST['t'] ?? '');
 
 if (!$enabled) {
@@ -35,6 +34,8 @@ $channel = (string)($_POST['channel'] ?? 'web-clarify');
 
 $result = null;
 
+$esc = static fn(string $s): string => htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
+
 if (strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     try {
         $payload = [
@@ -44,9 +45,7 @@ if (strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
 
         $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
         $host   = (string)($_SERVER['HTTP_HOST'] ?? 'localhost');
-
-        // Call the same site endpoint (no external deps)
-        $url = $scheme . '://' . $host . '/ingest/web';
+        $url    = $scheme . '://' . $host . '/ingest/web';
 
         $json = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 
@@ -82,30 +81,76 @@ if (strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     }
 }
 
-$esc = static fn(string $s): string => htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
+// Build UI
+$left = '
+  <div class="card">
+    <h1 class="card-title">Debug: POST Test</h1>
+    <p class="small">
+      Gated by <code>PF_DEBUG_TOOLS</code> + token.
+      Disable by setting <code>PF_DEBUG_TOOLS=0</code>.
+    </p>
 
-$out = '<div class="card">';
-$out .= '<h1 class="card-title">Debug: POST Test</h1>';
-$out .= '<p class="small">This tool is gated by <code>PF_DEBUG_TOOLS</code> + token. Disable by setting <code>PF_DEBUG_TOOLS=0</code>.</p>';
+    <form method="post" style="display:grid;gap:12px;margin-top:14px;">
+      <input type="hidden" name="t" value="' . $esc($reqToken) . '"/>
 
-$out .= '<form method="post" style="display:grid;gap:12px;">';
-$out .= '<input type="hidden" name="t" value="' . $esc($reqToken) . '"/>';
+      <div style="display:grid;gap:6px;">
+        <label class="small">Channel</label>
+        <input name="channel" value="' . $esc($channel) . '"
+          style="padding:12px;border-radius:12px;border:1px solid var(--pf-border);background:var(--pf-surface);color:var(--pf-text);" />
+        <div class="small">Examples: <code>web-clarify</code>, <code>email-clarify</code>, <code>email-scamcheck</code></div>
+      </div>
 
-$out .= '<label class="small">Channel</label>';
-$out .= '<input name="channel" value="' . $esc($channel) . '" style="padding:10px;border-radius:12px;border:1px solid var(--pf-border);"/>';
+      <div style="display:grid;gap:6px;">
+        <label class="small">Text</label>
+        <textarea name="text" rows="10"
+          style="padding:12px;border-radius:12px;border:1px solid var(--pf-border);background:var(--pf-surface);color:var(--pf-text);width:100%;">' . $esc($text) . '</textarea>
+        <div class="small">Posts JSON to <code>/ingest/web</code> and displays the raw response.</div>
+      </div>
 
-$out .= '<label class="small">Text</label>';
-$out .= '<textarea name="text" rows="6" style="padding:10px;border-radius:12px;border:1px solid var(--pf-border);width:100%;">' . $esc($text) . '</textarea>';
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <button class="btn btn-primary" type="submit">Send → /ingest/web</button>
+        <a class="btn" href="/debug/post?t=' . $esc($reqToken) . '">Reset</a>
+      </div>
+    </form>
+  </div>
+';
 
-$out .= '<button class="btn btn-primary" type="submit">Send POST → /ingest/web</button>';
-$out .= '</form>';
+$right = '
+  <div class="card">
+    <h2 class="card-title" style="margin:0;">Response</h2>
+    <p class="small" style="margin-top:6px;">Status, payload, and raw body returned by <code>/ingest/web</code>.</p>
+';
 
 if (is_array($result)) {
-    $out .= '<hr style="border:none;border-top:1px solid var(--pf-border);margin:16px 0;">';
-    $out .= '<div class="small"><strong>Response</strong></div>';
-    $out .= '<pre style="white-space:pre-wrap;word-break:break-word;margin:10px 0 0 0;">' . $esc(json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)) . '</pre>';
+    $pretty = json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    $right .= '<pre style="white-space:pre-wrap;word-break:break-word;margin:12px 0 0 0;padding:12px;border-radius:12px;border:1px solid var(--pf-border);background:var(--pf-bg);">' . $esc((string)$pretty) . '</pre>';
+} else {
+    $right .= '<div class="small" style="margin-top:12px;padding:12px;border-radius:12px;border:1px dashed var(--pf-border);">
+      No request sent yet. Fill the form and click <strong>Send</strong>.
+    </div>';
 }
 
-$out .= '</div>';
+$right .= '</div>';
 
-pf_render_basic_page('Debug POST Test', $out);
+$layout = '
+  <div style="display:grid;grid-template-columns: 1fr; gap:16px;">
+    <div class="small" style="margin-bottom:-6px;">
+      <strong>URL:</strong> <code>/debug/post</code> (token required)
+    </div>
+
+    <div style="display:grid;grid-template-columns: 1fr; gap:16px;"
+         class="pf-grid">
+      ' . $left . '
+      ' . $right . '
+    </div>
+  </div>
+
+  <style>
+    /* Lightweight responsive tweak (kept inline for the debug tool only) */
+    @media (min-width: 980px){
+      .pf-grid{ grid-template-columns: 1.1fr .9fr !important; }
+    }
+  </style>
+';
+
+pf_render_basic_page('Debug POST Test', $layout);
