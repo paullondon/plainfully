@@ -17,8 +17,14 @@ $channel = (string)($_POST['channel'] ?? 'web-clarify');
 
 $debugDbEnabled = (pf_env('PF_DEBUG_DB_CHECK', '0') === '1');
 
-$result = null;
-$dbCheck = null;
+$result  = null;
+$dbCheck = [
+    'enabled'  => $debugDbEnabled,
+    'trace_id' => null,
+    'found'    => null,
+    'row'      => null,
+    'error'    => null,
+];
 
 if (strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
     try {
@@ -46,48 +52,65 @@ if (strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
         $code = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
         curl_close($ch);
 
+        $bodyStr = ($body === false ? '' : (string)$body);
+
         $result = [
             'url'        => $url,
             'sent_json'  => $json,
             'http_code'  => $code,
             'curl_error' => $err,
-            'body'       => ($body === false ? '' : $body),
+            'body'       => $bodyStr,
         ];
 
-        // --- DB verify (optional) ---
-        if ($debugDbEnabled && $code === 200 && is_string($result['body']) && $result['body'] !== '') {
-            $decoded = json_decode($result['body'], true);
-            $traceId = (string)($decoded['trace_id'] ?? '');
+        // -----------------------------
+        // Optional DB verify
+        // -----------------------------
+        if ($debugDbEnabled) {
+            // Try to extract trace_id from the response body
+            $decoded = json_decode($bodyStr, true);
+            $traceId = is_array($decoded) ? (string)($decoded['trace_id'] ?? '') : '';
 
-            if ($traceId !== '') {
-                $pdo = pf_pdo();
-                $stmt = $pdo->prepare("
-                    SELECT id, trace_id, channel, status, attempts, created_at
-                    FROM pf_inbound_queue
-                    WHERE trace_id = :trace_id
-                    ORDER BY id DESC
-                    LIMIT 1
-                ");
-                $stmt->execute([':trace_id' => $traceId]);
-                $row = $stmt->fetch();
+            $dbCheck['trace_id'] = ($traceId !== '' ? $traceId : null);
 
-                if (is_array($row)) {
-                    $dbCheck = [
-                        'found'     => true,
-                        'id'        => (string)$row['id'],
-                        'trace_id'  => (string)$row['trace_id'],
-                        'channel'   => (string)$row['channel'],
-                        'status'    => (string)$row['status'],
-                        'attempts'  => (string)$row['attempts'],
-                        'created_at'=> (string)$row['created_at'],
-                    ];
-                } else {
-                    $dbCheck = ['found' => false, 'trace_id' => $traceId];
+            if ($traceId === '') {
+                $dbCheck['error'] = 'Could not extract trace_id from response body.';
+            } else {
+                try {
+                    $pdo = pf_pdo();
+                    $stmt = $pdo->prepare("
+                        SELECT id, trace_id, channel, status, attempts, created_at
+                        FROM pf_inbound_queue
+                        WHERE trace_id = :trace_id
+                        ORDER BY id DESC
+                        LIMIT 1
+                    ");
+                    $stmt->execute([':trace_id' => $traceId]);
+                    $row = $stmt->fetch();
+
+                    if (is_array($row)) {
+                        $dbCheck['found'] = true;
+                        $dbCheck['row'] = [
+                            'id'         => (string)$row['id'],
+                            'trace_id'   => (string)$row['trace_id'],
+                            'channel'    => (string)$row['channel'],
+                            'status'     => (string)$row['status'],
+                            'attempts'   => (string)$row['attempts'],
+                            'created_at' => (string)$row['created_at'],
+                        ];
+                    } else {
+                        $dbCheck['found'] = false;
+                    }
+                } catch (Throwable $e) {
+                    // Don’t leak credentials; just show the message.
+                    $dbCheck['error'] = 'DB query failed: ' . $e->getMessage();
                 }
             }
         }
     } catch (Throwable $e) {
         $result = ['error' => $e->getMessage()];
+        if ($debugDbEnabled) {
+            $dbCheck['error'] = 'POST test crashed: ' . $e->getMessage();
+        }
     }
 }
 
@@ -107,14 +130,12 @@ $left = '
         <label class="small">Channel</label>
         <input name="channel" value="' . $esc($channel) . '"
           style="padding:12px;border-radius:12px;border:1px solid var(--pf-border);background:var(--pf-surface);color:var(--pf-text);" />
-        <div class="small">Examples: <code>web-clarify</code>, <code>email-clarify</code>, <code>email-scamcheck</code></div>
       </div>
 
       <div style="display:grid;gap:6px;">
         <label class="small">Text</label>
         <textarea name="text" rows="10"
           style="padding:12px;border-radius:12px;border:1px solid var(--pf-border);background:var(--pf-surface);color:var(--pf-text);width:100%;">' . $esc($text) . '</textarea>
-        <div class="small">Posts JSON to <code>/ingest/web</code> and displays the raw response.</div>
       </div>
 
       <div style="display:flex;gap:10px;flex-wrap:wrap;">
@@ -134,36 +155,20 @@ $right = '
 if (is_array($result)) {
     $pretty = json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     $right .= '<pre style="white-space:pre-wrap;word-break:break-word;margin:12px 0 0 0;padding:12px;border-radius:12px;border:1px solid var(--pf-border);background:var(--pf-bg);">' . $esc((string)$pretty) . '</pre>';
-} else {
-    $right .= '<div class="small" style="margin-top:12px;padding:12px;border-radius:12px;border:1px dashed var(--pf-border);">
-      No request sent yet. Fill the form and click <strong>Send</strong>.
-    </div>';
 }
 
-if ($debugDbEnabled) {
-    $right .= '<hr style="border:none;border-top:1px solid var(--pf-border);margin:16px 0;">';
-    $right .= '<h2 class="card-title" style="margin:0;">DB Verify</h2>';
-    $right .= '<p class="small" style="margin-top:6px;">Looks up the inbound row by <code>trace_id</code>.</p>';
+$right .= '<hr style="border:none;border-top:1px solid var(--pf-border);margin:16px 0;">';
+$right .= '<h2 class="card-title" style="margin:0;">DB Verify</h2>';
+$right .= '<p class="small" style="margin-top:6px;">Controlled DB check (toggle via <code>PF_DEBUG_DB_CHECK=1</code>).</p>';
 
-    if (is_array($dbCheck)) {
-        $right .= '<pre style="white-space:pre-wrap;word-break:break-word;margin:12px 0 0 0;padding:12px;border-radius:12px;border:1px solid var(--pf-border);background:var(--pf-bg);">' .
-            $esc(json_encode($dbCheck, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)) .
-        '</pre>';
-    } else {
-        $right .= '<div class="small" style="margin-top:12px;padding:12px;border-radius:12px;border:1px dashed var(--pf-border);">
-          DB verify is enabled. Send a request to populate this panel.
-        </div>';
-    }
-}
+$right .= '<pre style="white-space:pre-wrap;word-break:break-word;margin:12px 0 0 0;padding:12px;border-radius:12px;border:1px solid var(--pf-border);background:var(--pf-bg);">' .
+    $esc(json_encode($dbCheck, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)) .
+'</pre>';
 
 $right .= '</div>';
 
 $layout = '
   <div style="display:grid;grid-template-columns: 1fr; gap:16px;">
-    <div class="small" style="margin-bottom:-6px;">
-      <strong>URL:</strong> <code>/debug/post</code> (token required)
-    </div>
-
     <div style="display:grid;grid-template-columns: 1fr; gap:16px;" class="pf-grid">
       ' . $left . '
       ' . $right . '
