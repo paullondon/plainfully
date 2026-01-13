@@ -18,8 +18,15 @@ pf_send_security_headers();
 $rawPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
 $method  = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
 
-// Normalize
+// Normalize:
+// - treat /index.php as /
+// - trim trailing slashes (so /health/ works)
+// - never allow empty path
 $path = ($rawPath === '' || $rawPath === '/index.php') ? '/' : $rawPath;
+if ($path !== '/') {
+    $path = rtrim($path, '/');
+    if ($path === '') { $path = '/'; }
+}
 
 try {
     pf_route_dispatch($path, $method);
