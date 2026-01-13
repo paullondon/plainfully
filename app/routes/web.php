@@ -4,13 +4,18 @@
  * ============================================================
  * Plainfully — Web Routes
  * ============================================================
- * Purpose:
- *   - Central route definitions (keeps public/index.php tiny)
+ * Central route definitions.
  */
 
 function pf_route_dispatch(string $path, string $method): void
 {
-    // Health check
+    // Debug POST test page (gated by env + token inside the file)
+    if ($path === '/debug/post' && ($method === 'GET' || $method === 'POST')) {
+        require_once PF_ROOT . '/app/pipelines/ingest/web/test_page.php';
+        exit;
+    }
+
+    // Health (kept here too, even though index.php hard-bypasses it)
     if ($path === '/health') {
         pf_json(['ok' => true, 'ts' => gmdate('c')]);
     }
@@ -26,21 +31,15 @@ function pf_route_dispatch(string $path, string $method): void
         ');
     }
 
-    // Ingest endpoints (placeholders)
+    // Ingest (web)
     if ($path === '/ingest/web' && $method === 'POST') {
         require_once PF_ROOT . '/app/pipelines/ingest/web/endpoint.php';
         exit;
     }
 
-    // Result view (placeholder)
+    // Result view placeholder
     if ($path === '/r' && $method === 'GET') {
         require_once PF_ROOT . '/app/pipelines/deliver/web/result_view.php';
-        exit;
-    }
-
-    // Debug POST test page (gated by env + token)
-    if ($path === '/debug/post' && ($method === 'GET' || $method === 'POST')) {
-        require_once PF_ROOT . '/app/pipelines/ingest/web/test_page.php';
         exit;
     }
 
