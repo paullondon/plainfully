@@ -1,33 +1,31 @@
 <?php declare(strict_types=1);
 
-use PDO;
-use PDOException;
-
 /**
- * db.php
- *
- * PDO factory for MariaDB/MySQL.
- * Expects env:
- *  - DB_HOST, DB_NAME, DB_USER, DB_PASS, DB_PORT (optional)
- *
- * Security:
- *  - Uses utf8mb4
- *  - Throws exceptions
- *  - Emulates prepares OFF
+ * ============================================================
+ * Plainfully — DB Support
+ * ============================================================
+ * Purpose:
+ *  - Provide a single, safe PDO connection helper
+ *  - No "use PDO" needed in global namespace (causes warnings)
  */
 
 function pf_pdo(): PDO
 {
     static $pdo = null;
+
     if ($pdo instanceof PDO) {
         return $pdo;
     }
 
-    $host = pf_env('DB_HOST', '127.0.0.1');
-    $name = pf_env('DB_NAME', 'live_plainfully');
-    $user = pf_env('DB_USER', 'root');
-    $pass = pf_env('DB_PASS', '');
-    $port = pf_env('DB_PORT', '3306');
+    $host = (string)pf_env('DB_HOST', '');
+    $name = (string)pf_env('DB_NAME', '');
+    $user = (string)pf_env('DB_USER', '');
+    $pass = (string)pf_env('DB_PASS', '');
+    $port = (string)pf_env('DB_PORT', '3306');
+
+    if ($host === '' || $name === '' || $user === '') {
+        throw new RuntimeException('Database env vars missing (DB_HOST/DB_NAME/DB_USER).');
+    }
 
     $dsn = "mysql:host={$host};port={$port};dbname={$name};charset=utf8mb4";
 
@@ -37,10 +35,11 @@ function pf_pdo(): PDO
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
             PDO::ATTR_EMULATE_PREPARES   => false,
         ]);
-        return $pdo;
     } catch (PDOException $e) {
-        pf_log('error', 'DB connection failed', ['err' => $e->getMessage()]);
-        // Fail closed
+        // Don’t leak DSN/user; log minimal
+        pf_log('error', 'DB connect failed', ['err' => $e->getMessage()]);
         throw $e;
     }
+
+    return $pdo;
 }
