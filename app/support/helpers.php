@@ -4,7 +4,7 @@
  * helpers.php
  *
  * All shared helper functions live here (NO lone functions elsewhere).
- * Keep this file small and boring.
+ * Keep this file small, boring, and safe.
  */
 
 function pf_json(array $data, int $status = 200): void
@@ -15,9 +15,38 @@ function pf_json(array $data, int $status = 200): void
     exit;
 }
 
+/**
+ * Detect whether the client likely wants HTML.
+ * (We keep this simple and safe for MVP.)
+ */
+function pf_wants_html(): bool
+{
+    $accept = (string)($_SERVER['HTTP_ACCEPT'] ?? '');
+    return stripos($accept, 'text/html') !== false || $accept === '';
+}
+
+/**
+ * Controlled error output (keeps the site "ours").
+ * - Returns branded HTML when appropriate
+ * - Returns plain text for non-browser clients
+ */
 function pf_http_error(int $status, string $message): void
 {
     http_response_code($status);
+
+    if (pf_wants_html()) {
+        $title = $status . ' — ' . $message;
+        $safeMsg = htmlspecialchars($message, ENT_QUOTES, 'UTF-8');
+
+        pf_render_basic_page($title, '
+            <div class="card">
+              <h1 class="card-title">' . htmlspecialchars((string)$status, ENT_QUOTES, 'UTF-8') . '</h1>
+              <p class="small">' . $safeMsg . '</p>
+              <p class="small"><a class="btn" href="/">Back to home</a></p>
+            </div>
+        ');
+    }
+
     header('Content-Type: text/plain; charset=utf-8');
     echo $message;
     exit;
