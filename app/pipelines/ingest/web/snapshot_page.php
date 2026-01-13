@@ -6,6 +6,7 @@
  * ============================================================
  * Purpose:
  *  - One-page view of queue health + recent items
+ *  - Clickable trace_id -> /debug/inspect (single place to verify flow)
  *
  * Safety:
  *  - Enabled ONLY when PF_DEBUG_TOOLS=1
@@ -56,12 +57,26 @@ try {
         LIMIT 5
     ")->fetchAll();
 
+    // Latest trace ids (for quick inspect buttons)
+    $latestInTrace = null;
+    if (!empty($inRecent) && isset($inRecent[0]['trace_id'])) {
+        $latestInTrace = (string)$inRecent[0]['trace_id'];
+    }
+
+    $latestOutTrace = null;
+    if (!empty($outRecent) && isset($outRecent[0]['trace_id'])) {
+        $latestOutTrace = (string)$outRecent[0]['trace_id'];
+    }
+
 } catch (Throwable $e) {
     pf_log('error', 'Snapshot failed', ['err' => $e->getMessage()]);
     pf_http_error(500, 'Server Error');
 }
 
-$renderTable = static function(string $title, array $rows) use ($esc): string {
+/**
+ * Render a table and make trace_id clickable if present.
+ */
+$renderTable = static function(string $title, array $rows) use ($esc, $reqToken): string {
     $html = '<div class="card">';
     $html .= '<h2 class="card-title" style="margin:0;">' . $esc($title) . '</h2>';
 
@@ -73,11 +88,13 @@ $renderTable = static function(string $title, array $rows) use ($esc): string {
     $html .= '<div style="overflow:auto;margin-top:12px;">';
     $html .= '<table style="width:100%;border-collapse:collapse;font-size:0.95rem;">';
 
-    // headers
     $headers = array_keys($rows[0]);
+
+    // headers
     $html .= '<thead><tr>';
     foreach ($headers as $h) {
-        $html .= '<th style="text-align:left;padding:10px;border-bottom:1px solid var(--pf-border);" class="small">' . $esc((string)$h) . '</th>';
+        $html .= '<th style="text-align:left;padding:10px;border-bottom:1px solid var(--pf-border);" class="small">'
+            . $esc((string)$h) . '</th>';
     }
     $html .= '</tr></thead><tbody>';
 
@@ -85,8 +102,17 @@ $renderTable = static function(string $title, array $rows) use ($esc): string {
         $html .= '<tr>';
         foreach ($headers as $h) {
             $v = (string)($r[$h] ?? '');
+
+            // Make trace_id clickable -> /debug/inspect
+            if ($h === 'trace_id' && $v !== '') {
+                $href = '/debug/inspect?t=' . rawurlencode($reqToken) . '&trace_id=' . rawurlencode($v);
+                $cell = '<a href="' . $esc($href) . '" class="small" style="text-decoration:underline;">' . $esc($v) . '</a>';
+            } else {
+                $cell = $esc($v);
+            }
+
             $html .= '<td style="padding:10px;border-bottom:1px solid var(--pf-border);vertical-align:top;">'
-                . $esc($v) . '</td>';
+                . $cell . '</td>';
         }
         $html .= '</tr>';
     }
@@ -94,6 +120,15 @@ $renderTable = static function(string $title, array $rows) use ($esc): string {
     $html .= '</tbody></table></div></div>';
     return $html;
 };
+
+// Quick inspect buttons
+$inspectBtns = '';
+if ($latestInTrace !== null) {
+    $inspectBtns .= '<a class="btn" href="/debug/inspect?t=' . $esc($reqToken) . '&trace_id=' . $esc($latestInTrace) . '">Inspect latest inbound</a>';
+}
+if ($latestOutTrace !== null) {
+    $inspectBtns .= '<a class="btn" href="/debug/inspect?t=' . $esc($reqToken) . '&trace_id=' . $esc($latestOutTrace) . '">Inspect latest outbound</a>';
+}
 
 // Layout
 $countsCard = '<div class="card">
@@ -119,6 +154,7 @@ $countsCard = '<div class="card">
   <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap;">
     <a class="btn" href="/debug/post?t=' . $esc($reqToken) . '">POST tester</a>
     <a class="btn" href="/debug/snapshot?t=' . $esc($reqToken) . '">Refresh snapshot</a>
+    ' . $inspectBtns . '
   </div>
 </div>';
 
