@@ -5,12 +5,9 @@
  * Plainfully — Email Ingest (Cron-friendly)
  * ============================================================
  * Purpose:
- *  - Poll IMAP for UNSEEN emails
+ *  - Poll IMAP for UNSEEN emails in clarify@plainfully.com inbox
  *  - Normalize -> insert into pf_inbound_queue (status=new)
  *  - Mark seen or delete (config)
- *
- * Scheduled task:
- *  - Run every 1 minute
  *
  * Env required:
  *  - PF_IMAP_HOST
@@ -25,6 +22,8 @@
  *  - PF_IMAP_MAX_EMAILS=20
  *  - PF_IMAP_ACTION=seen      (seen|delete)
  *  - PF_EMAIL_CHANNEL=email-clarify
+ *  - PF_EMAIL_INGEST_BLOCK_FROM=no-reply@plainfully.com
+ *  - PF_EMAIL_INGEST_DEBUG=0  (1 prints safe debug details to stdout)
  */
 
 require_once __DIR__ . '/../app/bootstrap.php';
@@ -41,6 +40,8 @@ final class PfEmailIngestCron
     private int    $maxEmails;
     private string $action;
     private string $channel;
+    private string $blockFrom;
+    private bool   $debug;
 
     public function __construct()
     {
@@ -65,19 +66,23 @@ final class PfEmailIngestCron
 
         $this->channel = (string)pf_env('PF_EMAIL_CHANNEL', 'email-clarify');
         if ($this->channel === '') { $this->channel = 'email-clarify'; }
+
+        $this->blockFrom = strtolower(trim((string)pf_env('PF_EMAIL_INGEST_BLOCK_FROM', 'no-reply@plainfully.com')));
+
+        $this->debug = ((string)pf_env('PF_EMAIL_INGEST_DEBUG', '0') === '1');
     }
 
     public function run(): int
     {
         if (!function_exists('imap_open')) {
-            pf_log('error', 'IMAP extension not available (imap_open missing)', []);
-            fwrite(STDERR, "IMAP extension not available.\n");
+            $this->out("IMAP extension not available (imap_open missing).");
+            pf_log('error', 'IMAP extension not available', []);
             return 0;
         }
 
         if ($this->host === '' || $this->user === '' || $this->pass === '') {
-            pf_log('error', 'Email ingest missing env (PF_IMAP_HOST/USER/PASS)', []);
-            fwrite(STDERR, "Missing IMAP env vars.\n");
+            $this->out("Missing IMAP env vars (PF_IMAP_HOST/USER/PASS).");
+            pf_log('error', 'Email ingest missing env', []);
             return 0;
         }
 
@@ -86,27 +91,29 @@ final class PfEmailIngestCron
 
         $mailboxStr = $this->buildMailboxString();
 
+        // Clear any prior IMAP errors so we only see fresh ones
+        if (function_exists('imap_errors')) { @imap_errors(); }
+
         $inbox = @imap_open($mailboxStr, $this->user, $this->pass, 0, 1, [
             'DISABLE_AUTHENTICATOR' => 'GSSAPI',
         ]);
 
         if ($inbox === false) {
             $err = (string)imap_last_error();
-            pf_log('error', 'IMAP open failed', ['err' => $err]);
-            fwrite(STDERR, "IMAP open failed: {$err}\n");
+            $this->out("IMAP open failed: {$err}");
+            pf_log('error', 'IMAP open failed', ['err' => $err, 'mailbox' => $this->safeMailbox()]);
+            if ($this->debug) { $this->dumpImapErrors(); }
             return 0;
         }
 
         try {
-            // UNSEEN only (fast + safe)
             $emails = imap_search($inbox, 'UNSEEN', SE_UID);
 
             if (!is_array($emails) || empty($emails)) {
-                echo "Email ingest complete. processed=0\n";
+                $this->out("Email ingest complete. processed=0");
                 return 0;
             }
 
-            // Process oldest first (FIFO-ish)
             sort($emails, SORT_NUMERIC);
 
             foreach ($emails as $uid) {
@@ -117,20 +124,32 @@ final class PfEmailIngestCron
                 if ($did) { $processed++; }
             }
 
-            // Expunge deletes if configured
             if ($this->action === 'delete') {
                 @imap_expunge($inbox);
             }
 
-            echo "Email ingest complete. processed={$processed}\n";
+            $this->out("Email ingest complete. processed={$processed}");
             pf_log('info', 'Email ingest complete', ['processed' => $processed]);
 
             return $processed;
+
         } catch (Throwable $e) {
             $ref = bin2hex(random_bytes(6));
-            pf_log('error', 'Email ingest crashed', ['ref' => $ref, 'err' => $e->getMessage()]);
-            fwrite(STDERR, "Email ingest crashed (ref {$ref})\n");
+            pf_log('error', 'Email ingest crashed', [
+                'ref' => $ref,
+                'err' => $e->getMessage(),
+                'mailbox' => $this->safeMailbox(),
+            ]);
+
+            $this->out("Email ingest crashed (ref {$ref})");
+
+            if ($this->debug) {
+                $this->out("DEBUG: " . $e->getMessage());
+                $this->dumpImapErrors();
+            }
+
             return $processed;
+
         } finally {
             @imap_close($inbox);
         }
@@ -138,31 +157,19 @@ final class PfEmailIngestCron
 
     private function ingestOne($inbox, int $uid): bool
     {
-        // Fetch headers + structure
         $overviewArr = imap_fetch_overview($inbox, (string)$uid, FT_UID);
         if (!is_array($overviewArr) || empty($overviewArr)) {
+            if ($this->debug) {
+                $this->out("DEBUG: Missing overview for UID {$uid}");
+                $this->dumpImapErrors();
+            }
             return false;
         }
+
         $ov = $overviewArr[0];
 
         $subject = isset($ov->subject) ? imap_utf8((string)$ov->subject) : '';
         $from    = isset($ov->from) ? imap_utf8((string)$ov->from) : '';
-        // --- Loop prevention: never ingest our own outbound ---
-        $blockFrom = strtolower(trim((string)pf_env('PF_EMAIL_INGEST_BLOCK_FROM', 'no-reply@plainfully.com')));
-        $fromLower = strtolower($from);
-
-        // crude but effective: if our outbound address appears anywhere in From, skip it
-        if ($blockFrom !== '' && $fromLower !== '' && str_contains($fromLower, $blockFrom)) {
-            // mark handled so it doesn't keep appearing
-            if ($this->action === 'delete') {
-                @imap_delete($inbox, (string)$uid, FT_UID);
-            } else {
-                @imap_setflag_full($inbox, (string)$uid, "\\Seen", ST_UID);
-            }
-            pf_log('info', 'Email ingest skipped (blocked From)', ['uid' => $uid, 'from' => $from]);
-            return false;
-        }
-
         $date    = isset($ov->date) ? (string)$ov->date : '';
 
         $messageId = '';
@@ -170,18 +177,21 @@ final class PfEmailIngestCron
             $messageId = trim((string)$ov->message_id);
         }
 
-        // Body (prefer text/plain, fallback to stripped html)
-        $text = $this->getBestBody($inbox, $uid);
-        $text = trim($text);
+        // --- Loop prevention: never ingest our own outbound ---
+        $fromLower = strtolower($from);
+        if ($this->blockFrom !== '' && $fromLower !== '' && str_contains($fromLower, $this->blockFrom)) {
+            $this->markHandled($inbox, $uid);
+            pf_log('info', 'Email ingest skipped (blocked From)', ['uid' => $uid, 'from' => $from]);
+            return false;
+        }
 
+        $text = trim($this->getBestBody($inbox, $uid));
         if ($text === '' && $subject === '') {
             $text = '(empty email)';
         }
 
-        // Trace id stable-ish from message-id if present, else random
         $traceId = $this->makeTraceId($messageId);
 
-        // Write inbound queue
         $payload = [
             'email' => [
                 'from'       => $from,
@@ -198,47 +208,44 @@ final class PfEmailIngestCron
             ],
         ];
 
+        // Insert into inbound queue
+        $pdo = pf_pdo();
+        $stmt = $pdo->prepare("
+            INSERT INTO pf_inbound_queue (trace_id, channel, payload_json, status, attempts, available_at, created_at)
+            VALUES (:trace_id, :channel, :payload_json, 'new', 0, NOW(), NOW())
+        ");
+
         try {
-            $pdo = pf_pdo();
-            $stmt = $pdo->prepare("
-                INSERT INTO pf_inbound_queue (trace_id, channel, payload_json, status, attempts, available_at, created_at)
-                VALUES (:trace_id, :channel, :payload_json, 'new', 0, NOW(), NOW())
-            ");
             $stmt->execute([
                 ':trace_id'     => $traceId,
                 ':channel'      => $this->channel,
                 ':payload_json' => json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
             ]);
         } catch (Throwable $e) {
-            // If trace_id collides (rare) or DB error, fall back to random trace id once
-            $fallback = $this->randomTraceId();
-            try {
-                $pdo = pf_pdo();
-                $stmt = $pdo->prepare("
-                    INSERT INTO pf_inbound_queue (trace_id, channel, payload_json, status, attempts, available_at, created_at)
-                    VALUES (:trace_id, :channel, :payload_json, 'new', 0, NOW(), NOW())
-                ");
-                $stmt->execute([
-                    ':trace_id'     => $fallback,
-                    ':channel'      => $this->channel,
-                    ':payload_json' => json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
-                ]);
-                $traceId = $fallback;
-            } catch (Throwable $e2) {
-                pf_log('error', 'Email ingest DB insert failed', ['err' => $e2->getMessage()]);
-                return false;
-            }
+            // One retry with a random trace id (collision / unique constraint / etc.)
+            $traceId = $this->randomTraceId();
+            $stmt->execute([
+                ':trace_id'     => $traceId,
+                ':channel'      => $this->channel,
+                ':payload_json' => json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+            ]);
         }
 
-        // Mark message handled
+        $this->markHandled($inbox, $uid);
+
+        pf_log('info', 'Email ingested', ['trace_id' => $traceId, 'uid' => $uid]);
+        if ($this->debug) { $this->out("DEBUG: ingested uid={$uid} trace_id={$traceId}"); }
+
+        return true;
+    }
+
+    private function markHandled($inbox, int $uid): void
+    {
         if ($this->action === 'delete') {
             @imap_delete($inbox, (string)$uid, FT_UID);
         } else {
             @imap_setflag_full($inbox, (string)$uid, "\\Seen", ST_UID);
         }
-
-        pf_log('info', 'Email ingested', ['trace_id' => $traceId, 'uid' => $uid]);
-        return true;
     }
 
     private function getBestBody($inbox, int $uid): string
@@ -249,24 +256,17 @@ final class PfEmailIngestCron
             return is_string($raw) ? $raw : '';
         }
 
-        // Single-part
         if (!isset($structure->parts) || !is_array($structure->parts)) {
             $raw = imap_body($inbox, (string)$uid, FT_UID);
             return is_string($raw) ? $this->decodePart($raw, (int)($structure->encoding ?? 0)) : '';
         }
 
-        // Multi-part: try text/plain first, then text/html
         $plain = $this->findPart($inbox, $uid, $structure, 'TEXT/PLAIN');
-        if ($plain !== '') {
-            return $plain;
-        }
+        if ($plain !== '') { return $plain; }
 
         $html = $this->findPart($inbox, $uid, $structure, 'TEXT/HTML');
-        if ($html !== '') {
-            return trim(strip_tags($html));
-        }
+        if ($html !== '') { return trim(strip_tags($html)); }
 
-        // Fallback: whole body
         $raw = imap_body($inbox, (string)$uid, FT_UID);
         return is_string($raw) ? $raw : '';
     }
@@ -281,12 +281,10 @@ final class PfEmailIngestCron
             if ($partMime === $mime) {
                 $raw = imap_fetchbody($inbox, (string)$uid, (string)$i, FT_UID);
                 if (!is_string($raw)) { return ''; }
-                $decoded = $this->decodePart($raw, (int)($part->encoding ?? 0));
-                return trim($decoded);
+                return trim($this->decodePart($raw, (int)($part->encoding ?? 0)));
             }
             $i++;
         }
-
         return '';
     }
 
@@ -295,7 +293,6 @@ final class PfEmailIngestCron
         $primary = (int)($part->type ?? 0);
         $sub     = strtoupper((string)($part->subtype ?? ''));
 
-        // Common: type 0 = text
         $map = [
             0 => 'TEXT',
             1 => 'MULTIPART',
@@ -330,10 +327,15 @@ final class PfEmailIngestCron
         return '{' . $this->host . ':' . $this->port . $enc . '}' . $this->mailbox;
     }
 
+    private function safeMailbox(): string
+    {
+        // host + port + enc only (no user/pass)
+        return $this->host . ':' . $this->port . ' ' . $this->enc . ' ' . $this->mailbox;
+    }
+
     private function makeTraceId(string $messageId): string
     {
         if ($messageId !== '') {
-            // Deterministic-ish trace id from message id (keeps duplicate spam grouped)
             $h = hash('sha256', strtolower($messageId));
             return substr($h, 0, 8) . '-' . substr($h, 8, 4) . '-' . substr($h, 12, 4) . '-' . substr($h, 16, 4) . '-' . substr($h, 20, 12);
         }
@@ -357,6 +359,23 @@ final class PfEmailIngestCron
         if ($v < $min) return $min;
         if ($v > $max) return $max;
         return $v;
+    }
+
+    private function out(string $msg): void
+    {
+        echo $msg . "\n";
+    }
+
+    private function dumpImapErrors(): void
+    {
+        $errs = imap_errors();
+        if (is_array($errs) && !empty($errs)) {
+            $this->out("DEBUG: imap_errors=" . json_encode($errs, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+        }
+        $last = imap_last_error();
+        if (is_string($last) && $last !== '') {
+            $this->out("DEBUG: imap_last_error=" . $last);
+        }
     }
 }
 
