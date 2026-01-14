@@ -157,7 +157,7 @@ final class PfEmailIngestCron
 
     private function ingestOne($inbox, int $uid): bool
     {
-        $overviewArr = imap_fetch_overview($inbox, $uid, FT_UID);
+        $overviewArr = imap_fetch_overview($inbox, (string)$uid, FT_UID);
         if (!is_array($overviewArr) || empty($overviewArr)) {
             if ($this->debug) {
                 $this->out("DEBUG: Missing overview for UID {$uid}");
