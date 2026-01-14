@@ -18,5 +18,10 @@ require_once PF_ROOT . '/app/support/helpers.php';
 require_once PF_ROOT . '/app/support/security.php';
 require_once PF_ROOT . '/app/support/db.php';
 
+// Third-party vendors (manual)
+require_once PF_ROOT . '/app/vendor/phpmailer/PHPMailer.php';
+require_once PF_ROOT . '/app/vendor/phpmailer/SMTP.php';
+require_once PF_ROOT . '/app/vendor/phpmailer/Exception.php';
+
 // Load .env (safe: does nothing if missing)
 pf_env_load(PF_ROOT . '/.env');
