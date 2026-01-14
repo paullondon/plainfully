@@ -76,7 +76,7 @@ try {
 /**
  * Render a table and make trace_id clickable if present.
  */
-$renderTable = static function(string $title, array $rows) use ($esc, $reqToken): string {
+$renderTable = static function(string $title, array $rows) use ($esc): string {
     $html = '<div class="card">';
     $html .= '<h2 class="card-title" style="margin:0;">' . $esc($title) . '</h2>';
 
@@ -88,38 +88,53 @@ $renderTable = static function(string $title, array $rows) use ($esc, $reqToken)
     $html .= '<div style="overflow:auto;margin-top:12px;">';
     $html .= '<table style="width:100%;border-collapse:collapse;font-size:0.95rem;">';
 
+    // headers
     $headers = array_keys($rows[0]);
 
-    // headers
+    // Inject View column if trace_id exists
+    $hasTrace = in_array('trace_id', $headers, true);
+    if ($hasTrace) {
+        $headers[] = 'view';
+    }
+
     $html .= '<thead><tr>';
     foreach ($headers as $h) {
         $html .= '<th style="text-align:left;padding:10px;border-bottom:1px solid var(--pf-border);" class="small">'
-            . $esc((string)$h) . '</th>';
+              . $esc((string)$h)
+              . '</th>';
     }
     $html .= '</tr></thead><tbody>';
 
     foreach ($rows as $r) {
         $html .= '<tr>';
-        foreach ($headers as $h) {
-            $v = (string)($r[$h] ?? '');
 
-            // Make trace_id clickable -> /debug/inspect
-            if ($h === 'trace_id' && $v !== '') {
-                $href = '/debug/inspect?t=' . rawurlencode($reqToken) . '&trace_id=' . rawurlencode($v);
-                $cell = '<a href="' . $esc($href) . '" class="small" style="text-decoration:underline;">' . $esc($v) . '</a>';
-            } else {
-                $cell = $esc($v);
+        foreach ($headers as $h) {
+            if ($h === 'view' && $hasTrace) {
+                $traceId = (string)($r['trace_id'] ?? '');
+                if ($traceId !== '') {
+                    $url = '/r?trace_id=' . rawurlencode($traceId);
+                    $html .= '<td style="padding:10px;border-bottom:1px solid var(--pf-border);">'
+                          . '<a class="btn" href="' . $esc($url) . '" target="_blank" rel="noopener">View</a>'
+                          . '</td>';
+                } else {
+                    $html .= '<td style="padding:10px;border-bottom:1px solid var(--pf-border);">—</td>';
+                }
+                continue;
             }
 
+            $v = (string)($r[$h] ?? '');
             $html .= '<td style="padding:10px;border-bottom:1px solid var(--pf-border);vertical-align:top;">'
-                . $cell . '</td>';
+                  . $esc($v)
+                  . '</td>';
         }
+
         $html .= '</tr>';
     }
 
     $html .= '</tbody></table></div></div>';
     return $html;
 };
+
 
 // Quick inspect buttons
 $inspectBtns = '';
