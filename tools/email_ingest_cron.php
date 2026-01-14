@@ -147,6 +147,22 @@ final class PfEmailIngestCron
 
         $subject = isset($ov->subject) ? imap_utf8((string)$ov->subject) : '';
         $from    = isset($ov->from) ? imap_utf8((string)$ov->from) : '';
+        // --- Loop prevention: never ingest our own outbound ---
+        $blockFrom = strtolower(trim((string)pf_env('PF_EMAIL_INGEST_BLOCK_FROM', 'no-reply@plainfully.com')));
+        $fromLower = strtolower($from);
+
+        // crude but effective: if our outbound address appears anywhere in From, skip it
+        if ($blockFrom !== '' && $fromLower !== '' && str_contains($fromLower, $blockFrom)) {
+            // mark handled so it doesn't keep appearing
+            if ($this->action === 'delete') {
+                @imap_delete($inbox, (string)$uid, FT_UID);
+            } else {
+                @imap_setflag_full($inbox, (string)$uid, "\\Seen", ST_UID);
+            }
+            pf_log('info', 'Email ingest skipped (blocked From)', ['uid' => $uid, 'from' => $from]);
+            return false;
+        }
+
         $date    = isset($ov->date) ? (string)$ov->date : '';
 
         $messageId = '';
