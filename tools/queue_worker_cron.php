@@ -76,113 +76,158 @@ final class PfCronWorker
         return $processed;
     }
 
-    /**
-     * Process a single inbound item.
-     * Returns true if something was processed, false if no work was available.
-     */
-    private function processOne(): bool
-    {
-        $pdo = pf_pdo();
+/**
+ * Process a single inbound queue item (FIFO).
+ * Returns true if something was processed, false if no work was available.
+ *
+ * Output:
+ *  - Writes exactly ONE outbound job to pf_outbound_queue
+ *  - Outbound channel is chosen based on inbound channel/payload
+ */
+private function processOne(): bool
+{
+    $pdo = pf_pdo();
 
-        // Claim one row safely
-        $pdo->beginTransaction();
+    // Claim one row safely
+    $pdo->beginTransaction();
 
-        try {
-            // Lock one eligible row (oldest first)
-            $sel = $pdo->prepare("
-                SELECT id, trace_id, channel, payload_json, attempts
-                FROM pf_inbound_queue
-                WHERE status='new' AND available_at <= NOW()
-                ORDER BY id ASC
-                LIMIT 1
-                FOR UPDATE
-            ");
-            $sel->execute();
-            $row = $sel->fetch();
+    try {
+        // Lock one eligible row (oldest first)
+        $sel = $pdo->prepare("
+            SELECT id, trace_id, channel, payload_json, attempts
+            FROM pf_inbound_queue
+            WHERE status='new' AND available_at <= NOW()
+            ORDER BY id ASC
+            LIMIT 1
+            FOR UPDATE
+        ");
+        $sel->execute();
+        $row = $sel->fetch();
 
-            if (!is_array($row)) {
-                $pdo->commit();
-                return false;
-            }
-
-            $inId     = (int)$row['id'];
-            $traceId  = (string)$row['trace_id'];
-            $channel  = (string)$row['channel'];
-            $payload  = (string)$row['payload_json'];
-            $attempts = (int)$row['attempts'];
-
-            // Mark as processing (still within the same lock/transaction)
-            $upd = $pdo->prepare("
-                UPDATE pf_inbound_queue
-                SET status='processing', attempts = attempts + 1
-                WHERE id = :id
-            ");
-            $upd->execute([':id' => $inId]);
-
-            // Build placeholder “processed” output (AI not wired yet)
-            $decoded = json_decode($payload, true);
-            $text = is_array($decoded) ? (string)($decoded['text'] ?? '') : '';
-
-            $outPayload = [
-                'trace_id' => $traceId,
-                'input' => [
-                    'channel' => $channel,
-                    'text_preview' => mb_substr($text, 0, 280),
-                ],
-                'result' => [
-                    'status' => 'processed-placeholder',
-                    'message' => 'Processed by cron worker (AI not wired yet).',
-                    'processed_at' => gmdate('c'),
-                ],
-            ];
-
-            // Write outbound row
-            $ins = $pdo->prepare("
-                INSERT INTO pf_outbound_queue (trace_id, channel, payload_json, status, attempts, available_at, created_at)
-                VALUES (:trace_id, :channel, :payload_json, 'new', 0, NOW(), NOW())
-            ");
-            $ins->execute([
-                ':trace_id'     => $traceId,
-                ':channel'      => 'web', // placeholder; later choose based on inbound/meta
-                ':payload_json' => json_encode($outPayload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
-            ]);
-
-            // Mark inbound done
-            $done = $pdo->prepare("UPDATE pf_inbound_queue SET status='done' WHERE id=:id");
-            $done->execute([':id' => $inId]);
-
+        if (!is_array($row)) {
             $pdo->commit();
-
-            pf_log('info', 'Cron worker processed', [
-                'in_id'    => $inId,
-                'trace_id' => $traceId,
-                'attempts' => $attempts + 1,
-            ]);
-
-            return true;
-        } catch (Throwable $e) {
-            $pdo->rollBack();
-
-            $ref = bin2hex(random_bytes(6));
-            pf_log('error', 'Cron worker failed', ['ref' => $ref, 'err' => $e->getMessage()]);
-
-            // Best-effort: unstick any row we may have set to processing in this attempt
-            try {
-                $pdo2 = pf_pdo();
-                $pdo2->prepare("
-                    UPDATE pf_inbound_queue
-                    SET status='new', available_at = DATE_ADD(NOW(), INTERVAL 10 SECOND)
-                    WHERE status='processing'
-                    ORDER BY id DESC
-                    LIMIT 1
-                ")->execute();
-            } catch (Throwable $ignored) {
-                // ignore
-            }
-
             return false;
         }
+
+        $inId     = (int)$row['id'];
+        $traceId  = (string)$row['trace_id'];
+        $channel  = (string)$row['channel'];
+        $payload  = (string)$row['payload_json'];
+        $attempts = (int)$row['attempts'];
+
+        // Mark as processing (still within the same lock/transaction)
+        $upd = $pdo->prepare("
+            UPDATE pf_inbound_queue
+            SET status='processing', attempts = attempts + 1
+            WHERE id = :id
+        ");
+        $upd->execute([':id' => $inId]);
+
+        // Decode inbound payload
+        $decoded = json_decode($payload, true);
+        $text = is_array($decoded) ? (string)($decoded['text'] ?? '') : '';
+
+        /**
+         * ============================================================
+         * Decide delivery route (single outbound queue, multiple channels)
+         * ============================================================
+         * Rule (MVP):
+         *  - If inbound is email-* then outbound channel is 'email'
+         *  - Otherwise outbound channel is 'web'
+         */
+        $outChannel = 'web';
+        $toRaw = null;
+
+        if ($channel === 'email-clarify' || str_starts_with($channel, 'email-')) {
+            $outChannel = 'email';
+
+            // Stored by email ingest as decoded['email']['from'] (often "Name <addr@domain>")
+            if (is_array($decoded) && isset($decoded['email']['from'])) {
+                $toRaw = (string)$decoded['email']['from'];
+            }
+        }
+
+        // Magic link (MVP): simple trace link. We'll harden to signed token + expiry next.
+        $resultUrl = '/r?trace_id=' . rawurlencode($traceId);
+
+        /**
+         * ============================================================
+         * Outbound payload (what deliverers consume)
+         * ============================================================
+         * deliver.to is intentionally "raw" for now; deliverer extracts email safely.
+         */
+        $outPayload = [
+            'trace_id' => $traceId,
+
+            'deliver' => [
+                'channel'    => $outChannel,
+                'to'         => $toRaw, // may be null for web jobs
+                'subject'    => 'Your Plainfully result',
+                'result_url' => $resultUrl,
+            ],
+
+            'input' => [
+                'channel'      => $channel,
+                'text_preview' => mb_substr($text, 0, 280),
+            ],
+
+            'result' => [
+                'status'       => 'processed-placeholder',
+                'message'      => 'Processed by cron worker (AI not wired yet).',
+                'processed_at' => gmdate('c'),
+            ],
+        ];
+
+        // Write outbound row (channel decides which deliverer picks it up)
+        $ins = $pdo->prepare("
+            INSERT INTO pf_outbound_queue (trace_id, channel, payload_json, status, attempts, available_at, created_at)
+            VALUES (:trace_id, :channel, :payload_json, 'new', 0, NOW(), NOW())
+        ");
+        $ins->execute([
+            ':trace_id'     => $traceId,
+            ':channel'      => $outChannel,
+            ':payload_json' => json_encode($outPayload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+        ]);
+
+        // Mark inbound done
+        $done = $pdo->prepare("UPDATE pf_inbound_queue SET status='done' WHERE id=:id");
+        $done->execute([':id' => $inId]);
+
+        $pdo->commit();
+
+        pf_log('info', 'Cron worker processed', [
+            'in_id'       => $inId,
+            'trace_id'    => $traceId,
+            'in_channel'  => $channel,
+            'out_channel' => $outChannel,
+            'attempts'    => $attempts + 1,
+        ]);
+
+        return true;
+
+    } catch (Throwable $e) {
+        $pdo->rollBack();
+
+        $ref = bin2hex(random_bytes(6));
+        pf_log('error', 'Cron worker failed', ['ref' => $ref, 'err' => $e->getMessage()]);
+
+        // Best-effort: unstick any row we may have set to processing in this attempt
+        try {
+            $pdo2 = pf_pdo();
+            $pdo2->prepare("
+                UPDATE pf_inbound_queue
+                SET status='new', available_at = DATE_ADD(NOW(), INTERVAL 10 SECOND)
+                WHERE status='processing'
+                ORDER BY id DESC
+                LIMIT 1
+            ")->execute();
+        } catch (Throwable $ignored) {
+            // ignore
+        }
+
+        return false;
     }
+}
 
     private function clampInt(int $v, int $min, int $max): int
     {
