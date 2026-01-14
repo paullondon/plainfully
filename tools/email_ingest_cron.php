@@ -244,7 +244,7 @@ final class PfEmailIngestCron
         if ($this->action === 'delete') {
             @imap_delete($inbox, $uid, FT_UID);
         } else {
-            @imap_setflag_full($inbox, $uid, "\\Seen", ST_UID);
+            @imap_setflag_full($inbox, (string)$uid, "\\Seen", ST_UID);
         }
     }
 
