@@ -157,7 +157,7 @@ final class PfEmailIngestCron
 
     private function ingestOne($inbox, int $uid): bool
     {
-        $overviewArr = imap_fetch_overview($inbox, (string)$uid, FT_UID);
+        $overviewArr = imap_fetch_overview($inbox, $uid, FT_UID);
         if (!is_array($overviewArr) || empty($overviewArr)) {
             if ($this->debug) {
                 $this->out("DEBUG: Missing overview for UID {$uid}");
@@ -242,22 +242,22 @@ final class PfEmailIngestCron
     private function markHandled($inbox, int $uid): void
     {
         if ($this->action === 'delete') {
-            @imap_delete($inbox, (string)$uid, FT_UID);
+            @imap_delete($inbox, $uid, FT_UID);
         } else {
-            @imap_setflag_full($inbox, (string)$uid, "\\Seen", ST_UID);
+            @imap_setflag_full($inbox, $uid, "\\Seen", ST_UID);
         }
     }
 
     private function getBestBody($inbox, int $uid): string
     {
-        $structure = imap_fetchstructure($inbox, (string)$uid, FT_UID);
+        $structure = imap_fetchstructure($inbox, $uid, FT_UID);
         if (!is_object($structure)) {
-            $raw = imap_body($inbox, (string)$uid, FT_UID);
+            $raw = imap_body($inbox, $uid, FT_UID);
             return is_string($raw) ? $raw : '';
         }
 
         if (!isset($structure->parts) || !is_array($structure->parts)) {
-            $raw = imap_body($inbox, (string)$uid, FT_UID);
+            $raw = imap_body($inbox, $uid, FT_UID);
             return is_string($raw) ? $this->decodePart($raw, (int)($structure->encoding ?? 0)) : '';
         }
 
@@ -267,7 +267,7 @@ final class PfEmailIngestCron
         $html = $this->findPart($inbox, $uid, $structure, 'TEXT/HTML');
         if ($html !== '') { return trim(strip_tags($html)); }
 
-        $raw = imap_body($inbox, (string)$uid, FT_UID);
+        $raw = imap_body($inbox, $uid, FT_UID);
         return is_string($raw) ? $raw : '';
     }
 
@@ -279,7 +279,7 @@ final class PfEmailIngestCron
         foreach ($parts as $part) {
             $partMime = $this->mimeType($part);
             if ($partMime === $mime) {
-                $raw = imap_fetchbody($inbox, (string)$uid, (string)$i, FT_UID);
+                $raw = imap_fetchbody($inbox, $uid, (string)$i, FT_UID);
                 if (!is_string($raw)) { return ''; }
                 return trim($this->decodePart($raw, (int)($part->encoding ?? 0)));
             }
