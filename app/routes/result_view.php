@@ -35,6 +35,13 @@ $updateRowCount = null;
 try {
     $pdo = pf_pdo();
 
+        // For diagnostics
+        pf_log('info', 'RESULT VIEW DEBUG CHECK', [
+            'PF_DEBUG_TOOLS' => pf_env('PF_DEBUG_TOOLS', 'not-set'),
+            'PF_DEBUG_TOKEN' => pf_env('PF_DEBUG_TOKEN', 'not-set'),
+            'token_ok'       => hash_equals((string)pf_env('PF_DEBUG_TOKEN', ''), (string)($_GET['t'] ?? '')),
+        ]);
+
     if ($showDiag) {
         $dbName = (string)$pdo->query('SELECT DATABASE()')->fetchColumn();
     }
