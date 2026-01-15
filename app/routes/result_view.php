@@ -43,15 +43,17 @@ try {
     }
 
     // Finalise web deliveries when viewed
-    if ($channel === 'web' && $status !== 'sent') {
-        $pdo->prepare("
-            UPDATE pf_outbound_queue
-            SET status='sent'
-            WHERE id=:id
+    if ($channel === 'web') {
+    $pdo->prepare("
+        UPDATE pf_outbound_queue
+        SET status='sent',
+            viewed_at = COALESCE(viewed_at, NOW())
+        WHERE id=:id
         ")->execute([':id' => $outId]);
 
         $status = 'sent';
     }
+
 
 } catch (Throwable $e) {
     pf_log('error', 'Result view error', ['err' => $e->getMessage()]);
