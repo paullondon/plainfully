@@ -44,7 +44,7 @@ try {
 
     // Recent rows
     $inRecent = $pdo->query("
-        SELECT id, trace_id, channel, status, viewed_at, attempts, created_at
+        SELECT id, trace_id, channel, status, attempts, created_at
         FROM pf_inbound_queue
         ORDER BY id DESC
         LIMIT 5
