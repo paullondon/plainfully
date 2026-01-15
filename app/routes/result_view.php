@@ -42,18 +42,25 @@ try {
         $payload = [];
     }
 
-    // Finalise web deliveries when viewed
     if ($channel === 'web') {
-    $pdo->prepare("
+    $upd = $pdo->prepare("
         UPDATE pf_outbound_queue
         SET status='sent',
             viewed_at = COALESCE(viewed_at, NOW())
         WHERE id=:id
-        ")->execute([':id' => $outId]);
+        LIMIT 1
+    ");
+    $upd->execute([':id' => $outId]);
 
-        $status = 'sent';
-    }
+    pf_log('info', 'Result view finalised outbound', [
+        'out_id'   => $outId,
+        'trace_id' => $traceId,
+        'channel'  => $channel,
+        'rowcount' => $upd->rowCount(),
+    ]);
 
+    $status = 'sent';
+}
 
 } catch (Throwable $e) {
     pf_log('error', 'Result view error', ['err' => $e->getMessage()]);
