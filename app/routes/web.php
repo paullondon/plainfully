@@ -55,5 +55,12 @@ function pf_route_dispatch(string $path, string $method): void
         exit;
     }
 
+    // Debug logs viewer (gated)
+    if ($path === '/debug/logs' && $method === 'GET') {
+        require_once PF_ROOT . '/app/pipelines/ingest/web/logs_page.php';
+        exit;
+    }
+    
+    // 404 for everything else
     pf_http_error(404, 'Not Found');
 }

@@ -146,6 +146,9 @@ if ($latestOutTrace !== null) {
     $inspectBtns .= '<a class="btn" href="/debug/inspect?t=' . $esc($reqToken) . '&trace_id=' . $esc($latestOutTrace) . '">Inspect latest outbound</a>';
 }
 
+// log button
+$inspectBtns .= '<a class="btn" href="/debug/logs?t=' . $esc($reqToken) . '" target="_blank" rel="noopener">Logs</a>';
+
 // Layout
 $countsCard = '<div class="card">
   <h1 class="card-title">Debug: System Snapshot</h1>
