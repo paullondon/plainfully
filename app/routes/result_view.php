@@ -7,10 +7,10 @@
  * Purpose:
  *  - Render a specific outbound result row (preferred via ?oid=)
  *  - If oid is present: mark THAT row as sent + viewed_at (debug correctness)
- *  - If oid missing: fall back to latest row for trace_id (no forced updates)
+ *  - Always re-read the DB after update to display the truth
  *
- * Notes:
- *  - oid path is used by debug tooling to prove E2E behaviour.
+ * Debug (optional):
+ *  - If PF_DEBUG_TOOLS=1 and ?t=PF_DEBUG_TOKEN is provided, show DB + rowcount.
  */
 
 require_once PF_ROOT . '/app/bootstrap.php';
@@ -24,25 +24,42 @@ if ($traceId === '' || !preg_match('/^[a-f0-9\-]{16,64}$/i', $traceId)) {
 
 $esc = static fn(string $s): string => htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
 
+$debugEnabled = (pf_env('PF_DEBUG_TOOLS', '0') === '1');
+$debugToken   = (string)pf_env('PF_DEBUG_TOKEN', '');
+$reqToken     = (string)($_GET['t'] ?? '');
+$showDiag     = $debugEnabled && $debugToken !== '' && hash_equals($debugToken, $reqToken);
+
+$dbName = '';
+$updateRowCount = null;
+
 try {
     $pdo = pf_pdo();
 
-    // 1) Select the exact outbound row if oid provided (debug uses this)
+    if ($showDiag) {
+        $dbName = (string)$pdo->query('SELECT DATABASE()')->fetchColumn();
+    }
+
+    // Select the exact outbound row if oid provided
     if ($oid > 0) {
         $sel = $pdo->prepare("
             SELECT id, trace_id, channel, status, viewed_at, payload_json, created_at
             FROM pf_outbound_queue
-            WHERE id = :id AND trace_id = :trace_id
+            WHERE id = :id
             LIMIT 1
         ");
-        $sel->execute([':id' => $oid, ':trace_id' => $traceId]);
+        $sel->execute([':id' => $oid]);
         $row = $sel->fetch();
 
         if (!is_array($row)) {
             pf_http_error(404, 'Not Found');
         }
 
-        // 2) Force “viewed” state for this specific outbound row (debug truth)
+        // Optional safety: ensure the oid matches the trace_id you're passing (helps catch wrong links)
+        if ((string)$row['trace_id'] !== $traceId) {
+            pf_http_error(404, 'Not Found');
+        }
+
+        // Force “viewed” state for this specific outbound row
         $upd = $pdo->prepare("
             UPDATE pf_outbound_queue
             SET status='sent',
@@ -52,13 +69,15 @@ try {
         ");
         $upd->execute([':id' => $oid]);
 
+        $updateRowCount = $upd->rowCount();
+
         pf_log('info', 'Result view marked outbound as viewed', [
             'out_id'   => $oid,
             'trace_id' => $traceId,
-            'rowcount' => $upd->rowCount(),
+            'rowcount' => $updateRowCount,
         ]);
 
-        // 3) Re-read so the page reflects DB truth (no guessing)
+        // Re-read the row (this is the source of truth we display)
         $sel2 = $pdo->prepare("
             SELECT id, trace_id, channel, status, viewed_at, payload_json, created_at
             FROM pf_outbound_queue
@@ -73,7 +92,7 @@ try {
         }
 
     } else {
-        // Fallback: latest outbound for trace_id (public link behaviour)
+        // Fallback: latest outbound for trace_id
         $sel = $pdo->prepare("
             SELECT id, trace_id, channel, status, viewed_at, payload_json, created_at
             FROM pf_outbound_queue
@@ -105,6 +124,19 @@ $resultMsg   = (string)($payload['result']['message'] ?? 'Result ready.');
 $resultState = (string)($payload['result']['status'] ?? 'ok');
 $processedAt = (string)($payload['result']['processed_at'] ?? '');
 
+$diagHtml = '';
+if ($showDiag) {
+    $diagHtml = '
+      <div class="card" style="margin-top:12px;">
+        <h2 class="card-title" style="margin:0;">Debug diagnostics</h2>
+        <p class="small" style="margin-top:10px;">
+          DB: <strong>' . $esc($dbName ?: '—') . '</strong><br>
+          UPDATE rowcount: <strong>' . $esc($updateRowCount === null ? '—' : (string)$updateRowCount) . '</strong>
+        </p>
+      </div>
+    ';
+}
+
 pf_render_basic_page('Plainfully Result', '
   <div class="card">
     <h1 class="card-title">Your result</h1>
@@ -128,5 +160,6 @@ pf_render_basic_page('Plainfully Result', '
 
     <p class="small">Processed: ' . $esc($processedAt !== '' ? $processedAt : '—') . '</p>
   </div>
+
+  ' . $diagHtml . '
 ');
-// End of file
