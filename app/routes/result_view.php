@@ -19,15 +19,43 @@ if ($traceId === '' || !preg_match('/^[a-f0-9\-]{16,64}$/i', $traceId)) {
 try {
     $pdo = pf_pdo();
 
-    $stmt = $pdo->prepare("
-        SELECT id, channel, status, payload_json
-        FROM pf_outbound_queue
-        WHERE trace_id = :trace_id
-        ORDER BY id DESC
-        LIMIT 1
-    ");
-    $stmt->execute([':trace_id' => $traceId]);
-    $row = $stmt->fetch();
+    $oid = (int)($_GET['oid'] ?? 0);
+
+    if ($oid > 0) {
+        // Exact outbound row (best for debug + correctness)
+        $sel = $pdo->prepare("
+            SELECT id, trace_id, channel, status, payload_json
+            FROM pf_outbound_queue
+            WHERE id = :id AND trace_id = :trace_id
+            LIMIT 1
+        ");
+        $sel->execute([':id' => $oid, ':trace_id' => $traceId]);
+        $row = $sel->fetch();
+    } else {
+        // Prefer latest WEB outbound row for this trace (so viewing marks web as viewed)
+        $sel = $pdo->prepare("
+            SELECT id, trace_id, channel, status, payload_json
+            FROM pf_outbound_queue
+            WHERE trace_id = :trace_id AND channel='web'
+            ORDER BY id DESC
+            LIMIT 1
+        ");
+        $sel->execute([':trace_id' => $traceId]);
+        $row = $sel->fetch();
+
+        // Fallback: latest any channel if no web row exists
+        if (!is_array($row)) {
+            $sel2 = $pdo->prepare("
+                SELECT id, trace_id, channel, status, payload_json
+                FROM pf_outbound_queue
+                WHERE trace_id = :trace_id
+                ORDER BY id DESC
+                LIMIT 1
+            ");
+            $sel2->execute([':trace_id' => $traceId]);
+            $row = $sel2->fetch();
+        }
+    }
 
     if (!is_array($row)) {
         pf_http_error(404, 'Not Found');
@@ -38,29 +66,21 @@ try {
     $status  = (string)$row['status'];
 
     $payload = json_decode((string)$row['payload_json'], true);
-    if (!is_array($payload)) {
-        $payload = [];
+    if (!is_array($payload)) { $payload = []; }
+
+    // Mark viewed only for web rows
+    if ($channel === 'web') {
+        $upd = $pdo->prepare("
+            UPDATE pf_outbound_queue
+            SET status='sent',
+                viewed_at = COALESCE(viewed_at, NOW())
+            WHERE id=:id
+            LIMIT 1
+        ");
+        $upd->execute([':id' => $outId]);
+        $status = 'sent';
     }
 
-    if ($channel === 'web') {
-    $upd = $pdo->prepare("
-        UPDATE pf_outbound_queue
-        SET status='sent',
-            viewed_at = COALESCE(viewed_at, NOW())
-        WHERE id=:id
-        LIMIT 1
-    ");
-    $upd->execute([':id' => $outId]);
-
-    pf_log('info', 'Result view finalised outbound', [
-        'out_id'   => $outId,
-        'trace_id' => $traceId,
-        'channel'  => $channel,
-        'rowcount' => $upd->rowCount(),
-    ]);
-
-    $status = 'sent';
-}
 
 } catch (Throwable $e) {
     pf_log('error', 'Result view error', ['err' => $e->getMessage()]);

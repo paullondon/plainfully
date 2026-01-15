@@ -112,7 +112,8 @@ $renderTable = static function(string $title, array $rows) use ($esc): string {
             if ($h === 'view' && $hasTrace) {
                 $traceId = (string)($r['trace_id'] ?? '');
                 if ($traceId !== '') {
-                    $url = '/r?trace_id=' . rawurlencode($traceId);
+                    $rowId = (string)($r['id'] ?? '');
+                    $url = '/r?trace_id=' . rawurlencode($traceId) . '&oid=' . rawurlencode($rowId);
                     $html .= '<td style="padding:10px;border-bottom:1px solid var(--pf-border);">'
                           . '<a class="btn" href="' . $esc($url) . '" target="_blank" rel="noopener">View</a>'
                           . '</td>';
