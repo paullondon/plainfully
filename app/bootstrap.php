@@ -13,10 +13,16 @@
 
 define('PF_ROOT', dirname(__DIR__));
 
+// support files
 require_once PF_ROOT . '/app/support/env.php';
 require_once PF_ROOT . '/app/support/helpers.php';
 require_once PF_ROOT . '/app/support/security.php';
 require_once PF_ROOT . '/app/support/db.php';
+
+// Pillars 
+require_once PF_ROOT . '/app/pillars/storage/attachment_store.php';
+require_once PF_ROOT . '/app/pillars/storage/local_attachment_store.php';
+require_once PF_ROOT . '/app/pillars/storage/r2_attachment_store.php';
 
 // Third-party vendors (manual)
 require_once PF_ROOT . '/app/vendor/phpmailer/PHPMailer.php';
