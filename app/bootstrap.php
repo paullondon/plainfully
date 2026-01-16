@@ -2,40 +2,61 @@
 
 /**
  * ============================================================
- * Plainfully — App Bootstrap
+ * Plainfully — App Bootstrap (safe loader)
  * ============================================================
- * Purpose:
- *   - Define PF_ROOT
- *   - Load environment variables FIRST
- *   - Load shared helpers + factories
- *   - Load pipeline pillars
+ * Why:
+ *  - Prevent whole-site 500s due to missing moved files.
+ *  - Load .env early so cron + web behave the same.
  */
 
 define('PF_ROOT', dirname(__DIR__));
 
-// ------------------------------------------------------------
-// 1) Core support (env first so everything else can read it)
-// ------------------------------------------------------------
-require_once PF_ROOT . '/app/support/env.php';
-pf_load_env_file(PF_ROOT . '/.env'); // NOTE: PF_ROOT constant must be defined before this call
+/**
+ * Safe require helper (no lone functions elsewhere; bootstrap is allowed).
+ * - $required=true  => hard stop with readable message if missing
+ * - $required=false => skip if missing (used for optional vendors)
+ */
+$pf_require = static function (string $path, bool $required = true): void {
+    if (is_file($path)) {
+        require_once $path;
+        return;
+    }
+
+    error_log('[plainfully] bootstrap missing file: ' . $path);
+
+    if ($required) {
+        http_response_code(500);
+        // Keep it minimal; your 404/500 theming comes later in routing.
+        echo "Server Error (bootstrap missing dependency).";
+        exit;
+    }
+};
 
 // ------------------------------------------------------------
-// 2) Remaining support (safe after env loaded)
+// 1) ENV support first (so everything else can read env)
 // ------------------------------------------------------------
-require_once PF_ROOT . '/app/support/helpers.php';
-require_once PF_ROOT . '/app/support/security.php';
-require_once PF_ROOT . '/app/support/db.php';
+$pf_require(PF_ROOT . '/app/support/env.php', true);
+pf_load_env_file(PF_ROOT . '/.env');
+
+// ------------------------------------------------------------
+// 2) Core support
+// ------------------------------------------------------------
+$pf_require(PF_ROOT . '/app/support/helpers.php', true);
+$pf_require(PF_ROOT . '/app/support/security.php', true);
+$pf_require(PF_ROOT . '/app/support/db.php', true);
 
 // ------------------------------------------------------------
 // 3) Pipeline pillars (shared infrastructure)
+// NOTE: You moved pillars under pipelines. These must exist.
 // ------------------------------------------------------------
-require_once PF_ROOT . '/app/pipelines/pillars/storage/attachment_store.php';
-require_once PF_ROOT . '/app/pipelines/pillars/storage/local_attachment_store.php';
-require_once PF_ROOT . '/app/pipelines/pillars/storage/r2_attachment_store.php';
+$pf_require(PF_ROOT . '/app/pipelines/pillars/storage/attachment_store.php', true);
+$pf_require(PF_ROOT . '/app/pipelines/pillars/storage/local_attachment_store.php', true);
+$pf_require(PF_ROOT . '/app/pipelines/pillars/storage/r2_attachment_store.php', true);
 
 // ------------------------------------------------------------
-// 4) Third-party vendors (manual)
+// 4) Optional vendors (do NOT take site down if missing)
 // ------------------------------------------------------------
-require_once PF_ROOT . '/app/vendor/phpmailer/PHPMailer.php';
-require_once PF_ROOT . '/app/vendor/phpmailer/SMTP.php';
-require_once PF_ROOT . '/app/vendor/phpmailer/Exception.php';
+$pf_require(PF_ROOT . '/app/vendor/phpmailer/PHPMailer.php', false);
+$pf_require(PF_ROOT . '/app/vendor/phpmailer/SMTP.php', false);
+$pf_require(PF_ROOT . '/app/vendor/phpmailer/Exception.php', false);
+8
