@@ -32,17 +32,3 @@ require_once PF_ROOT . '/app/vendor/phpmailer/Exception.php';
 // Load .env (safe: does nothing if missing)
 $envPath = PF_ROOT . '/.env';
 pf_load_env_file($envPath);
-
-// ============================================================
-// ENV SANITY CHECK (temporary, keep until stable)
-// ============================================================
-$__pf_env_check = [
-  'sapi' => PHP_SAPI,
-  'cwd'  => getcwd(),
-  'env_file' => defined('PF_ENV_FILE') ? PF_ENV_FILE : '(not-defined)',
-  'PF_STORAGE_DRIVER' => pf_env('PF_STORAGE_DRIVER', '(missing)'),
-  'PF_STORAGE_LOCAL_DIR' => pf_env('PF_STORAGE_LOCAL_DIR', '(missing)'),
-];
-
-pf_log('info', 'Bootstrap env sanity', $__pf_env_check);
-unset($__pf_env_check);
