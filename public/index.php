@@ -2,249 +2,166 @@
 
 /**
  * ============================================================
- * Plainfully — Temporary Coming Soon Front Page
+ * Plainfully — Minimal Coming Soon Front Page
  * ============================================================
- * Purpose:
- *   Serve a premium "coming soon" page at "/" with ZERO redirects.
- *
- * Why this approach:
- *   - Avoids Cloudflare redirect rules + loop headaches
- *   - Avoids Apache/nginx/.htaccess precedence issues
- *   - Guarantees everyone landing on the site sees the page
- *
- * How to disable later:
- *   - Delete this file (restore your previous index.php), OR
- *   - Set PF_COMING_SOON=0 in your environment and deploy the real app.
+ * Philosophy:
+ *   - Minimal
+ *   - Quietly confident
+ *   - Nothing given away
+ *   - Feels deliberate, not placeholder
  */
 
-$COMING_SOON_ENABLED = true;
-
-/**
- * Optional env toggle (safe: if getenv is unavailable, we ignore it)
- * PF_COMING_SOON=0 will disable the coming soon page.
- */
-try {
-    $envVal = getenv('PF_COMING_SOON');
-    if ($envVal !== false && trim((string)$envVal) === '0') {
-        $COMING_SOON_ENABLED = false;
-    }
-} catch (Throwable $e) {
-    // Fail-safe: keep coming soon enabled.
-}
-
-if ($COMING_SOON_ENABLED === false) {
-    // If you later disable this, load your real front controller here.
-    // Example (adjust to your actual app entry):
-    // require __DIR__ . '/app.php';
-    http_response_code(503);
-    header('Content-Type: text/plain; charset=utf-8');
-    echo "Coming soon toggle is off, but app bootstrap is not wired yet.";
-    exit;
-}
-
-// Normal coming-soon response
 http_response_code(200);
 header('Content-Type: text/html; charset=utf-8');
-header('Cache-Control: no-store, max-age=0'); // prevent caching issues while iterating
-header('X-Robots-Tag: noindex, nofollow');     // stop indexing during coming soon
+header('X-Robots-Tag: noindex, nofollow');
 
 $year = (int)date('Y');
-
-// Your stated logo location: /public/assets/img
-$logoUrl = '/assets/img/plainfully-logo.svg';
-
-// If you want the file to be INLINE SVG later, you can swap to readfile + sanitize.
-// For now: simple, safe <img>.
+$logoUrl = '/assets/img/logo-icon.svg';
 ?>
 <!doctype html>
 <html lang="en-GB">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="robots" content="noindex, nofollow" />
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
 
-  <title>Plainfully — Coming Soon</title>
-  <meta name="description" content="Something big is coming. Watch this space." />
-
-  <!-- Keep these if they exist in your project -->
-  <link rel="stylesheet" href="/assets/css/theme.css" />
-  <link rel="stylesheet" href="/assets/css/base.css" />
-  <link rel="stylesheet" href="/assets/css/components/cards.css" />
+  <title>Plainfully</title>
+  <meta name="description" content="Something is coming." />
+  <meta name="robots" content="noindex, nofollow">
 
   <style>
-    :root{
-      --pf-bg: #0b0f14;
-      --pf-text: #e5e7eb;
-      --pf-text-muted: rgba(229,231,235,0.72);
-      --pf-border: rgba(255,255,255,0.10);
-      --pf-brand: #2c6f63;
-      --pf-accent: #ce9f77;
+    /* ============================================================
+       Minimal / Mysterious Theme
+       ============================================================ */
 
-      --glow-a: rgba(44,111,99,0.45);
-      --glow-b: rgba(206,159,119,0.35);
-
-      --radius: 18px;
-      --shadow: 0 20px 70px rgba(0,0,0,0.45);
-      --shadow-soft: 0 10px 40px rgba(0,0,0,0.28);
+    :root {
+      --bg: #0d0f12;          /* near-black, not pure */
+      --surface: #12151a;     /* subtle separation */
+      --text: #e6e7ea;        /* soft white */
+      --muted: #9ca3af;       /* restraint */
+      --accent: #6ee7b7;      /* quiet confidence */
+      --border: rgba(255,255,255,0.06);
     }
 
-    html, body { height: 100%; }
-    body{
+    * { box-sizing: border-box; }
+
+    html, body {
+      height: 100%;
       margin: 0;
-      background: radial-gradient(1200px 800px at 20% 10%, rgba(44,111,99,0.22), transparent 60%),
-                  radial-gradient(900px 600px at 80% 20%, rgba(206,159,119,0.18), transparent 55%),
-                  radial-gradient(900px 700px at 50% 85%, rgba(44,111,99,0.16), transparent 60%),
-                  var(--pf-bg);
-      color: var(--pf-text);
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
       display: grid;
       place-items: center;
-      padding: 24px;
-      overflow-x: hidden;
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      padding: 32px;
     }
 
-    .wrap{ width: 100%; max-width: 980px; display: grid; gap: 18px; }
-
-    .shell{
-      position: relative;
-      border-radius: var(--radius);
-      background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
-      border: 1px solid var(--pf-border);
-      box-shadow: var(--shadow);
-      overflow: hidden;
+    .frame {
+      width: 100%;
+      max-width: 860px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      padding: clamp(32px, 6vw, 72px);
     }
 
-    .shell::before,
-    .shell::after{
-      content:"";
-      position: absolute;
-      inset: -40%;
-      background:
-        radial-gradient(circle at 30% 35%, var(--glow-a) 0%, transparent 55%),
-        radial-gradient(circle at 70% 60%, var(--glow-b) 0%, transparent 55%);
-      filter: blur(18px);
-      opacity: 0.9;
-      transform: translate3d(0,0,0);
-      animation: drift 10s ease-in-out infinite alternate;
-      pointer-events: none;
-    }
-    .shell::after{
-      opacity: 0.65;
-      animation-duration: 13s;
-      animation-direction: alternate-reverse;
-    }
-    @keyframes drift{
-      from { transform: translate3d(-2%, -1%, 0) scale(1.02); }
-      to   { transform: translate3d( 2%,  1%, 0) scale(1.06); }
+    header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 56px;
     }
 
-    .content{ position: relative; padding: clamp(22px, 4vw, 40px); display: grid; gap: 18px; }
-
-    header{ display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; }
-
-    .brand{ display:inline-flex; align-items:center; gap:12px; text-decoration:none; color:inherit; min-height:44px; }
-    .logo{ width:44px; height:44px; display:grid; place-items:center; }
-    .logo img{ width:44px; height:44px; object-fit:contain; display:block; }
-
-    .brand-name{ font-weight:700; letter-spacing:0.2px; font-size:16px; line-height:1.1; }
-
-    .pill{
-      display:inline-flex; align-items:center; gap:10px;
-      border:1px solid var(--pf-border);
-      border-radius:999px;
-      padding:8px 12px;
-      background: rgba(0,0,0,0.18);
-      box-shadow: var(--shadow-soft);
-      color: var(--pf-text-muted);
-      font-size:13px;
+    .logo {
+      width: 36px;
+      height: 36px;
     }
 
-    .dot{
-      width:8px; height:8px; border-radius:999px;
-      background: var(--pf-accent);
-      box-shadow: 0 0 0 6px rgba(206,159,119,0.12);
-      animation: pulse 1.8s ease-in-out infinite;
-    }
-    @keyframes pulse{
-      0%,100%{ transform:scale(1); opacity:0.85; }
-      50%{ transform:scale(1.35); opacity:1; }
+    .logo img {
+      width: 100%;
+      height: 100%;
+      display: block;
     }
 
-    h1{ margin:0; font-size: clamp(34px, 4.8vw, 64px); line-height:1.03; letter-spacing:-0.6px; }
-    .sub{ margin:0; max-width:62ch; color: var(--pf-text-muted); font-size: clamp(15px, 1.6vw, 18px); line-height:1.55; }
-
-    .emphasis{
-      background: linear-gradient(90deg, rgba(44,111,99,0.9), rgba(206,159,119,0.9));
-      -webkit-background-clip:text; background-clip:text; color:transparent;
+    .brand {
+      font-weight: 600;
+      letter-spacing: 0.3px;
+      font-size: 15px;
     }
 
-    .meta{ display:flex; flex-wrap:wrap; gap:10px; margin-top:8px; }
-    .chip{
-      border:1px solid var(--pf-border);
-      background: rgba(0,0,0,0.14);
-      color: var(--pf-text-muted);
-      border-radius:999px;
-      padding:8px 12px;
-      font-size:13px;
-      line-height:1;
+    main {
+      max-width: 520px;
     }
 
-    footer{
-      display:flex; justify-content:space-between; align-items:center; gap:14px; flex-wrap:wrap;
-      border-top:1px solid rgba(255,255,255,0.08);
-      padding-top:14px;
-      margin-top:6px;
-      color: var(--pf-text-muted);
-      font-size:13px;
+    h1 {
+      font-size: clamp(32px, 4vw, 56px);
+      line-height: 1.05;
+      font-weight: 600;
+      margin: 0 0 18px 0;
     }
 
-    .link{ color:inherit; text-decoration:none; border-bottom:1px dashed rgba(229,231,235,0.35); }
-    .link:focus, .link:hover{ border-bottom-color: rgba(229,231,235,0.85); outline:none; }
+    p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1.6;
+    }
 
-    @media (prefers-reduced-motion: reduce){
-      .shell::before, .shell::after, .dot { animation:none !important; }
+    .hint {
+      margin-top: 32px;
+      font-size: 13px;
+      letter-spacing: 0.2px;
+      color: var(--muted);
+    }
+
+    .hint span {
+      color: var(--accent);
+    }
+
+    footer {
+      margin-top: 72px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    @media (max-width: 640px) {
+      footer {
+        flex-direction: column;
+        gap: 12px;
+      }
     }
   </style>
 </head>
 
 <body>
-  <main class="wrap" aria-label="Coming soon page">
-    <section class="shell" role="region" aria-label="Plainfully coming soon">
-      <div class="content">
-        <header>
-          <a class="brand" href="/" aria-label="Plainfully home">
-            <span class="logo" aria-hidden="true">
-              <img src="<?= htmlspecialchars($logoUrl, ENT_QUOTES, 'UTF-8') ?>" alt="" />
-            </span>
-            <span class="brand-name">Plainfully</span>
-          </a>
+  <section class="frame" role="region" aria-label="Plainfully coming soon">
+    <header>
+      <span class="logo" aria-hidden="true">
+        <img src="<?= htmlspecialchars($logoUrl, ENT_QUOTES, 'UTF-8') ?>" alt="">
+      </span>
+      <span class="brand">Plainfully</span>
+    </header>
 
-          <div class="pill" aria-label="Status">
-            <span class="dot" aria-hidden="true"></span>
-            <span>In the workshop</span>
-          </div>
-        </header>
+    <main>
+      <h1>Something is coming.</h1>
+      <p>
+        Not loud.  
+        Not rushed.  
+        Built properly.
+      </p>
 
-        <div>
-          <h1><span class="emphasis">Something big</span> is coming.</h1>
-          <p class="sub">
-            We’re building something calm, sharp, and genuinely useful.
-            <strong>Watch this space.</strong>
-          </p>
-
-          <div class="meta" aria-label="Highlights">
-            <span class="chip">Simple</span>
-            <span class="chip">Fast</span>
-            <span class="chip">Privacy-first</span>
-          </div>
-        </div>
-
-        <footer>
-          <span>© <?= $year ?> Plainfully</span>
-          <span><a class="link" href="/help">Help</a></span>
-        </footer>
+      <div class="hint">
+        <span>Watch this space.</span>
       </div>
-    </section>
-  </main>
+    </main>
+
+    <footer>
+      <span>© <?= $year ?> Plainfully</span>
+      <span>Quietly in progress</span>
+    </footer>
+  </section>
 </body>
 </html>
