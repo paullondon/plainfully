@@ -4,30 +4,38 @@
  * ============================================================
  * Plainfully — App Bootstrap
  * ============================================================
- * File: app/bootstrap.php
  * Purpose:
- *   - Load environment variables
- *   - Load shared helpers (NO lone functions elsewhere)
- *   - Provide core factories (PDO, etc.)
+ *   - Define PF_ROOT
+ *   - Load environment variables FIRST
+ *   - Load shared helpers + factories
+ *   - Load pipeline pillars
  */
 
 define('PF_ROOT', dirname(__DIR__));
 
-// support files
+// ------------------------------------------------------------
+// 1) Core support (env first so everything else can read it)
+// ------------------------------------------------------------
 require_once PF_ROOT . '/app/support/env.php';
+pf_load_env_file(PF_ROOT . '/.env'); // NOTE: PF_ROOT constant must be defined before this call
+
+// ------------------------------------------------------------
+// 2) Remaining support (safe after env loaded)
+// ------------------------------------------------------------
 require_once PF_ROOT . '/app/support/helpers.php';
 require_once PF_ROOT . '/app/support/security.php';
 require_once PF_ROOT . '/app/support/db.php';
 
-// Pipeline pillars (shared infrastructure)
+// ------------------------------------------------------------
+// 3) Pipeline pillars (shared infrastructure)
+// ------------------------------------------------------------
 require_once PF_ROOT . '/app/pipelines/pillars/storage/attachment_store.php';
 require_once PF_ROOT . '/app/pipelines/pillars/storage/local_attachment_store.php';
 require_once PF_ROOT . '/app/pipelines/pillars/storage/r2_attachment_store.php';
 
-// Third-party vendors (manual)
+// ------------------------------------------------------------
+// 4) Third-party vendors (manual)
+// ------------------------------------------------------------
 require_once PF_ROOT . '/app/vendor/phpmailer/PHPMailer.php';
 require_once PF_ROOT . '/app/vendor/phpmailer/SMTP.php';
 require_once PF_ROOT . '/app/vendor/phpmailer/Exception.php';
-
-// Load .env (safe: does nothing if missing)
-pf_load_env_file($PF_ROOT . '/.env');
