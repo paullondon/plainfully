@@ -27,4 +27,10 @@ final class R2AttachmentStore implements AttachmentStore
     {
         return ['driver' => 'r2', 'key' => $key];
     }
+
+    public function delete(string $key): void
+    {
+        // Later: delete object from R2.
+        // For now: safe no-op so code won’t break if someone switches driver accidentally.
+    }
 }

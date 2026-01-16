@@ -54,6 +54,16 @@ final class LocalAttachmentStore implements AttachmentStore
         ];
     }
 
+    public function delete(string $key): void
+    {
+        $path = $this->parseKey($key);
+
+        // Idempotent: if it’s already gone, that’s fine.
+        if (is_file($path)) {
+            @unlink($path);
+        }
+    }
+
     private function parseKey(string $key): string
     {
         if (strpos($key, 'local:') !== 0) {
@@ -64,7 +74,19 @@ final class LocalAttachmentStore implements AttachmentStore
         // Security: ensure it lives under baseDir
         $realBase = realpath($this->baseDir) ?: $this->baseDir;
         $realPath = realpath($path);
-        if ($realPath === false || strpos($realPath, $realBase) !== 0) {
+
+        // If the file was deleted already, realpath() returns false.
+        // In that case, we still validate by string prefix check as a fallback.
+        if ($realPath === false) {
+            $normBase = rtrim($realBase, '/') . '/';
+            $normPath = rtrim($path, '/');
+            if (strpos($normPath, $normBase) !== 0) {
+                throw new RuntimeException('Invalid local path');
+            }
+            return $normPath;
+        }
+
+        if (strpos($realPath, $realBase) !== 0) {
             throw new RuntimeException('Invalid local path');
         }
 
@@ -76,7 +98,6 @@ final class LocalAttachmentStore implements AttachmentStore
         $name = trim($name);
         if ($name === '') $name = 'file.bin';
 
-        // Keep it boring + safe
         $name = preg_replace('/[^a-zA-Z0-9._-]+/', '_', $name) ?? 'file.bin';
         $name = ltrim($name, '._'); // avoid hidden files
         if ($name === '') $name = 'file.bin';

@@ -18,9 +18,14 @@ interface AttachmentStore
     public function get(string $key): string;
 
     /**
-     * Return metadata (best-effort) about a stored key.
+     * Best-effort metadata for a stored key.
      */
     public function stat(string $key): array;
+
+    /**
+     * Delete a stored object. Must be safe to call repeatedly (idempotent).
+     */
+    public function delete(string $key): void;
 }
 
 final class AttachmentStoreFactory
