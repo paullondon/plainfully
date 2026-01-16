@@ -30,5 +30,4 @@ require_once PF_ROOT . '/app/vendor/phpmailer/SMTP.php';
 require_once PF_ROOT . '/app/vendor/phpmailer/Exception.php';
 
 // Load .env (safe: does nothing if missing)
-$envPath = PF_ROOT . '/.env';
-pf_load_env_file($envPath);
+pf_load_env_file($PF_ROOT . '/.env');
