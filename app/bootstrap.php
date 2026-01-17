@@ -90,7 +90,12 @@ $pf_require(PF_ROOT . '/app/pipelines/pillars/storage/local_attachment_store.php
 $pf_require(PF_ROOT . '/app/pipelines/pillars/storage/r2_attachment_store.php', true);
 
 // ------------------------------------------------------------
-// 4) Optional vendors
+// 4) Pipeline pillars (Processror)
+// ------------------------------------------------------------
+$pf_require(PF_ROOT . '/app/pipelines/process/processor.php', true);
+
+// ------------------------------------------------------------
+// 5) Optional vendors
 // ------------------------------------------------------------
 $pf_require(PF_ROOT . '/app/vendor/phpmailer/PHPMailer.php', false);
 $pf_require(PF_ROOT . '/app/vendor/phpmailer/SMTP.php', false);

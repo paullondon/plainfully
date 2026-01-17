@@ -123,9 +123,32 @@ private function processOne(): bool
         ");
         $upd->execute([':id' => $inId]);
 
+        /**
+         * ============================================================
+         * Process inbound payload
+         * ============================================================
+         * For MVP this is a stub that pretends to do OCR + sanitise.
+         * The real processor will be wired in next.
+         * ===========================================================
+         */
+
         // Decode inbound payload
         $decoded = json_decode($payload, true);
-        $text = is_array($decoded) ? (string)($decoded['text'] ?? '') : '';
+        if (!is_array($decoded)) { $decoded = []; }
+
+        // Run processor (OCR stub + sanitise)
+        $proc = new \App\Pipelines\Process\Processor();
+        $procOut = $proc->run($decoded, $traceId, $channel);
+
+        // Use processed preview + result
+        $decoded = $procOut['updated_payload'];
+        $text    = (string)($procOut['text_preview'] ?? '');
+        $result  = is_array($procOut['result'] ?? null) ? $procOut['result'] : [
+            'status' => 'processed-placeholder',
+            'message' => 'Processed (fallback).',
+            'processed_at' => gmdate('c'),
+        ];
+
 
         /**
          * ============================================================
@@ -171,11 +194,8 @@ private function processOne(): bool
                 'text_preview' => mb_substr($text, 0, 280),
             ],
 
-            'result' => [
-                'status'       => 'processed-placeholder',
-                'message'      => 'Processed by cron worker (AI not wired yet).',
-                'processed_at' => gmdate('c'),
-            ],
+            'result' => $result,
+
         ];
 
         // Write outbound row (channel decides which deliverer picks it up)
