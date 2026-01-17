@@ -12,7 +12,7 @@ function pf_route_dispatch(string $path, string $method): void
     // Home (Coming Soon)
     if ($path === '/' && $method === 'GET') {
         ob_start();
-        require PF_ROOT . '/app/public/coming_soon/coming_soon.php';
+        require_once PF_ROOT . '/public/coming_soon/coming_soon.php';
         $html = ob_get_clean();
 
         pf_render_basic_page('Plainfully', $html);
