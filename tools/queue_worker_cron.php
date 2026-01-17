@@ -194,6 +194,11 @@ private function processOne(): bool
                 'text_preview' => mb_substr($text, 0, 280),
             ],
 
+            'evidence' => [
+                'attachments'    => $decoded['attachments'] ?? [],
+                'ocr_text_parts' => $decoded['ocr_text_parts'] ?? [],
+            ],
+
             'result' => $result,
 
         ];
