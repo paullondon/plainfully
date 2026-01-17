@@ -9,26 +9,13 @@
 
 function pf_route_dispatch(string $path, string $method): void
 {
-    // Debug POST test page (gated by env + token inside the file)
-    if ($path === '/debug/post' && ($method === 'GET' || $method === 'POST')) {
-        require_once PF_ROOT . '/app/pipelines/ingest/web/test_page.php';
-        exit;
-    }
-
-    // Health (kept here too, even though index.php hard-bypasses it)
-    if ($path === '/health') {
-        pf_json(['ok' => true, 'ts' => gmdate('c')]);
-    }
-
-    // Home
+    // Home (Coming Soon)
     if ($path === '/' && $method === 'GET') {
-        pf_render_basic_page('Plainfully (Reboot)', '
-            <div class="card">
-              <h1 class="card-title">Plainfully is rebooted</h1>
-              <p class="small">Skeleton is live. Next: wire ingest → queue → process → deliver.</p>
-              <p class="small">Try <code>/health</code></p>
-            </div>
-        ');
+        ob_start();
+        require PF_ROOT . '/app/public/coming_soon/coming_soon.php';
+        $html = ob_get_clean();
+
+        pf_render_basic_page('Plainfully', $html);
     }
 
     // Ingest (web)
@@ -42,22 +29,32 @@ function pf_route_dispatch(string $path, string $method): void
         require_once PF_ROOT . '/app/pipelines/deliver/web/result_view.php';
         exit;
     }
+    // Health (kept here too, even though index.php hard-bypasses it)
+    if ($path === '/health') {
+        pf_json(['ok' => true, 'ts' => gmdate('c')]);
+    }
+
+    // Debug POST test page (gated by env + token inside the file)
+    if ($path === '/debug/post' && ($method === 'GET' || $method === 'POST')) {
+        require_once PF_ROOT . '/app/pipelines/debug/test_page.php';
+        exit;
+    }
 
     // Debug system snapshot (gated)
     if ($path === '/debug/snapshot' && ($method === 'GET' || $method === 'POST')) {
-        require_once PF_ROOT . '/app/pipelines/ingest/web/snapshot_page.php';
+        require_once PF_ROOT . '/app/pipelines/debug/snapshot_page.php';
         exit;
     }
 
     // Debug inspect (gated)
     if ($path === '/debug/inspect' && $method === 'GET') {
-        require_once PF_ROOT . '/app/pipelines/ingest/web/inspect_page.php';
+        require_once PF_ROOT . '/app/pipelines/debug/inspect_page.php';
         exit;
     }
 
     // Debug logs viewer (gated)
     if ($path === '/debug/logs' && $method === 'GET') {
-        require_once PF_ROOT . '/app/pipelines/ingest/web/logs_page.php';
+        require_once PF_ROOT . '/app/pipelines/debug/logs_page.php';
         exit;
     }
     
