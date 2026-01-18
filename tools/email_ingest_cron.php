@@ -5,7 +5,7 @@
  * Plainfully — Email Ingest (Cron-friendly)
  * ============================================================
  * Purpose:
- *  - Poll IMAP for UNSEEN emails in clarify@plainfully.com inbox
+ *  - Poll IMAP for ALL emails in clarify@plainfully.com inbox
  *  - Normalize -> insert into pf_inbound_queue (status=new)
  *  - Mark seen or delete (config)
  *
@@ -107,10 +107,11 @@ final class PfEmailIngestCron
         }
 
         try {
-            $emails = imap_search($inbox, 'UNSEEN', SE_UID);
+            $emails = imap_search($inbox, 'ALL', SE_UID);
 
             if (!is_array($emails) || empty($emails)) {
-                $this->out("Email ingest complete. processed=0");
+                pf_log('info', 'Email ingest: no messages found', ['criteria' => 'ALL']);
+                if ($this->debug) { $this->dumpImapErrors(); }
                 return 0;
             }
 
@@ -120,13 +121,17 @@ final class PfEmailIngestCron
                 if ($processed >= $this->maxEmails) { break; }
                 if ((microtime(true) - $start) >= $this->maxSeconds) { break; }
 
-                $did = $this->ingestOne($inbox, (int)$uid);
-                if ($did) { $processed++; }
+                $ok = $this->ingestOne($inbox, (int)$uid);
+
+                if (!$ok) {
+                    pf_log('error', 'Email ingest failed (left in inbox)', ['uid' => (int)$uid]);
+                    if ($this->debug) { $this->dumpImapErrors(); }
+                    continue;
+                }
+
+                $processed++;
             }
 
-            if ($this->action === 'delete') {
-                @imap_expunge($inbox);
-            }
 
             $this->out("Email ingest complete. processed={$processed}");
             pf_log('info', 'Email ingest complete', ['processed' => $processed]);
@@ -151,6 +156,7 @@ final class PfEmailIngestCron
             return $processed;
 
         } finally {
+            @imap_expunge($inbox);
             @imap_close($inbox);
         }
     }
@@ -346,12 +352,10 @@ final class PfEmailIngestCron
 
     private function markHandled($inbox, int $uid): void
     {
-        if ($this->action === 'delete') {
-            @imap_delete($inbox, $uid, FT_UID);
-        } else {
-            @imap_setflag_full($inbox, (string)$uid, "\\Seen", ST_UID);
-        }
+        // Delete by UID. If ingestion fails, we never call this.
+        @imap_delete($inbox, (string)$uid, FT_UID);
     }
+
 
     private function getBestBody($inbox, int $uid): string
     {
