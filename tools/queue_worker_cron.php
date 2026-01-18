@@ -46,6 +46,8 @@ final class PfCronWorker
             'max_seconds' => $this->maxSeconds,
             'max_items'   => $this->maxItems,
         ]);
+        
+        $this->debugSnapshot();
 
         while (true) {
             if ($processed >= $this->maxItems) {
@@ -72,6 +74,7 @@ final class PfCronWorker
         }
 
         pf_log('info', 'Cron worker end', ['processed' => $processed]);
+        $this->debugSnapshot();
         echo "Cron worker complete. processed={$processed}\n";
         return $processed;
     }
@@ -253,6 +256,46 @@ private function processOne(): bool
         return false;
     }
 }
+
+    /**
+     * Print a safe DB snapshot so we can debug "processed=0" properly.
+     */
+    private function debugSnapshot(): void
+    {
+        try {
+            $pdo = pf_pdo();
+
+            $counts = $pdo->query("
+                SELECT status, COUNT(*) c
+                FROM pf_inbound_queue
+                GROUP BY status
+                ORDER BY status
+            ")->fetchAll();
+
+            $next = $pdo->query("
+                SELECT id, trace_id, status, attempts, available_at, created_at
+                FROM pf_inbound_queue
+                ORDER BY available_at ASC, id ASC
+                LIMIT 1
+            ")->fetch();
+
+            $nextEligible = $pdo->query("
+                SELECT id, trace_id, status, attempts, available_at, created_at
+                FROM pf_inbound_queue
+                WHERE status='new' AND available_at <= NOW()
+                ORDER BY id ASC
+                LIMIT 1
+            ")->fetch();
+
+            echo "DEBUG: inbound_counts=" . json_encode($counts, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n";
+            echo "DEBUG: inbound_next_any=" . json_encode($next ?: null, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n";
+            echo "DEBUG: inbound_next_eligible=" . json_encode($nextEligible ?: null, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n";
+            echo "DEBUG: now_db=" . (string)$pdo->query("SELECT NOW() n")->fetchColumn() . "\n";
+        } catch (Throwable $e) {
+            echo "DEBUG: snapshot_failed=" . $e->getMessage() . "\n";
+        }
+    }
+
 
     private function clampInt(int $v, int $min, int $max): int
     {
