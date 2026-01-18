@@ -256,7 +256,7 @@ final class PfEmailIngestCron
      */
     private function extractAttachmentsToPayload($inbox, int $uid, string $traceId): array
     {
-        $store = AttachmentStoreFactory::make();
+        $store = \app\pipelines\pillars\storage\AttachmentStoreFactory::make();
 
         $allowed = [
             'application/pdf' => true,
