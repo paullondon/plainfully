@@ -2,7 +2,7 @@
 
 namespace App\Pipelines\Process;
 
-use \app\pipelines\pillars\storage\AttachmentStoreFactory;
+use \app\pipelines\pillars\storage\attachment_store\AttachmentStoreFactory;
 use Throwable;
 
 final class Processor
@@ -72,7 +72,7 @@ final class Processor
         $mode = strtolower((string)\pf_env('PF_ATTACHMENTS_MODE', 'ephemeral')); // ephemeral|retain
         $doDelete = ($mode !== 'retain');
 
-        $store = \app\pipelines\pillars\storage\AttachmentStoreFactory::make();
+                $store = \app\pipelines\pillars\storage\attachment_store\AttachmentStoreFactory::make();
 
         $atts = $payload['attachments'];
         foreach ($atts as $idx => $a) {
