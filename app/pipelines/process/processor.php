@@ -71,6 +71,13 @@ final class Processor
         $mode = strtolower((string)\pf_env('PF_ATTACHMENTS_MODE', 'ephemeral')); // ephemeral|retain
         $doDelete = ($mode !== 'retain');
 
+        if ((string)pf_env('PF_DEBUG_WORKER', '0') === '1') {
+            pf_log('debug', 'Worker class_exists checks', [
+                'Processor' => class_exists('\\App\\Pipelines\\Process\\Processor'),
+                'Factory'   => class_exists('\\App\\Pillars\\Storage\\AttachmentStoreFactory'),
+            ]);
+        }
+
         $store = \App\Pillars\Storage\AttachmentStoreFactory::make();
 
         $atts = $payload['attachments'];
