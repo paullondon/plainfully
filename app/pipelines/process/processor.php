@@ -78,7 +78,7 @@ final class Processor
             ]);
         }
 
-        $store = \App\Pillars\Storage\AttachmentStoreFactory::make();
+        $store = \App\Pipelines\Pillars\Storage\AttachmentStoreFactory::make();
 
         $atts = $payload['attachments'];
         foreach ($atts as $idx => $a) {
