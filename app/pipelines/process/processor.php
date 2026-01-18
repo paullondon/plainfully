@@ -72,7 +72,7 @@ final class Processor
         $mode = strtolower((string)\pf_env('PF_ATTACHMENTS_MODE', 'ephemeral')); // ephemeral|retain
         $doDelete = ($mode !== 'retain');
 
-        $store = AttachmentStoreFactory::make();
+        $store = \App\Pillars\Storage\AttachmentStoreFactory::make();
 
         $atts = $payload['attachments'];
         foreach ($atts as $idx => $a) {
