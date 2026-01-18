@@ -271,7 +271,7 @@ final class PfEmailIngestCron
             'image/webp'      => true,
         ];
 
-        $struct = @imap_fetchstructure($inbox, (string)$uid, FT_UID);
+        $struct = @imap_fetchstructure($inbox, $uid, FT_UID);
         if (!$struct || empty($struct->parts) || !is_array($struct->parts)) {
             return [];
         }
@@ -310,7 +310,7 @@ final class PfEmailIngestCron
 
             $section = (string)($i + 1);
 
-            $raw = (string)@imap_fetchbody($inbox, (string)$uid, $section, FT_UID);
+            $raw = (string)@imap_fetchbody($inbox, $uid, $section, FT_UID);
             if ($raw === '') continue;
 
             // decode
