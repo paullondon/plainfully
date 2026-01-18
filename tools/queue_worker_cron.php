@@ -46,7 +46,7 @@ final class PfCronWorker
             'max_seconds' => $this->maxSeconds,
             'max_items'   => $this->maxItems,
         ]);
-        
+
         $this->debugSnapshot();
 
         while (true) {
@@ -74,7 +74,6 @@ final class PfCronWorker
         }
 
         pf_log('info', 'Cron worker end', ['processed' => $processed]);
-        $this->debugSnapshot();
         echo "Cron worker complete. processed={$processed}\n";
         return $processed;
     }
