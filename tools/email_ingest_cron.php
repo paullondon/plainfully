@@ -192,6 +192,7 @@ final class PfEmailIngestCron
 
         $traceId = $this->makeTraceId($messageId);
 
+        // inbound payload
         $payload = [
             'email' => [
                 'from'       => $from,
@@ -199,14 +200,24 @@ final class PfEmailIngestCron
                 'date'       => $date,
                 'message_id' => $messageId,
                 'uid'        => $uid,
-                'mailbox'    => $this->mailbox,
+                'mailbox'    => $this->mailbox ?? 'INBOX',
             ],
+
+            // Processor reads these
+            'text_parts'  => [$text],
+            'attachments' => [],
+
+            // Optional legacy
             'text' => $text,
+
             'meta' => [
                 'received_at' => gmdate('c'),
                 'source'      => 'imap',
             ],
         ];
+
+        // Attachments (stored now, OCR/delete happens later in Processor)
+        $payload['attachments'] = $this->extractAttachmentsToPayload($inbox, $uid, $traceId);
 
         // Insert into inbound queue
         $pdo = pf_pdo();
@@ -237,6 +248,100 @@ final class PfEmailIngestCron
         if ($this->debug) { $this->out("DEBUG: ingested uid={$uid} trace_id={$traceId}"); }
 
         return true;
+    }
+
+    /**
+     * Extract allowed attachments from an IMAP message UID, store via AttachmentStore,
+     * and return meta rows for the inbound payload.
+     */
+    private function extractAttachmentsToPayload($inbox, int $uid, string $traceId): array
+    {
+        $store = AttachmentStoreFactory::make();
+
+        $allowed = [
+            'application/pdf' => true,
+            'image/jpeg'      => true,
+            'image/png'       => true,
+            'image/webp'      => true,
+        ];
+
+        $struct = @imap_fetchstructure($inbox, (string)$uid, FT_UID);
+        if (!$struct || empty($struct->parts) || !is_array($struct->parts)) {
+            return [];
+        }
+
+        $out = [];
+
+        foreach ($struct->parts as $i => $part) {
+            $disp = strtolower((string)($part->disposition ?? ''));
+            $isAttachment = ($disp === 'attachment' || $disp === 'inline');
+
+            // filename
+            $filename = '';
+            if (!empty($part->dparameters) && is_array($part->dparameters)) {
+                foreach ($part->dparameters as $dp) {
+                    if (!isset($dp->attribute, $dp->value)) continue;
+                    if (strtolower((string)$dp->attribute) === 'filename') { $filename = (string)$dp->value; break; }
+                }
+            }
+            if ($filename === '' && !empty($part->parameters) && is_array($part->parameters)) {
+                foreach ($part->parameters as $p) {
+                    if (!isset($p->attribute, $p->value)) continue;
+                    if (strtolower((string)$p->attribute) === 'name') { $filename = (string)$p->value; break; }
+                }
+            }
+
+            if (!$isAttachment && $filename === '') continue;
+
+            // mime
+            $typeMap = [0=>'text',1=>'multipart',2=>'message',3=>'application',4=>'audio',5=>'image',6=>'video',7=>'other'];
+            $major = $typeMap[(int)($part->type ?? 7)] ?? 'other';
+            $sub   = strtolower((string)($part->subtype ?? 'octet-stream'));
+            $mime  = $major . '/' . $sub;
+
+            if ($mime === 'image/jpg') $mime = 'image/jpeg';
+            if (!isset($allowed[$mime])) continue;
+
+            $section = (string)($i + 1);
+
+            $raw = (string)@imap_fetchbody($inbox, (string)$uid, $section, FT_UID);
+            if ($raw === '') continue;
+
+            // decode
+            $enc = (int)($part->encoding ?? 0);
+            if ($enc === 3)      { $bytes = base64_decode($raw, true); }
+            elseif ($enc === 4)  { $bytes = quoted_printable_decode($raw); }
+            else                 { $bytes = $raw; }
+
+            if (!is_string($bytes) || $bytes === '') continue;
+
+            $safeName = trim($filename) !== '' ? $filename : ('attachment_' . $section);
+            $safeName = preg_replace('/[^a-zA-Z0-9._-]+/', '_', $safeName) ?: ('attachment_' . $section);
+
+            try {
+                $storeKey = $store->put($traceId, $safeName, $bytes, $mime);
+
+                $out[] = [
+                    'name'      => $safeName,
+                    'mime'      => $mime,
+                    'size'      => strlen($bytes),
+                    'store_key' => $storeKey,
+                    'sha256'    => hash('sha256', $bytes),
+                ];
+            } catch (Throwable $e) {
+                pf_log('error', 'Attachment store failed', [
+                    'trace_id' => $traceId,
+                    'uid'      => $uid,
+                    'name'     => $safeName,
+                    'mime'     => $mime,
+                    'err'      => $e->getMessage(),
+                ]);
+            } finally {
+                unset($bytes, $raw);
+            }
+        }
+
+        return $out;
     }
 
     private function markHandled($inbox, int $uid): void
