@@ -91,11 +91,50 @@ final class Processor
             $eligible = (str_starts_with($mime, 'image/') || $mime === 'application/pdf');
             if (!$eligible) continue;
 
-            $payload['ocr_text_parts'][] = "[OCR_STUB] Extracted text placeholder for '{$name}' ({$mime}).";
+            // PROOF STEP (MVP): read the stored bytes back to prove the file is реально there.
+            // We only log size + sha256 prefix (no content) for GDPR safety.
+            $bytesRead = '';
+            $sizeRead  = 0;
+            $shaPrefix = '';
+
+            if ($key !== '' && $key !== '[deleted]') {
+                try {
+                    $bytesRead = $store->get($key);
+                    $sizeRead  = strlen($bytesRead);
+                    $shaPrefix = substr(hash('sha256', $bytesRead), 0, 12);
+
+                    \pf_log('info', 'OCR stub proof: attachment read OK', [
+                        'trace_id'   => $traceId,
+                        'name'       => $name,
+                        'mime'       => $mime,
+                        'size_read'  => $sizeRead,
+                        'sha_prefix' => $shaPrefix,
+                    ]);
+                } catch (Throwable $e) {
+                    \pf_log('error', 'OCR stub proof: attachment read FAILED', [
+                        'trace_id' => $traceId,
+                        'name'     => $name,
+                        'mime'     => $mime,
+                        'key'      => $key,
+                        'err'      => $e->getMessage(),
+                    ]);
+                } finally {
+                    // Ensure bytes are dropped ASAP
+                    $bytesRead = '';
+                }
+            }
+
+            $payload['ocr_text_parts'][] =
+                "[OCR_STUB] Read {$sizeRead} bytes (sha256 {$shaPrefix}...) for '{$name}' ({$mime}).";
+
 
             if ($doDelete && $key !== '' && $key !== '[deleted]') {
                 try {
-                    $store->delete($key);
+                    if (\pf_env('PF_OCR_STAGING', '0') === '1') {
+                        $store->moveToOcrStaging($key);
+                    } else {
+                        $store->delete($key);
+                    }
 
                     $a['store_key']   = '[deleted]';
                     $a['deleted_at']  = gmdate('c');

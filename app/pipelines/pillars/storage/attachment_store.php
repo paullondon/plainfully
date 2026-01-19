@@ -26,10 +26,17 @@ interface AttachmentStore
      * Delete a stored object. Must be safe to call repeatedly (idempotent).
      */
     public function delete(string $key): void;
+
+    /**
+     * Move a stored object to an OCR staging area (optional debug/visibility).
+     */
+    public function moveToOcrStaging(string $key): void;
+
 }
 
 final class AttachmentStoreFactory
 {
+
     public static function make(): AttachmentStore
     {
         $driver = strtolower((string)\pf_env('PF_STORAGE_DRIVER', 'local'));

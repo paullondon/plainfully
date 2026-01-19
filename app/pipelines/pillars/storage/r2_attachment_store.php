@@ -33,4 +33,9 @@ final class R2AttachmentStore implements AttachmentStore
         // Later: delete object from R2.
         // For now: safe no-op so code won’t break if someone switches driver accidentally.
     }
+    public function moveToOcrStaging(string $key): void
+    {
+        // MVP: no-op (or throw). For R2 we’ll implement copy+delete later.
+        $this->delete($key);
+    }
 }

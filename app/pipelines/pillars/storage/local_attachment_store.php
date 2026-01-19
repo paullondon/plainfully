@@ -13,6 +13,42 @@ final class LocalAttachmentStore implements AttachmentStore
         $this->baseDir = rtrim($baseDir, '/');
     }
 
+    /**
+     * Move an attachment into an OCR staging folder (debug/visibility).
+     * This keeps the bytes available briefly for the OCR step before deletion.
+     *
+     * NOTE:
+     * - This is optional behaviour, gated by PF_OCR_STAGING=1.
+     * - Uses rename() for speed (same filesystem).
+     */
+    public function moveToOcrStaging(string $key): void
+    {
+        // Only handle local keys
+        if (!str_starts_with($key, 'local:')) {
+            throw new \RuntimeException('moveToOcrStaging only supports local: keys');
+        }
+
+        $src = substr($key, 6); // strip "local:"
+        if ($src === '' || !is_file($src)) {
+            // Idempotent: if already gone, treat as success
+            return;
+        }
+
+        // Put alongside attachments, under /ocr_pending/
+        $dst = str_replace('/attachments/', '/attachments/ocr_pending/', $src);
+
+        $dir = dirname($dst);
+        if (!is_dir($dir)) {
+            if (!mkdir($dir, 0775, true) && !is_dir($dir)) {
+                throw new \RuntimeException('Failed to create OCR staging dir: ' . $dir);
+            }
+        }
+
+        if (!@rename($src, $dst)) {
+            throw new \RuntimeException('Failed to move to OCR staging');
+        }
+    }
+    
     public function put(string $traceId, string $originalName, string $bytes, string $mime): string
     {
         $safeName = $this->safeFilename($originalName);
